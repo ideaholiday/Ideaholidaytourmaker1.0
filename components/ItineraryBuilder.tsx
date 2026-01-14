@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { ItineraryItem, Hotel, Activity, Transfer, ItineraryService } from '../types';
+import { ItineraryItem, Hotel, Activity, Transfer, ItineraryService, OperatorInventoryItem } from '../types';
 import { adminService } from '../services/adminService';
-import { Plus, Trash2, GripVertical, Save, Hotel as HotelIcon, Camera, Car, Check, DollarSign, X, Search, Briefcase, MapPin } from 'lucide-react';
+import { inventoryService } from '../services/inventoryService'; // Import Inventory Service
+import { Plus, Trash2, GripVertical, Save, Hotel as HotelIcon, Camera, Car, Check, DollarSign, X, Search, Briefcase, MapPin, Globe } from 'lucide-react';
 
 interface Props {
   initialItinerary: ItineraryItem[];
@@ -44,11 +45,45 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
     );
 
     if (matchedDest) {
-        setHotels(adminService.getHotels().filter(h => h.destinationId === matchedDest.id && h.isActive));
-        setActivities(adminService.getActivities().filter(a => a.destinationId === matchedDest.id && a.isActive));
-        setTransfers(adminService.getTransfers().filter(t => t.destinationId === matchedDest.id && t.isActive));
+        // 1. Get Admin Inventory
+        const adminHotels = adminService.getHotels().filter(h => h.destinationId === matchedDest.id && h.isActive);
+        const adminActivities = adminService.getActivities().filter(a => a.destinationId === matchedDest.id && a.isActive);
+        const adminTransfers = adminService.getTransfers().filter(t => t.destinationId === matchedDest.id && t.isActive);
+
+        // 2. Get Approved Operator Inventory
+        const opItems = inventoryService.getApprovedItems(matchedDest.id);
+        
+        // 3. Merge & Map
+        const opHotels = opItems.filter(i => i.type === 'HOTEL').map(i => mapOpItemToHotel(i));
+        const opActivities = opItems.filter(i => i.type === 'ACTIVITY').map(i => mapOpItemToActivity(i));
+        const opTransfers = opItems.filter(i => i.type === 'TRANSFER').map(i => mapOpItemToTransfer(i));
+
+        setHotels([...adminHotels, ...opHotels]);
+        setActivities([...adminActivities, ...opActivities]);
+        setTransfers([...adminTransfers, ...opTransfers]);
     }
   }, [initialItinerary, destination]);
+
+  // Helper Mappers
+  const mapOpItemToHotel = (i: OperatorInventoryItem): Hotel => ({
+      id: i.id, name: i.name, destinationId: i.destinationId, category: i.category || '4 Star',
+      roomType: i.roomType || 'Standard', mealPlan: i.mealPlan || 'BB', cost: i.costPrice,
+      costType: i.costType || 'Per Room', season: 'Peak', validFrom: '', validTo: '', 
+      isActive: true, currency: i.currency, isOperatorInventory: true, operatorName: i.operatorName
+  });
+
+  const mapOpItemToActivity = (i: OperatorInventoryItem): Activity => ({
+      id: i.id, activityName: i.name, destinationId: i.destinationId, activityType: (i.activityType as any) || 'Other',
+      costAdult: i.costPrice, costChild: i.costChild || i.costPrice, ticketIncluded: true, transferIncluded: false,
+      isActive: true, currency: i.currency, description: i.description, isOperatorInventory: true, operatorName: i.operatorName
+  });
+
+  const mapOpItemToTransfer = (i: OperatorInventoryItem): Transfer => ({
+      id: i.id, transferName: i.name, destinationId: i.destinationId, transferType: i.transferType || 'PVT',
+      vehicleType: i.vehicleType || 'Sedan', maxPassengers: i.maxPassengers || 3, cost: i.costPrice,
+      costBasis: i.costBasis || 'Per Vehicle', nightSurcharge: 0, isActive: true, currency: i.currency,
+      description: i.description, isOperatorInventory: true, operatorName: i.operatorName
+  });
 
   // Recalculate cost whenever items change
   useEffect(() => {
@@ -115,7 +150,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
           name: hotel.name,
           cost: hotel.cost, 
           price: hotel.cost,
-          meta: { roomType: hotel.roomType, mealPlan: hotel.mealPlan }
+          meta: { roomType: hotel.roomType, mealPlan: hotel.mealPlan },
+          isOperatorInventory: hotel.isOperatorInventory,
+          operatorName: hotel.operatorName
       });
       setActiveServiceDay(null);
   };
@@ -127,7 +164,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
           name: act.activityName,
           cost: act.costAdult, // Base cost (needs Pax mult logic in real quote)
           price: act.costAdult,
-          meta: { type: act.activityType }
+          meta: { type: act.activityType },
+          isOperatorInventory: act.isOperatorInventory,
+          operatorName: act.operatorName
       });
       setActiveServiceDay(null);
   };
@@ -139,7 +178,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
           name: trans.transferName,
           cost: trans.cost,
           price: trans.cost,
-          meta: { vehicle: trans.vehicleType }
+          meta: { vehicle: trans.vehicleType },
+          isOperatorInventory: trans.isOperatorInventory,
+          operatorName: trans.operatorName
       });
       setActiveServiceDay(null);
   };
@@ -162,6 +203,12 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   const filteredHotels = hotels.filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredActivities = activities.filter(a => a.activityName.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredTransfers = transfers.filter(t => t.transferName.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const OperatorBadge = () => (
+      <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 ml-2 font-bold flex items-center gap-0.5">
+          <Globe size={8}/> DMC
+      </span>
+  );
 
   return (
     <div className="bg-slate-50 rounded-xl border border-slate-200 p-6">
@@ -244,6 +291,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                             {svc.type === 'ACTIVITY' && <Camera size={14} />}
                             {svc.type === 'TRANSFER' && <Car size={14} />}
                             <span className="font-medium">{svc.name}</span>
+                            {svc.isOperatorInventory && <OperatorBadge />}
                             <span className="text-xs opacity-70 border-l border-current pl-2 ml-1">{svc.cost}</span>
                             <button onClick={() => removeServiceFromDay(index, sIdx)} className="hover:text-red-500 ml-1"><X size={14}/></button>
                         </div>
@@ -303,7 +351,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                     {filteredActivities.map(a => (
                                         <button key={a.id} onClick={() => addActivity(index, a)} className="w-full text-left p-2 hover:bg-pink-50 rounded-lg flex justify-between items-center group">
                                             <div>
-                                                <p className="text-sm font-bold text-slate-800">{a.activityName}</p>
+                                                <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                                    {a.activityName} {a.isOperatorInventory && <OperatorBadge />}
+                                                </p>
                                                 <p className="text-xs text-slate-500">{a.activityType} {a.ticketIncluded ? '• Ticket Inc' : ''}</p>
                                             </div>
                                             <span className="text-sm font-mono font-medium text-pink-600">{a.costAdult}</span>
@@ -318,7 +368,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                     {filteredTransfers.map(t => (
                                         <button key={t.id} onClick={() => addTransfer(index, t)} className="w-full text-left p-2 hover:bg-blue-50 rounded-lg flex justify-between items-center group">
                                             <div>
-                                                <p className="text-sm font-bold text-slate-800">{t.transferName}</p>
+                                                <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                                    {t.transferName} {t.isOperatorInventory && <OperatorBadge />}
+                                                </p>
                                                 <p className="text-xs text-slate-500">{t.vehicleType} • {t.transferType}</p>
                                             </div>
                                             <span className="text-sm font-mono font-medium text-blue-600">{t.cost}</span>
@@ -333,7 +385,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                     {filteredHotels.map(h => (
                                         <button key={h.id} onClick={() => addHotel(index, h)} className="w-full text-left p-2 hover:bg-indigo-50 rounded-lg flex justify-between items-center group">
                                             <div>
-                                                <p className="text-sm font-bold text-slate-800">{h.name}</p>
+                                                <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                                    {h.name} {h.isOperatorInventory && <OperatorBadge />}
+                                                </p>
                                                 <p className="text-xs text-slate-500">{h.roomType} • {h.mealPlan}</p>
                                             </div>
                                             <span className="text-sm font-mono font-medium text-indigo-600">{h.cost}</span>

@@ -10,7 +10,7 @@ import { MapPin, Calendar, Users, Hotel as HotelIcon, ArrowRight, Plus, Trash2, 
 import { TemplateSelector } from '../../components/TemplateSelector';
 import { FavoriteTemplateModal } from '../../components/FavoriteTemplateModal';
 import { CityNightSelector } from '../../components/CityNightSelector';
-import { CitySequencePreview } from '../../components/CitySequencePreview'; // NEW
+import { CitySequencePreview } from '../../components/CitySequencePreview';
 import { generateItineraryFromTemplate } from '../../utils/templateEngine';
 import { Toast, ToastType } from '../../components/ui/Toast';
 
@@ -270,6 +270,7 @@ export const SmartBuilder: React.FC = () => {
           children: basics.children
       });
 
+      // Map generated items to current cities context if possible, or fallback
       const mapped = generated.map((item, idx) => ({
           ...item,
           cityId: itinerary[idx]?.cityId || cityVisits[0]?.cityId

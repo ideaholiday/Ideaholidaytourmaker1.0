@@ -131,4 +131,21 @@ export const TemplateSelector: React.FC<Props> = ({ destination, nights, onSelec
                         </div>
                     </div>
                     {t.note && <p className="text-xs text-slate-500 mb-2 italic line-clamp-1">"{t.note}"</p>}
-                    <p className="text-xs text-slate-400 mb-3
+                    <p className="text-xs text-slate-400 mb-3 flex-grow">Created {new Date(t.createdAt).toLocaleDateString()}</p>
+                    
+                    <div className="flex justify-between items-center mt-auto">
+                        <div className="flex items-center gap-1 text-xs font-bold text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Use <ArrowRight size={12} />
+                        </div>
+                        <div onClick={(e) => handleDeleteFavorite(e, t.id)} className="text-slate-300 hover:text-red-500 z-10 p-1">
+                            <Trash2 size={14} />
+                        </div>
+                    </div>
+                </button>
+            ))}
+            {favorites.length === 0 && <p className="text-slate-400 italic text-sm">No favorites saved for {nights} nights.</p>}
+        </div>
+      )}
+    </div>
+  );
+};

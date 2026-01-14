@@ -3,7 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
-import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book } from 'lucide-react';
 
 export const AgentDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -29,12 +29,15 @@ export const AgentDashboard: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+      <div className="flex flex-col xl:flex-row justify-between items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Agent Dashboard</h1>
           <p className="text-slate-500">Welcome back, {user.name} ({user.companyName})</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <Link to="/agent/guidebook" className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition flex items-center gap-2 shadow-sm">
+             <Book size={18} /> Guide Book
+          </Link>
           <Link to="/agent/reports" className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition flex items-center gap-2 shadow-sm">
              <TrendingUp size={18} /> P&L Report
           </Link>

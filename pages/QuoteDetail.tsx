@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -7,7 +8,6 @@ import { bookingService } from '../services/bookingService'; // Import Booking S
 import { currencyService } from '../services/currencyService';
 import { INITIAL_QUOTES } from '../constants';
 import { Quote, Message, UserRole, ItineraryItem, Traveler } from '../types';
-import { generateItinerary } from '../services/geminiService';
 import { usePricingEngine } from '../hooks/usePricingEngine';
 import { formatWhatsAppQuote } from '../utils/whatsappFormatter';
 import { generateQuotePDF } from '../utils/pdfGenerator';
@@ -19,7 +19,7 @@ import { ChatPanel } from '../components/ChatPanel';
 import { OperatorQuoteView } from '../components/OperatorQuoteView';
 import { OperatorAssignmentPanel } from '../components/OperatorAssignmentPanel';
 import { BookingWizard } from '../components/agent/BookingWizard'; // Import BookingWizard
-import { ArrowLeft, Sparkles, Calculator, Download, Share2, FileText, Edit, Wallet, Printer, AlertTriangle, CheckCircle, CreditCard, X, EyeOff, Coins, Globe } from 'lucide-react';
+import { ArrowLeft, Sparkles, Calculator, Download, Share2, FileText, Edit, Wallet, Printer, AlertTriangle, CheckCircle, CreditCard, X, EyeOff, Coins, Globe, RefreshCw } from 'lucide-react';
 
 export const QuoteDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -38,11 +38,6 @@ export const QuoteDetail: React.FC = () => {
   // Currency Display State
   const [displayCurrency, setDisplayCurrency] = useState('USD');
   const availableCurrencies = currencyService.getCurrencies();
-
-  // AI State
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [showAiModal, setShowAiModal] = useState(false);
 
   // Booking State
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -89,6 +84,7 @@ export const QuoteDetail: React.FC = () => {
   const isAdminOrStaff = user.role === UserRole.ADMIN || user.role === UserRole.STAFF;
   const isAgent = user.role === UserRole.AGENT;
   const canEdit = isAgent || isAdminOrStaff;
+  const isQuickQuote = quote.type === 'QUICK';
   
   // Dynamic Price Conversion Logic
   const convertedPrice = currencyService.convert(quote.price || 0, quote.currency || 'USD', displayCurrency);
@@ -119,16 +115,8 @@ export const QuoteDetail: React.FC = () => {
     agentService.updateQuote(updatedQuote);
   };
 
-  const handleOperatorStatusUpdate = (status: 'ACCEPTED' | 'DECLINED', reason?: string) => {
-      // (Implementation same as previous, omitted for brevity)
-  };
-
   const handleOperatorAssignment = (operatorId: string, operatorName: string, pricing: { mode: 'NET' | 'FIXED', price?: number }) => {
       // (Implementation same as previous)
-  };
-
-  const handleAiGeneration = async () => {
-    // (Implementation same as previous)
   };
 
   const handleUpdateItinerary = (newItinerary: ItineraryItem[]) => {
@@ -156,7 +144,9 @@ export const QuoteDetail: React.FC = () => {
         currency: 'USD', // Always store in Base for consistency
         cost: hasNewPricing ? calculatedCost : quote.cost,
         price: b2bPrice,
-        sellingPrice: newSellingPrice
+        sellingPrice: newSellingPrice,
+        type: 'DETAILED' as const, // Upgrade type
+        status: 'PENDING' as const // Reset estimate status
     };
 
     setQuote(updatedQuote);
@@ -206,12 +196,22 @@ export const QuoteDetail: React.FC = () => {
   
   const submitBooking = (travelers: Traveler[]) => {
       if (!user || !quote) return;
+      if (isQuickQuote) {
+          alert("Please convert this estimate to a Detailed Itinerary before booking.");
+          return;
+      }
       
       const newBooking = bookingService.createBookingFromQuote(quote, user, travelers);
       setShowBookingModal(false);
       
       alert(`Booking Created Successfully! Ref: ${newBooking.uniqueRefNo}`);
       navigate(`/booking/${newBooking.id}`);
+  };
+
+  const handleConvert = () => {
+      if (confirm("This will convert the Estimate into a Detailed Itinerary for customization. Proceed?")) {
+          setIsEditingItinerary(true);
+      }
   };
 
   // --------------------------------------------------------
@@ -226,7 +226,7 @@ export const QuoteDetail: React.FC = () => {
               <OperatorQuoteView 
                   quote={quote} 
                   user={user}
-                  onUpdateStatus={handleOperatorStatusUpdate}
+                  onUpdateStatus={() => {}} // Simple placeholder
                   onSendMessage={handleSendMessage}
               />
           </div>
@@ -249,9 +249,12 @@ export const QuoteDetail: React.FC = () => {
           
           {/* Header Actions */}
           <div className="flex flex-wrap justify-between items-center gap-4">
-            <h1 className="text-2xl font-bold text-slate-900">
-              Quote <span className="text-slate-400 font-normal">#{quote.uniqueRefNo}</span>
-            </h1>
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                Quote <span className="text-slate-400 font-normal">#{quote.uniqueRefNo}</span>
+                {isQuickQuote && <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded font-bold uppercase">Estimate</span>}
+                </h1>
+            </div>
             <div className="flex gap-2">
               {isAgent && (
                   <button onClick={handleShareClientLink} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm font-medium">
@@ -259,7 +262,7 @@ export const QuoteDetail: React.FC = () => {
                   </button>
               )}
               
-              {isAgent && (quote.status === 'PENDING' || quote.status === 'CONFIRMED') && (
+              {isAgent && !isQuickQuote && (quote.status === 'PENDING' || quote.status === 'CONFIRMED') && (
                   <button onClick={handleOpenBooking} className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium animate-pulse">
                     <CreditCard size={18} /> Book Now
                   </button>
@@ -273,6 +276,19 @@ export const QuoteDetail: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Quick Quote Banner */}
+          {isQuickQuote && (
+              <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg flex justify-between items-center shadow-sm">
+                  <div>
+                      <h3 className="font-bold text-amber-800 flex items-center gap-2"><Sparkles size={18}/> Quick Estimate</h3>
+                      <p className="text-sm text-amber-700">This price is based on average rates. Convert to a detailed itinerary to book.</p>
+                  </div>
+                  <button onClick={handleConvert} className="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-amber-700 flex items-center gap-2 shadow-sm">
+                      <RefreshCw size={16} /> Convert to Detailed
+                  </button>
+              </div>
+          )}
 
           {/* Quote Preview Card */}
           <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
@@ -314,15 +330,17 @@ export const QuoteDetail: React.FC = () => {
                  >
                    <span className="flex items-center gap-2"><FileText size={16}/> Itinerary</span>
                  </button>
-                 <button 
-                    onClick={() => setActiveTab('COSTING')}
-                    className={`px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === 'COSTING' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                 >
-                   <span className="flex items-center gap-2">
-                      <Calculator size={16}/> 
-                      {isAgent ? 'Profit & Branding' : 'Costing & Adjustments'}
-                   </span>
-                 </button>
+                 {!isQuickQuote && (
+                    <button 
+                        onClick={() => setActiveTab('COSTING')}
+                        className={`px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === 'COSTING' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                    <span className="flex items-center gap-2">
+                        <Calculator size={16}/> 
+                        {isAgent ? 'Profit & Branding' : 'Costing & Adjustments'}
+                    </span>
+                    </button>
+                 )}
                </div>
 
                {/* Tab Content */}
@@ -330,7 +348,7 @@ export const QuoteDetail: React.FC = () => {
                  <div>
                    {isEditingItinerary ? (
                      <ItineraryBuilder 
-                       initialItinerary={quote.itinerary || []}
+                       initialItinerary={quote.itinerary && quote.itinerary.length > 0 ? quote.itinerary : [{ day: 1, title: 'Arrival', description: 'Arrive and transfer to hotel.', inclusions: [], services: [] }]}
                        destination={quote.destination}
                        onSave={handleUpdateItinerary}
                        onCancel={() => setIsEditingItinerary(false)}
@@ -338,7 +356,7 @@ export const QuoteDetail: React.FC = () => {
                    ) : (
                      <>
                         <div className="flex justify-end mb-4">
-                            {canEdit && quote.status !== 'BOOKED' && (
+                            {canEdit && quote.status !== 'BOOKED' && !isQuickQuote && (
                                 <button 
                                     onClick={() => setIsEditingItinerary(true)} 
                                     className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-800 font-medium"
@@ -350,7 +368,10 @@ export const QuoteDetail: React.FC = () => {
                        {quote.itinerary && quote.itinerary.length > 0 ? (
                          <ItineraryView itinerary={quote.itinerary} />
                        ) : (
-                         <div className="prose prose-slate max-w-none text-sm whitespace-pre-wrap">{quote.serviceDetails}</div>
+                         <div className="prose prose-slate max-w-none text-sm whitespace-pre-wrap bg-slate-50 p-4 rounded-lg border border-slate-100">
+                             <h4 className="font-bold text-slate-700 mb-2">Package Inclusions (Estimate):</h4>
+                             {quote.serviceDetails}
+                         </div>
                        )}
                      </>
                    )}
@@ -379,12 +400,17 @@ export const QuoteDetail: React.FC = () => {
                         
                         <div className="flex justify-between items-end">
                             <div>
-                                <span className="text-base font-bold text-slate-900 block">Total Package Cost</span>
+                                <span className="text-base font-bold text-slate-900 block">
+                                    {isQuickQuote ? 'Estimated Total' : 'Total Package Cost'}
+                                </span>
                                 <span className="text-xs text-slate-500">(Incl. of all taxes)</span>
                             </div>
-                            <span className="text-2xl font-bold text-brand-700 font-mono">
-                                {currencyService.getSymbol(displayCurrency)} {isAgent ? convertedSellingPrice.toLocaleString() : convertedPrice.toLocaleString()}
-                            </span>
+                            <div className="text-right">
+                                {isQuickQuote && <span className="block text-[10px] text-amber-600 font-bold uppercase tracking-wide">Starting From</span>}
+                                <span className="text-2xl font-bold text-brand-700 font-mono">
+                                    {currencyService.getSymbol(displayCurrency)} {isAgent ? convertedSellingPrice.toLocaleString() : convertedPrice.toLocaleString()}
+                                </span>
+                            </div>
                         </div>
                         
                         {quote.hotelMode === 'REF' && (
@@ -444,7 +470,7 @@ export const QuoteDetail: React.FC = () => {
 
         {/* RIGHT COLUMN: Sidebar (Chat / Assignment) */}
         <div className="lg:col-span-1 space-y-6">
-            {isAdminOrStaff && (
+            {!isQuickQuote && isAdminOrStaff && (
                 <OperatorAssignmentPanel 
                     quote={quote}
                     onAssign={handleOperatorAssignment}

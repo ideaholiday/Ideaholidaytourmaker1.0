@@ -2,9 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { MOCK_USERS } from '../constants';
 import { ResendVerification } from '../components/ResendVerification';
-import { Shield, Lock, Mail, AlertCircle, Briefcase, UserCheck, CheckCircle, Loader2 } from 'lucide-react';
+import { Shield, Lock, Mail, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { UserRole } from '../types';
 
 export const Login: React.FC = () => {
@@ -79,11 +78,6 @@ export const Login: React.FC = () => {
       }
       setIsSubmitting(false);
     }
-  };
-
-  const fillCredentials = (uEmail: string) => {
-    setEmail(uEmail);
-    setPassword('password123');
   };
 
   if (isRedirecting) {
@@ -203,28 +197,6 @@ export const Login: React.FC = () => {
                Forgot your password? <Link to="/forgot-password" className="text-brand-600 hover:underline">Reset here</Link>.
              </p>
           </div>
-        </div>
-        
-        {/* Demo Accounts Panel */}
-        <div className="mt-8">
-            <p className="text-center text-xs text-slate-500 mb-3 uppercase tracking-wider font-bold">Quick Access (Demo / Mock Mode)</p>
-            <div className="grid grid-cols-1 gap-2">
-                {MOCK_USERS.map((u) => (
-                    <button 
-                        key={u.id}
-                        onClick={() => fillCredentials(u.email)}
-                        className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg text-xs hover:border-brand-500 hover:shadow-md transition text-left group"
-                    >
-                        <span className="flex items-center gap-2 font-bold text-slate-700 group-hover:text-brand-700">
-                            {u.role === 'ADMIN' ? <Shield size={14} className="text-red-500"/> : 
-                             u.role === 'SUPPLIER' ? <Briefcase size={14} className="text-purple-500"/> : 
-                             <UserCheck size={14} className="text-blue-500"/>}
-                            {u.role}
-                        </span>
-                        <span className="text-slate-400 font-mono">{u.email}</span>
-                    </button>
-                ))}
-            </div>
         </div>
       </div>
     </div>

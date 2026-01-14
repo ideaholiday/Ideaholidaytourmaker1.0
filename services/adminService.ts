@@ -2,6 +2,7 @@
 import { Destination, Hotel, PricingRule, Transfer, Activity, Visa, FixedPackage, User, UserRole, ItineraryTemplate } from '../types';
 import { MOCK_USERS } from '../constants';
 import { INITIAL_TEMPLATES } from '../data/itineraryTemplates';
+import { idGeneratorService } from './idGenerator'; // Import generator
 
 // Mock Initial Data - Assigned to Super Admin (u1) by default
 const INITIAL_DESTINATIONS: Destination[] = [
@@ -217,7 +218,9 @@ class AdminService {
       const newUser = {
         ...user,
         id: user.id || `u${Date.now()}`,
-        isVerified: true // Admin created users are auto-verified
+        isVerified: true, // Admin created users are auto-verified
+        // Assign Unique ID if not present
+        uniqueId: user.uniqueId || idGeneratorService.generateUniqueId(user.role)
       };
       list.push(newUser);
     }

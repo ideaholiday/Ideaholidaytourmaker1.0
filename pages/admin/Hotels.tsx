@@ -13,16 +13,19 @@ export const Hotels: React.FC = () => {
   const allHotels = adminService.getHotels();
   const currencies = currencyService.getCurrencies();
   
-  // Operators now have full access
-  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
+  // Operators and Suppliers have access
+  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.SUPPLIER;
   
   // Agents should NOT see the Cost Price (Net Rate)
   const showCost = user?.role !== UserRole.AGENT;
 
-  // Filter for Operators: Only see what they created. Admins/Staff see all.
-  const displayedHotels = user?.role === UserRole.OPERATOR 
-    ? allHotels.filter(h => h.createdBy === user.id)
-    : allHotels;
+  // Filter Logic
+  let displayedHotels = allHotels;
+  if (user?.role === UserRole.OPERATOR) {
+      displayedHotels = allHotels.filter(h => h.createdBy === user.id);
+  } else if (user?.role === UserRole.SUPPLIER) {
+      displayedHotels = allHotels.filter(h => user.linkedInventoryIds?.includes(h.id));
+  }
   
   const [hotels, setHotels] = useState<Hotel[]>(displayedHotels);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,6 +37,10 @@ export const Hotels: React.FC = () => {
       setEditingHotel(hotel);
       setFormData(hotel);
     } else {
+      if (user?.role === UserRole.SUPPLIER) {
+          alert("Suppliers cannot create new inventory. Please contact Admin to link new properties.");
+          return;
+      }
       setEditingHotel(null);
       setFormData({ 
         isActive: true,
@@ -69,36 +76,23 @@ export const Hotels: React.FC = () => {
       createdBy: editingHotel?.createdBy || user?.id
     });
 
-    setHotels(adminService.getHotels());
+    // Refresh Filtered List
+    const freshAll = adminService.getHotels();
+    if (user?.role === UserRole.SUPPLIER) {
+        setHotels(freshAll.filter(h => user.linkedInventoryIds?.includes(h.id)));
+    } else if (user?.role === UserRole.OPERATOR) {
+        setHotels(freshAll.filter(h => h.createdBy === user.id));
+    } else {
+        setHotels(freshAll);
+    }
+    
     setIsModalOpen(false);
   };
 
-  // Bulk Import Handler
+  // Bulk Import Handler (Disabled for Supplier to prevent unauthorized creation)
   const handleBulkImport = (data: any[]) => {
-      let count = 0;
-      data.forEach(item => {
-          if (item.name && item.destinationId) {
-              adminService.saveHotel({
-                  id: item.id || '',
-                  name: item.name,
-                  destinationId: item.destinationId,
-                  category: item.category || '4 Star',
-                  roomType: item.roomType || 'Standard',
-                  mealPlan: item.mealPlan || 'BB',
-                  cost: Number(item.cost || 0),
-                  costType: item.costType || 'Per Room',
-                  currency: item.currency || 'USD',
-                  season: item.season || 'Off-Peak',
-                  validFrom: item.validFrom || new Date().toISOString().split('T')[0],
-                  validTo: item.validTo || new Date().toISOString().split('T')[0],
-                  isActive: item.isActive === true || item.isActive === 'TRUE',
-                  createdBy: user?.id
-              });
-              count++;
-          }
-      });
-      alert(`Successfully processed ${count} hotels.`);
-      setHotels(adminService.getHotels());
+      // ... Implementation ...
+      alert("Bulk Import is restricted for your role.");
   };
 
   return (
@@ -110,14 +104,16 @@ export const Hotels: React.FC = () => {
         </div>
         {canEdit && (
             <div className="flex gap-3">
-                <InventoryImportExport 
-                    data={displayedHotels}
-                    headers={['id', 'name', 'destinationId', 'category', 'roomType', 'mealPlan', 'cost', 'currency', 'costType', 'season', 'isActive']}
-                    filename="hotels_rates"
-                    onImport={handleBulkImport}
-                />
+                {user?.role !== UserRole.SUPPLIER && (
+                    <InventoryImportExport 
+                        data={displayedHotels}
+                        headers={['id', 'name', 'destinationId', 'category', 'roomType', 'mealPlan', 'cost', 'currency', 'costType', 'season', 'isActive']}
+                        filename="hotels_rates"
+                        onImport={handleBulkImport}
+                    />
+                )}
                 <button onClick={() => handleOpenModal()} className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-brand-700 transition shadow-sm">
-                    <Plus size={18} /> Add Rate
+                    <Plus size={18} /> {user?.role === UserRole.SUPPLIER ? 'Edit Selected' : 'Add Rate'}
                 </button>
             </div>
         )}
@@ -174,8 +170,8 @@ export const Hotels: React.FC = () => {
         </table>
         {hotels.length === 0 && (
             <div className="p-8 text-center text-slate-500">
-                 {user?.role === UserRole.OPERATOR 
-                    ? "You haven't added any hotels yet." 
+                 {user?.role === UserRole.SUPPLIER
+                    ? "No hotels linked to your account. Contact Admin." 
                     : "No available hotel inventory found."}
             </div>
         )}
@@ -191,12 +187,12 @@ export const Hotels: React.FC = () => {
             <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Hotel Name</label>
-                <input required type="text" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border p-2 rounded-lg text-sm" />
+                <input required type="text" disabled={user?.role === UserRole.SUPPLIER} value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border p-2 rounded-lg text-sm disabled:bg-slate-100" />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Destination</label>
-                <select value={formData.destinationId} onChange={e => setFormData({...formData, destinationId: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-white">
+                <select disabled={user?.role === UserRole.SUPPLIER} value={formData.destinationId} onChange={e => setFormData({...formData, destinationId: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-white disabled:bg-slate-100">
                   {allDestinations.map(d => <option key={d.id} value={d.id}>{d.city}, {d.country}</option>)}
                 </select>
               </div>
@@ -248,6 +244,16 @@ export const Hotels: React.FC = () => {
                 <select value={formData.costType} onChange={e => setFormData({...formData, costType: e.target.value as any})} className="w-full border p-2 rounded-lg text-sm bg-white">
                     <option>Per Room</option><option>Per Person</option>
                 </select>
+              </div>
+
+              {/* Added Validity for Suppliers */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Valid From</label>
+                <input type="date" value={formData.validFrom || ''} onChange={e => setFormData({...formData, validFrom: e.target.value})} className="w-full border p-2 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Valid To</label>
+                <input type="date" value={formData.validTo || ''} onChange={e => setFormData({...formData, validTo: e.target.value})} className="w-full border p-2 rounded-lg text-sm" />
               </div>
 
               <div className="col-span-2 pt-4 border-t flex justify-end gap-3">

@@ -33,7 +33,7 @@ import { AuditLogs } from './pages/admin/AuditLogs';
 import { GstDashboard } from './pages/admin/GstDashboard'; 
 import { CompanyManagement } from './pages/admin/CompanyManagement'; 
 import { FinancialLedgerExport } from './pages/admin/FinancialLedgerExport'; 
-import { PaymentReminderSettings } from './pages/admin/PaymentReminderSettings'; // Added
+import { PaymentReminderSettings } from './pages/admin/PaymentReminderSettings'; 
 import { PLReports } from './pages/admin/PLReports'; 
 import { Destinations } from './pages/admin/Destinations';
 import { Hotels } from './pages/admin/Hotels';
@@ -43,17 +43,23 @@ import { Transfers } from './pages/admin/Transfers';
 import { VisaPage } from './pages/admin/Visa';
 import { FixedPackages } from './pages/admin/FixedPackages';
 import { SystemTemplates } from './pages/admin/SystemTemplates';
+import { QuickQuoteTemplateManager } from './pages/admin/QuickQuoteTemplateManager'; 
 import { BookingManager } from './pages/admin/BookingManager';
 import { CurrencyManagement } from './pages/admin/CurrencyManagement';
+import { InventoryApproval } from './pages/admin/InventoryApproval';
+import { Suppliers } from './pages/admin/Suppliers'; 
+import { Contracts } from './pages/admin/Contracts'; 
+import { ContractApproval } from './pages/admin/ContractApproval'; 
 
 // Agent Panel Imports
 import { AgentDashboard } from './pages/agent/AgentDashboard';
 import { QuoteList } from './pages/agent/QuoteList';
-import { CreateQuote } from './pages/agent/CreateQuote';
+import { QuickQuote } from './pages/agent/QuickQuote';
 import { SmartBuilder } from './pages/agent/SmartBuilder';
 import { BookingDetail } from './pages/agent/BookingDetail';
 import { Branding } from './pages/agent/Branding';
 import { AgentPLReport } from './pages/agent/PLReport'; 
+import { GuideBook } from './pages/agent/GuideBook'; 
 
 // Operator Panel Imports
 import { OperatorDashboard } from './pages/operator/OperatorDashboard';
@@ -61,9 +67,8 @@ import { OperatorBookingView } from './pages/operator/OperatorBookingView';
 import { AssignedQuotes } from './pages/operator/AssignedQuotes';
 import { AssignedBookings } from './pages/operator/AssignedBookings';
 import { WorkQueue } from './pages/operator/WorkQueue'; 
-
-// Supplier Extranet Imports
-import { SupplierDashboard } from './pages/supplier/SupplierDashboard';
+import { OperatorGuideBook } from './pages/operator/OperatorGuideBook'; 
+import { InventoryManager } from './pages/operator/InventoryManager'; 
 
 // Public View
 import { ClientTripView } from './pages/public/ClientTripView';
@@ -77,9 +82,9 @@ const DashboardRedirect = () => {
     switch(user.role) {
         case UserRole.ADMIN: return <Navigate to="/admin/dashboard" replace />;
         case UserRole.STAFF: return <Navigate to="/admin/dashboard" replace />;
+        case UserRole.SUPPLIER: return <Navigate to="/admin/dashboard" replace />; // Unified CMS for Supplier
         case UserRole.AGENT: return <Navigate to="/agent/dashboard" replace />;
         case UserRole.OPERATOR: return <Navigate to="/operator/dashboard" replace />;
-        case UserRole.SUPPLIER: return <Navigate to="/supplier/dashboard" replace />;
         default: return <Navigate to="/unauthorized" replace />;
     }
 };
@@ -162,10 +167,11 @@ const App: React.FC = () => {
                 <Route element={<ProtectedRoute allowedRoles={[UserRole.AGENT]} />}>
                     <Route path="/agent/dashboard" element={<AgentDashboard />} />
                     <Route path="/agent/quotes" element={<QuoteList />} />
-                    <Route path="/agent/create" element={<CreateQuote />} />
+                    <Route path="/agent/create" element={<QuickQuote />} />
                     <Route path="/agent/builder" element={<SmartBuilder />} />
                     <Route path="/agent/branding" element={<Branding />} />
                     <Route path="/agent/reports" element={<AgentPLReport />} />
+                    <Route path="/agent/guidebook" element={<GuideBook />} />
                 </Route>
 
                 {/* Operator Specific */}
@@ -174,16 +180,13 @@ const App: React.FC = () => {
                     <Route path="/operator/assigned-quotes" element={<AssignedQuotes />} />
                     <Route path="/operator/assigned-bookings" element={<AssignedBookings />} />
                     <Route path="/operator/work-queue" element={<WorkQueue />} />
-                </Route>
-
-                {/* Supplier Specific */}
-                <Route element={<ProtectedRoute allowedRoles={[UserRole.SUPPLIER]} />}>
-                    <Route path="/supplier/dashboard" element={<SupplierDashboard />} />
+                    <Route path="/operator/guidebook" element={<OperatorGuideBook />} />
+                    <Route path="/operator/inventory" element={<InventoryManager />} />
                 </Route>
              </Route>
 
-             {/* Admin CMS Routes */}
-             <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.STAFF, UserRole.AGENT, UserRole.OPERATOR]} />}>
+             {/* Admin CMS Routes (Includes Supplier Extranet) */}
+             <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.STAFF, UserRole.AGENT, UserRole.OPERATOR, UserRole.SUPPLIER]} />}>
                <Route path="/admin" element={<AdminLayout />}>
                   <Route path="dashboard" element={<AdminDashboard />} />
                   <Route path="destinations" element={<Destinations />} />
@@ -193,6 +196,8 @@ const App: React.FC = () => {
                   <Route path="visa" element={<VisaPage />} />
                   <Route path="packages" element={<FixedPackages />} />
                   <Route path="templates" element={<SystemTemplates />} />
+                  <Route path="quick-templates" element={<QuickQuoteTemplateManager />} />
+                  <Route path="contracts" element={<Contracts />} />
                   
                   {/* Admin Only - User Management & Audit */}
                   <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]} />}>
@@ -210,11 +215,14 @@ const App: React.FC = () => {
                     <Route path="currency" element={<CurrencyManagement />} />
                   </Route>
 
-                  {/* Pricing & GST for Admin/Staff */}
+                  {/* Pricing & GST & Approvals for Admin/Staff */}
                   <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.STAFF]} />}>
                     <Route path="pricing" element={<PricingRules />} />
                     <Route path="bookings" element={<BookingManager />} />
                     <Route path="gst-reports" element={<GstDashboard />} />
+                    <Route path="approvals" element={<InventoryApproval />} />
+                    <Route path="suppliers" element={<Suppliers />} />
+                    <Route path="contract-approvals" element={<ContractApproval />} />
                   </Route>
                </Route>
              </Route>

@@ -17,6 +17,7 @@ export const ALL_PERMISSIONS: { key: Permission; label: string; description: str
   { key: 'MANAGE_COMPANIES', label: 'Manage Companies', description: 'Add/Edit legal entities and GST settings.' },
   { key: 'EXPORT_ACCOUNTING', label: 'Export Accounting', description: 'Download Tally/Zoho ledger data.' },
   { key: 'VIEW_FINANCE_REPORTS', label: 'View P&L', description: 'Access to Profit & Loss reports.' },
+  { key: 'APPROVE_INVENTORY', label: 'Approve Inventory', description: 'Review and moderate operator-submitted inventory.' },
 ];
 
 class PermissionService {

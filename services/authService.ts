@@ -4,6 +4,7 @@ import { MOCK_USERS } from '../constants';
 import { auditLogService } from './auditLogService';
 import { apiClient } from './apiClient';
 import { emailVerificationService } from './emailVerificationService';
+import { idGeneratorService } from './idGenerator.ts'; // Import
 import { auth, db } from './firebase';
 import { 
     signInWithEmailAndPassword, 
@@ -25,8 +26,18 @@ class AuthService {
   constructor() {
     const stored = localStorage.getItem(STORAGE_KEY_USERS);
     const storedUsers = stored ? JSON.parse(stored) : [];
+    
+    // MOCK DATA MIGRATION: Ensure Mock Users have uniqueId
     const initialEmails = new Set(storedUsers.map((u: User) => u.email.toLowerCase()));
-    const defaults = MOCK_USERS.filter(u => !initialEmails.has(u.email.toLowerCase()));
+    
+    const defaults = MOCK_USERS.map(u => {
+        if (!u.uniqueId) {
+            // Assign ID if missing (First run migration for mock data)
+            u.uniqueId = idGeneratorService.generateUniqueId(u.role);
+        }
+        return u;
+    }).filter(u => !initialEmails.has(u.email.toLowerCase()));
+
     this.users = [...defaults, ...storedUsers];
     if (!stored || defaults.length > 0) this.saveUsers();
   }
@@ -44,6 +55,7 @@ class AuthService {
           // We merge to avoid overwriting existing fields like 'welcomeEmailSent'
           await setDoc(userRef, {
               uid: user.id,
+              uniqueId: user.uniqueId, // Sync the ID
               email: user.email,
               displayName: user.name,
               role: user.role,
@@ -113,8 +125,12 @@ class AuthService {
         throw new Error(error.message);
     }
 
+    // GENERATE UNIQUE ID
+    const uniqueId = idGeneratorService.generateUniqueId(role);
+
     const newUser: User = {
         id: firebaseUser.uid,
+        uniqueId, // Assign ID
         name,
         email,
         role,
@@ -159,8 +175,10 @@ class AuthService {
           }
       } else {
           // New/Restored User
+          const uniqueId = idGeneratorService.generateUniqueId(UserRole.AGENT);
           user = {
               id: fbUser.uid,
+              uniqueId,
               name: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
               email: fbUser.email || '',
               role: UserRole.AGENT,

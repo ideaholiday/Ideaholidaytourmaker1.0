@@ -1,4 +1,5 @@
 
+
 import { Booking, PaymentReminder, ReminderConfig, ReminderType, ReminderStage, User } from '../types';
 import { bookingService } from './bookingService';
 import { auditLogService } from './auditLogService';
@@ -58,7 +59,9 @@ class PaymentReminderService {
 
     // Filter in-memory to speed up loop
     const eligibleBookings = bookings.filter(b => 
-        b.status !== 'CANCELLED' && 
+        b.status !== 'CANCELLED_NO_REFUND' && 
+        b.status !== 'CANCELLED_WITH_REFUND' && 
+        b.status !== 'CANCELLATION_REQUESTED' && 
         b.status !== 'REJECTED' && 
         b.status !== 'COMPLETED' && 
         b.paymentStatus !== 'PAID_IN_FULL' && 

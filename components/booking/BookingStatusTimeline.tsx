@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { BookingStatus } from '../../types';
 import { Check, Clock, Play, Flag, XCircle, AlertCircle } from 'lucide-react';
@@ -15,11 +16,11 @@ const STEPS: { status: BookingStatus; label: string; icon: any }[] = [
 ];
 
 export const BookingStatusTimeline: React.FC<Props> = ({ status }) => {
-  if (status === 'CANCELLED' || status === 'REJECTED') {
+  if (status === 'CANCELLED_NO_REFUND' || status === 'CANCELLED_WITH_REFUND' || status === 'REJECTED') {
       return (
           <div className="bg-red-50 p-4 rounded-lg flex items-center justify-center gap-2 text-red-700 font-bold border border-red-200">
               <XCircle size={20} />
-              Booking {status}
+              Booking {status.replace(/_/g, ' ')}
           </div>
       );
   }

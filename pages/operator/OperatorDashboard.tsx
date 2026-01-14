@@ -7,7 +7,7 @@ import { agentService } from '../../services/agentService'; // Import Agent Serv
 import { Booking, Quote } from '../../types';
 import { AssignedBookingsTable } from '../../components/operator/AssignedBookingsTable';
 import { AssignedQuotesTable } from '../../components/operator/AssignedQuotesTable';
-import { Briefcase, Calendar, CheckCircle, Clock, AlertTriangle, RefreshCw, ArrowRight, FileText, PlayCircle } from 'lucide-react';
+import { Briefcase, Calendar, CheckCircle, AlertTriangle, RefreshCw, ArrowRight, FileText, PlayCircle, Book } from 'lucide-react';
 
 export const OperatorDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -88,6 +88,9 @@ export const OperatorDashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
+            <Link to="/operator/guidebook" className="p-2 bg-white border border-slate-200 text-slate-500 hover:text-brand-600 rounded-lg shadow-sm transition flex items-center gap-2">
+                <Book size={18} /> <span className="text-xs font-medium">Guide Book</span>
+            </Link>
             <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded-lg text-xs flex items-center gap-2">
                 <AlertTriangle size={14} />
                 <span>Privacy Mode Active: Pricing & Agent details hidden.</span>
