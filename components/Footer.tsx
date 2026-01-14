@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { BRANDING } from '../constants';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin, Facebook, Instagram } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -14,9 +15,12 @@ export const Footer: React.FC = () => {
               Your trusted partner for B2B travel solutions. We simplify tour operations with advanced technology.
             </p>
             <div className="flex space-x-4">
-              <a href="#" className="hover:text-white transition">FB</a>
-              <a href="#" className="hover:text-white transition">IN</a>
-              <a href="#" className="hover:text-white transition">TW</a>
+              <a href="https://www.facebook.com/ideaholiday.in" target="_blank" rel="noopener noreferrer" className="hover:text-white transition" title="Facebook">
+                <Facebook size={20} />
+              </a>
+              <a href="https://www.instagram.com/ideaholiday1/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition" title="Instagram">
+                <Instagram size={20} />
+              </a>
             </div>
           </div>
 
