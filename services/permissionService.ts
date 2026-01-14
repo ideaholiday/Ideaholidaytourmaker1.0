@@ -1,0 +1,54 @@
+
+import { User, Permission, UserRole } from '../types';
+import { profileService } from './profileService';
+import { auditLogService } from './auditLogService';
+
+export const ALL_PERMISSIONS: { key: Permission; label: string; description: string }[] = [
+  { key: 'CREATE_QUOTE', label: 'Create Quotes', description: 'Can create and manage new quotations.' },
+  { key: 'EDIT_QUOTE', label: 'Edit Quotes', description: 'Can modify existing quotes.' },
+  { key: 'ASSIGN_OPERATOR', label: 'Assign Operators', description: 'Can assign ground operators to bookings.' },
+  { key: 'VIEW_NET_COST', label: 'View Net Costs', description: 'Can see internal buying rates.' },
+  { key: 'SET_OPERATOR_PRICE', label: 'Set Operator Pricing', description: 'Can override operator payables.' },
+  { key: 'APPROVE_BOOKING', label: 'Approve Bookings', description: 'Can confirm bookings and lock itineraries.' },
+  { key: 'APPROVE_CANCELLATION', label: 'Approve Cancellations', description: 'Can process refunds and penalties.' },
+  { key: 'VIEW_PAYMENTS', label: 'View Payments', description: 'Read-only access to transaction history.' },
+  { key: 'MODIFY_PAYMENTS', label: 'Manage Payments', description: 'Can record new payments and refunds.' },
+  { key: 'VIEW_AUDIT_LOGS', label: 'View Audit Logs', description: 'Access to system security logs.' },
+  { key: 'MANAGE_COMPANIES', label: 'Manage Companies', description: 'Add/Edit legal entities and GST settings.' },
+  { key: 'EXPORT_ACCOUNTING', label: 'Export Accounting', description: 'Download Tally/Zoho ledger data.' },
+  { key: 'VIEW_FINANCE_REPORTS', label: 'View P&L', description: 'Access to Profit & Loss reports.' },
+];
+
+class PermissionService {
+  
+  hasPermission(user: User, permission: Permission): boolean {
+    if (user.role === UserRole.ADMIN) return true; // Admin has all
+    if (user.role === UserRole.STAFF) {
+      return user.permissions?.includes(permission) || false;
+    }
+    return false; // Agents/Operators generally don't use this system, strict roles apply
+  }
+
+  updatePermissions(userId: string, permissions: Permission[]) {
+    const user = profileService.getUser(userId);
+    const oldPerms = user?.permissions;
+    
+    profileService.updateProfileDetails(userId, { permissions });
+
+    if (user) {
+        // AUDIT LOG
+        const adminUser: User = { id: 'admin_sys', name: 'Admin', role: UserRole.ADMIN, email: '', isVerified: true };
+        auditLogService.logAction({
+            entityType: 'PERMISSION',
+            entityId: userId,
+            action: 'PERMISSIONS_UPDATED',
+            description: `Permissions updated for ${user.name}.`,
+            user: adminUser,
+            previousValue: oldPerms,
+            newValue: permissions
+        });
+    }
+  }
+}
+
+export const permissionService = new PermissionService();
