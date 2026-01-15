@@ -3,80 +3,22 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { profileService } from '../../services/profileService';
 import { adminService } from '../../services/adminService';
-import { contractService } from '../../services/contractService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
-import { Users, BookCheck, Briefcase, DollarSign, Activity, Map, Hotel, UserPlus, Store, Shield, ScrollText, Car, Settings } from 'lucide-react';
+import { Users, BookCheck, Briefcase, DollarSign, Store, Shield, UserPlus } from 'lucide-react';
+import { SupplierDashboard } from '../supplier/SupplierDashboard';
 
 export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   
   if (!user) return null;
 
-  // --- SUPPLIER DASHBOARD VIEW ---
+  // --- SUPPLIER VIEW ---
   if (user.role === UserRole.SUPPLIER) {
-      const myHotels = adminService.getHotels().filter(h => user.linkedInventoryIds?.includes(h.id)).length;
-      const myTransfers = adminService.getTransfers().filter(t => user.linkedInventoryIds?.includes(t.id)).length;
-      const myContracts = contractService.getContractsBySupplier(user.id);
-      
-      const activeContracts = myContracts.filter(c => c.status === 'ACTIVE').length;
-      const pendingContracts = myContracts.filter(c => c.status === 'PENDING_APPROVAL').length;
-
-      return (
-        <div className="space-y-8">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Supplier Extranet</h1>
-                <p className="text-slate-500">Welcome, {user.companyName || user.name}. Manage your inventory and contracts.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <p className="text-xs font-bold text-slate-500 uppercase">Linked Hotels</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-2">{myHotels}</h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <p className="text-xs font-bold text-slate-500 uppercase">Linked Vehicles</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-2">{myTransfers}</h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <p className="text-xs font-bold text-green-600 uppercase">Active Contracts</p>
-                    <h3 className="text-2xl font-bold text-green-700 mt-2">{activeContracts}</h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <p className="text-xs font-bold text-amber-600 uppercase">Pending Review</p>
-                    <h3 className="text-2xl font-bold text-amber-700 mt-2">{pendingContracts}</h3>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Link to="/admin/contracts" className="bg-white p-6 rounded-xl border border-slate-200 hover:border-brand-500 hover:shadow-md transition group">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="bg-brand-50 p-2 rounded-lg text-brand-600 group-hover:bg-brand-600 group-hover:text-white transition">
-                            <ScrollText size={24} />
-                        </div>
-                        <h3 className="font-bold text-slate-900 text-lg">Manage Contracts</h3>
-                    </div>
-                    <p className="text-sm text-slate-500">View agreements, check validity, and submit new contract drafts for approval.</p>
-                </Link>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <Link to="/admin/hotels" className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:shadow-md transition text-center flex flex-col items-center justify-center">
-                        <Hotel size={28} className="text-indigo-600 mb-2" />
-                        <span className="font-bold text-slate-800">Manage Hotels</span>
-                        <span className="text-xs text-slate-400 mt-1">Rates & Blackouts</span>
-                    </Link>
-                    <Link to="/admin/transfers" className="bg-white p-5 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition text-center flex flex-col items-center justify-center">
-                        <Car size={28} className="text-blue-600 mb-2" />
-                        <span className="font-bold text-slate-800">Manage Transport</span>
-                        <span className="text-xs text-slate-400 mt-1">Fleets & Pricing</span>
-                    </Link>
-                </div>
-            </div>
-        </div>
-      );
+      return <SupplierDashboard />;
   }
 
-  // --- ADMIN / STAFF VIEW (Existing) ---
+  // --- ADMIN / STAFF VIEW ---
   const stats = profileService.getAdminDashboardStats();
   const destinations = adminService.getDestinations().length;
   const hotels = adminService.getHotels().length;
@@ -198,11 +140,11 @@ export const AdminDashboard: React.FC = () => {
                 <span className="text-sm font-medium text-slate-700">All Bookings</span>
              </Link>
              <Link to="/admin/destinations" className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-center group">
-                <Map size={24} className="mx-auto text-slate-400 group-hover:text-amber-600 mb-2" />
+                <Store size={24} className="mx-auto text-slate-400 group-hover:text-amber-600 mb-2" />
                 <span className="text-sm font-medium text-slate-700">Destinations ({destinations})</span>
              </Link>
              <Link to="/admin/hotels" className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-center group">
-                <Hotel size={24} className="mx-auto text-slate-400 group-hover:text-pink-600 mb-2" />
+                <Store size={24} className="mx-auto text-slate-400 group-hover:text-pink-600 mb-2" />
                 <span className="text-sm font-medium text-slate-700">Hotels ({hotels})</span>
              </Link>
              <Link to="/admin/staff" className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-center group">

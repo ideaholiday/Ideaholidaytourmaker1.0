@@ -89,10 +89,75 @@ export const Hotels: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  // Bulk Import Handler (Disabled for Supplier to prevent unauthorized creation)
+  // Bulk Import Handler
   const handleBulkImport = (data: any[]) => {
-      // ... Implementation ...
-      alert("Bulk Import is restricted for your role.");
+      if (user?.role === UserRole.SUPPLIER) {
+          alert("Bulk Import is restricted for your role.");
+          return;
+      }
+
+      let count = 0;
+      data.forEach(item => {
+          // Resolve Destination ID from Name if needed
+          let destId = item.destinationId;
+          const matchedDest = allDestinations.find(d => 
+              d.id === item.destinationId || 
+              d.city.toLowerCase() === String(item.destinationId).toLowerCase()
+          );
+          
+          if (matchedDest) {
+              destId = matchedDest.id;
+          }
+
+          if (item.name && destId) {
+              adminService.saveHotel({
+                  id: item.id || '',
+                  name: item.name,
+                  destinationId: destId,
+                  category: item.category || '4 Star',
+                  roomType: item.roomType || 'Standard',
+                  mealPlan: item.mealPlan || 'BB',
+                  cost: Number(item.cost || 0),
+                  costType: item.costType || 'Per Room',
+                  currency: item.currency || 'USD',
+                  season: item.season || 'Off-Peak',
+                  validFrom: item.validFrom || new Date().toISOString().split('T')[0],
+                  validTo: item.validTo || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+                  isActive: item.isActive === true || String(item.isActive).toUpperCase() === 'TRUE',
+                  createdBy: user?.id
+              });
+              count++;
+          }
+      });
+      alert(`Successfully processed ${count} hotels.`);
+      setHotels(adminService.getHotels());
+  };
+
+  const handleDownloadTemplate = () => {
+      const headers = [
+          'name', 'destinationId', 'category', 'roomType', 
+          'mealPlan', 'cost', 'currency', 'costType', 'season', 
+          'validFrom', 'validTo', 'isActive'
+      ];
+      
+      const sampleRows = [
+          ['Grand Hotel', 'Dubai', '4 Star', 'Deluxe Room', 'BB', '150', 'USD', 'Per Room', 'Peak', '2024-01-01', '2024-12-31', 'TRUE'],
+          ['Sea View Resort', 'Phuket', '5 Star', 'Ocean Suite', 'HB', '200', 'USD', 'Per Room', 'Off-Peak', '2024-01-01', '2024-12-31', 'TRUE']
+      ];
+      
+      const csvContent = [
+          headers.join(','), 
+          ...sampleRows.map(r => r.map(c => `"${c}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `hotel_inventory_template.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   };
 
   return (
@@ -110,6 +175,7 @@ export const Hotels: React.FC = () => {
                         headers={['id', 'name', 'destinationId', 'category', 'roomType', 'mealPlan', 'cost', 'currency', 'costType', 'season', 'isActive']}
                         filename="hotels_rates"
                         onImport={handleBulkImport}
+                        onDownloadTemplate={handleDownloadTemplate}
                     />
                 )}
                 <button onClick={() => handleOpenModal()} className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-brand-700 transition shadow-sm">

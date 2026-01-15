@@ -1,16 +1,17 @@
 
 import React, { useRef } from 'react';
-import { Download, Upload } from 'lucide-react';
+import { Download, Upload, FileSpreadsheet } from 'lucide-react';
 
 interface Props {
   data: any[];
   headers: string[]; // Keys in data object corresponding to CSV columns
   filename: string;
   onImport: (data: any[]) => void;
+  onDownloadTemplate?: () => void;
   label?: string;
 }
 
-export const InventoryImportExport: React.FC<Props> = ({ data, headers, filename, onImport, label }) => {
+export const InventoryImportExport: React.FC<Props> = ({ data, headers, filename, onImport, onDownloadTemplate, label }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
@@ -119,6 +120,15 @@ export const InventoryImportExport: React.FC<Props> = ({ data, headers, filename
 
   return (
     <div className="flex gap-2">
+      {onDownloadTemplate && (
+        <button 
+            onClick={onDownloadTemplate}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition shadow-sm"
+            title="Download Sample CSV"
+        >
+            <FileSpreadsheet size={16} /> Template
+        </button>
+      )}
       <button 
         onClick={handleExport}
         className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm font-medium transition shadow-sm"

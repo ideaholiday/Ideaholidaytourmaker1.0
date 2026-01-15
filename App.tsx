@@ -70,6 +70,9 @@ import { WorkQueue } from './pages/operator/WorkQueue';
 import { OperatorGuideBook } from './pages/operator/OperatorGuideBook'; 
 import { InventoryManager } from './pages/operator/InventoryManager'; 
 
+// Supplier Panel Imports
+import { SupplierDashboard } from './pages/supplier/SupplierDashboard';
+
 // Public View
 import { ClientTripView } from './pages/public/ClientTripView';
 import { ClientPaymentPage } from './pages/public/ClientPaymentPage'; 
@@ -82,7 +85,7 @@ const DashboardRedirect = () => {
     switch(user.role) {
         case UserRole.ADMIN: return <Navigate to="/admin/dashboard" replace />;
         case UserRole.STAFF: return <Navigate to="/admin/dashboard" replace />;
-        case UserRole.SUPPLIER: return <Navigate to="/admin/dashboard" replace />; // Unified CMS for Supplier
+        case UserRole.SUPPLIER: return <Navigate to="/supplier/dashboard" replace />;
         case UserRole.AGENT: return <Navigate to="/agent/dashboard" replace />;
         case UserRole.OPERATOR: return <Navigate to="/operator/dashboard" replace />;
         default: return <Navigate to="/unauthorized" replace />;
@@ -183,10 +186,15 @@ const App: React.FC = () => {
                     <Route path="/operator/guidebook" element={<OperatorGuideBook />} />
                     <Route path="/operator/inventory" element={<InventoryManager />} />
                 </Route>
+
+                {/* Supplier Specific */}
+                <Route element={<ProtectedRoute allowedRoles={[UserRole.SUPPLIER]} />}>
+                    <Route path="/supplier/dashboard" element={<SupplierDashboard />} />
+                </Route>
              </Route>
 
-             {/* Admin CMS Routes (Includes Supplier Extranet) */}
-             <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.STAFF, UserRole.AGENT, UserRole.OPERATOR, UserRole.SUPPLIER]} />}>
+             {/* Admin CMS Routes */}
+             <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.STAFF]} />}>
                <Route path="/admin" element={<AdminLayout />}>
                   <Route path="dashboard" element={<AdminDashboard />} />
                   <Route path="destinations" element={<Destinations />} />
