@@ -1,14 +1,14 @@
-import { PricingInput, PricingBreakdown } from '../types';
+
+import { PricingInput, PricingBreakdown, PricingRule } from '../types';
 import { roundPrice } from './rounding';
 
 /**
- * Calculates the Total Net Cost for the itinerary.
- * Note: Logic updated to usually handle this via the SmartBuilder now, 
- * but this utility remains for the manual calculator in QuoteDetail.
+ * Calculates Supplier Net Cost (Raw Inventory Cost).
+ * Admin Only View.
  */
-const calculateNetCost = (input: PricingInput): number => {
+export const calculateSupplierCost = (input: PricingInput): number => {
   const { travelers, hotel, transfers, activities, visa } = input;
-  const totalPax = travelers.adults + travelers.children; // Infants usually free or handled separately
+  const totalPax = travelers.adults + travelers.children; 
 
   // 1. Hotel Cost
   let hotelCost = 0;
@@ -41,49 +41,107 @@ const calculateNetCost = (input: PricingInput): number => {
 };
 
 /**
+ * Calculates Markup Value based on amount and rule (Percentage vs Fixed).
+ */
+const calculateMarkupValue = (baseAmount: number, markup: number, type: 'Percentage' | 'Fixed', paxCount: number): number => {
+    if (type === 'Percentage') {
+        return baseAmount * (markup / 100);
+    }
+    // Fixed markup is usually Per Person in travel
+    return markup * paxCount;
+};
+
+/**
  * Master Calculation Function
+ * Flow:
+ * 1. Supplier Cost (Raw)
+ * 2. + Company Markup = Platform Net (Agent's Cost)
+ * 3. + Agent Markup = Subtotal
+ * 4. + GST = Final Price
  */
 export const calculateQuotePrice = (input: PricingInput): PricingBreakdown => {
-  const netCost = calculateNetCost(input);
+  const supplierCost = calculateSupplierCost(input);
   const totalPax = input.travelers.adults + input.travelers.children;
 
-  // 1. Company Markup
-  let companyMarkupValue = 0;
-  if (input.rules.markupType === 'Percentage') {
-    companyMarkupValue = netCost * (input.rules.companyMarkup / 100);
-  } else {
-    companyMarkupValue = input.rules.companyMarkup * totalPax; 
-  }
-
-  // 2. Agent Markup (Default estimation)
-  const buyingPrice = netCost + companyMarkupValue;
+  // 1. Company Markup (Platform Margin)
+  const companyMarkupValue = calculateMarkupValue(supplierCost, input.rules.companyMarkup, input.rules.markupType, totalPax);
   
-  let agentMarkupValue = 0;
-  if (input.rules.markupType === 'Percentage') {
-    agentMarkupValue = buyingPrice * (input.rules.agentMarkup / 100);
-  } else {
-    agentMarkupValue = input.rules.agentMarkup * totalPax;
-  }
+  // 2. Platform Net Cost (This is what the Agent Sees as "Net Cost")
+  const platformNetCost = supplierCost + companyMarkupValue;
 
-  // 3. Subtotal
-  const subtotal = buyingPrice + agentMarkupValue;
+  // 3. Agent Markup (Added by Agent)
+  const agentMarkupValue = calculateMarkupValue(platformNetCost, input.rules.agentMarkup, input.rules.markupType, totalPax);
 
-  // 4. GST
+  // 4. Subtotal (Before Tax)
+  const subtotal = platformNetCost + agentMarkupValue;
+
+  // 5. GST (Tax on Subtotal)
   const gstAmount = subtotal * (input.rules.gstPercentage / 100);
 
-  // 5. Final Calculation
+  // 6. Final Calculation
   let rawFinalPrice = subtotal + gstAmount;
 
-  // 6. Rounding
+  // 7. Rounding
   const finalPrice = roundPrice(rawFinalPrice, input.rules.roundOff);
 
   return {
-    netCost: Number(netCost.toFixed(2)),
+    supplierCost: Number(supplierCost.toFixed(2)),
     companyMarkupValue: Number(companyMarkupValue.toFixed(2)),
+    platformNetCost: Number(platformNetCost.toFixed(2)),
     agentMarkupValue: Number(agentMarkupValue.toFixed(2)),
     subtotal: Number(subtotal.toFixed(2)),
     gstAmount: Number(gstAmount.toFixed(2)),
     finalPrice: finalPrice,
-    perPersonPrice: totalPax > 0 ? Number((finalPrice / totalPax).toFixed(2)) : 0
+    perPersonPrice: totalPax > 0 ? Number((finalPrice / totalPax).toFixed(2)) : 0,
+    
+    // Legacy support alias
+    netCost: Number(platformNetCost.toFixed(2))
   };
 };
+
+/**
+ * Simplified Calculator for direct values (e.g. SmartBuilder live view)
+ * Assumes inputs are already summed or raw.
+ */
+export const calculatePriceFromNet = (
+    netCost: number, 
+    rules: PricingRule, 
+    paxCount: number,
+    agentMarkupOverride?: number
+): PricingBreakdown => {
+    // Treat input 'netCost' as 'supplierCost' effectively
+    const supplierCost = netCost;
+    
+    const companyMarkupValue = calculateMarkupValue(supplierCost, rules.companyMarkup, rules.markupType, paxCount);
+    const platformNetCost = supplierCost + companyMarkupValue;
+    
+    const effectiveAgentMarkup = agentMarkupOverride !== undefined ? agentMarkupOverride : rules.agentMarkup;
+    // If override is provided, assume it's a fixed value (flat fee) added to total, OR if percentage logic needed, handle here.
+    // For SmartBuilder, Agent usually adds a FLAT markup.
+    
+    let agentMarkupValue = 0;
+    if (agentMarkupOverride !== undefined) {
+        // Flat markup override
+        agentMarkupValue = agentMarkupOverride;
+    } else {
+        // Use rule
+        agentMarkupValue = calculateMarkupValue(platformNetCost, rules.agentMarkup, rules.markupType, paxCount);
+    }
+
+    const subtotal = platformNetCost + agentMarkupValue;
+    const gstAmount = subtotal * (rules.gstPercentage / 100);
+    const rawFinalPrice = subtotal + gstAmount;
+    const finalPrice = roundPrice(rawFinalPrice, rules.roundOff);
+
+    return {
+        supplierCost,
+        companyMarkupValue,
+        platformNetCost,
+        agentMarkupValue,
+        subtotal,
+        gstAmount,
+        finalPrice,
+        perPersonPrice: paxCount > 0 ? Number((finalPrice / paxCount).toFixed(2)) : 0,
+        netCost: platformNetCost
+    };
+}

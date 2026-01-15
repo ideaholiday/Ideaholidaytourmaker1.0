@@ -401,13 +401,17 @@ export interface PricingInput {
 }
 
 export interface PricingBreakdown {
-  netCost: number;
-  companyMarkupValue: number;
-  agentMarkupValue: number;
-  subtotal: number;
-  gstAmount: number;
-  finalPrice: number;
+  supplierCost: number;      // Raw Cost (Admin Only)
+  companyMarkupValue: number;// Platform Margin
+  platformNetCost: number;   // Agent's Buying Price (Supplier + Platform Margin)
+  agentMarkupValue: number;  // Agent's Margin
+  subtotal: number;          // Before Tax (Platform Net + Agent Markup)
+  gstAmount: number;         // Tax
+  finalPrice: number;        // Client Price
   perPersonPrice: number;
+  
+  // Legacy support
+  netCost?: number;          // Alias for platformNetCost in some contexts
 }
 
 export interface GSTRecord {

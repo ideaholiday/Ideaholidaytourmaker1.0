@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
 import { profileService } from '../../services/profileService';
-import { Booking, Quote, User, ItineraryItem, UserRole, Traveler } from '../../types';
+import { Booking, Quote, User, ItineraryItem, UserRole, Traveler, PricingBreakdown } from '../../types';
 import { MapPin, Calendar, Users, CheckCircle, Clock, Download, Plane, Hotel, Star, ShieldCheck, Car, Briefcase, ArrowRight, CreditCard } from 'lucide-react';
 import { INITIAL_QUOTES } from '../../constants';
 import { generateQuotePDF } from '../../utils/pdfGenerator';
@@ -26,11 +26,24 @@ const TripContent: React.FC<{
   const handleDownloadPDF = () => {
       if (!data || !agent) return;
       const isQuote = !('payments' in data);
-      const breakdown = isQuote ? {
-          finalPrice: data.sellingPrice || (data as Quote).price || 0,
-          perPersonPrice: ((data.sellingPrice || 0) / data.paxCount),
-          netCost: 0, companyMarkupValue: 0, agentMarkupValue: 0, gstAmount: 0, subtotal: 0
-      } : null; 
+      
+      let breakdown: PricingBreakdown | null = null;
+      
+      if (isQuote) {
+          const sellingPrice = data.sellingPrice || (data as Quote).price || 0;
+          breakdown = {
+              finalPrice: sellingPrice,
+              perPersonPrice: (sellingPrice / data.paxCount),
+              netCost: 0, 
+              companyMarkupValue: 0, 
+              agentMarkupValue: 0, 
+              gstAmount: 0, 
+              subtotal: 0,
+              supplierCost: 0,
+              platformNetCost: 0
+          };
+      }
+      
       generateQuotePDF(data as Quote, breakdown, UserRole.AGENT, agent);
   };
 

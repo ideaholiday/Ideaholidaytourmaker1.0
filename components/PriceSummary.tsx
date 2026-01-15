@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { PricingBreakdown, UserRole } from '../types';
 
@@ -22,27 +23,40 @@ export const PriceSummary: React.FC<Props> = ({ breakdown, role, currency }) => 
       <div className="space-y-3">
         {/* Admin / Staff View: Full Breakdown */}
         {!isAgent && (
-          <>
-            <div className="flex justify-between text-sm text-slate-600">
-              <span>Total Net Cost</span>
-              <span className="font-mono">{breakdown.netCost.toLocaleString()}</span>
+          <div className="text-xs text-slate-500 border-b border-slate-200 pb-3 mb-3">
+            <div className="flex justify-between mb-1">
+              <span>Supplier Net</span>
+              <span className="font-mono">{breakdown.supplierCost.toLocaleString()}</span>
             </div>
-             <div className="flex justify-between text-sm text-slate-600">
-              <span>Tax / GST</span>
-              <span className="font-mono">{breakdown.gstAmount.toLocaleString()}</span>
+            <div className="flex justify-between text-blue-600">
+              <span>+ Platform Margin</span>
+              <span className="font-mono">{breakdown.companyMarkupValue.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-sm text-green-600 font-medium">
-              <span>Total Markup (Profit)</span>
-              <span className="font-mono">+ {(breakdown.companyMarkupValue + breakdown.agentMarkupValue).toLocaleString()}</span>
-            </div>
-            <div className="border-t border-slate-200 my-2"></div>
-          </>
+          </div>
         )}
 
-        {/* Agent View: Only Final Selling Price */}
+        {/* Agent View starts here (They see Platform Net as their Cost) */}
+        <div className="flex justify-between text-sm text-slate-600">
+            <span>Net Cost (B2B)</span>
+            <span className="font-mono font-medium">{breakdown.platformNetCost.toLocaleString()}</span>
+        </div>
+
+        <div className="flex justify-between text-sm text-green-600 font-medium">
+            <span>+ Your Markup</span>
+            <span className="font-mono">{breakdown.agentMarkupValue.toLocaleString()}</span>
+        </div>
+
+        <div className="flex justify-between text-sm text-slate-600">
+            <span>+ Tax / GST</span>
+            <span className="font-mono">{breakdown.gstAmount.toLocaleString()}</span>
+        </div>
+
+        <div className="border-t border-slate-200 my-2"></div>
+
+        {/* Final Price */}
         <div className="flex justify-between items-end">
           <div>
-            <span className="text-base font-bold text-slate-900 block">Total Package Cost</span>
+            <span className="text-base font-bold text-slate-900 block">Final Selling Price</span>
             <span className="text-xs text-slate-500">(Incl. of all taxes)</span>
           </div>
           <span className="text-2xl font-bold text-brand-700 font-mono">

@@ -4,8 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { adminService } from '../../services/adminService';
 import { bookingService } from '../../services/bookingService';
 import { currencyService } from '../../services/currencyService';
-import { Hotel, Transfer, UserRole, Booking, ItineraryService, Destination } from '../../types';
-import { Store, RefreshCw, AlertTriangle, CheckCircle, Save, Calendar, Ban, User, BedDouble, Car, Clock, Search, LogOut, Plus, X } from 'lucide-react';
+import { Hotel, Transfer, UserRole, Booking, Destination } from '../../types';
+import { Store, RefreshCw, AlertTriangle, CheckCircle, Save, Calendar, Ban, User, BedDouble, Car, Clock, Search, LogOut, Plus, X, TrendingUp, BarChart3, DollarSign, ArrowRight } from 'lucide-react';
 import { auditLogService } from '../../services/auditLogService';
 
 type Tab = 'DASHBOARD' | 'RESERVATIONS' | 'INVENTORY';
@@ -19,11 +19,12 @@ interface ReservationRow {
   serviceDate: string; // Calculated Check-in
   serviceName: string;
   details: string; // Room Type or Vehicle
-  nights?: number; // Estimated
+  nights: number;
+  netValue: number; // Est revenue for this specific service
 }
 
 export const SupplierDashboard: React.FC = () => {
-  const { user, reloadUser } = useAuth(); // specific reload to refresh linkedIds in context if needed
+  const { user, reloadUser } = useAuth(); 
   const [activeTab, setActiveTab] = useState<Tab>('DASHBOARD');
   
   // Inventory State
@@ -57,7 +58,6 @@ export const SupplierDashboard: React.FC = () => {
   useEffect(() => {
     if (user) {
         loadData();
-        // Load helpers
         setDestinations(adminService.getDestinations().filter(d => d.isActive));
         setCurrencies(currencyService.getCurrencies().map(c => c.code));
     }
@@ -67,7 +67,6 @@ export const SupplierDashboard: React.FC = () => {
     if (!user || user.role !== UserRole.SUPPLIER) return;
 
     // 1. Load Inventory
-    // Safeguard: linkedInventoryIds might be missing in old data
     const linkedIds = user.linkedInventoryIds || [];
     
     let myItems: (Hotel | Transfer)[] = [];
@@ -89,15 +88,18 @@ export const SupplierDashboard: React.FC = () => {
         booking.itinerary?.forEach(day => {
             day.services?.forEach(svc => {
                 if (linkedIds.includes(svc.id)) {
-                    // Calculate Service Date: TravelDate + (Day - 1)
+                    // Calculate Service Date
                     const travelDate = new Date(booking.travelDate);
                     const serviceDate = new Date(travelDate);
                     serviceDate.setDate(travelDate.getDate() + (day.day - 1));
 
-                    // Extract meta details
+                    // Extract details
                     let details = '-';
                     if (svc.meta?.roomType) details = `${svc.meta.roomType} (${svc.meta.mealPlan})`;
                     if (svc.meta?.vehicle) details = svc.meta.vehicle;
+
+                    // Approximate Revenue (Using current cost if historical snapshot missing, simplistic for demo)
+                    const itemCost = svc.cost || 0; 
 
                     myReservations.push({
                         bookingId: booking.id,
@@ -107,7 +109,9 @@ export const SupplierDashboard: React.FC = () => {
                         pax: booking.paxCount || 0,
                         serviceDate: serviceDate.toISOString().split('T')[0],
                         serviceName: svc.name || 'Service',
-                        details: details
+                        details: details,
+                        nights: 1, // Simplified per day entry
+                        netValue: itemCost
                     });
                 }
             });
@@ -153,29 +157,19 @@ export const SupplierDashboard: React.FC = () => {
       e.preventDefault();
       if (!user || !newInventory.name || !newInventory.destinationId) return;
 
-      // 1. Create the Hotel Object
       const newItem: Hotel = {
           ...newInventory,
           id: `h_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
           createdBy: user.id
       } as Hotel;
 
-      // 2. Save to System
       adminService.saveHotel(newItem);
 
-      // 3. Link to Supplier (Update User Record)
-      // Note: We need to update the actual user record in DB
       const currentUserRecord = adminService.getUsers().find(u => u.id === user.id);
       if (currentUserRecord) {
           const currentLinks = currentUserRecord.linkedInventoryIds || [];
           const updatedLinks = [...currentLinks, newItem.id];
-          
-          adminService.saveUser({
-              ...currentUserRecord,
-              linkedInventoryIds: updatedLinks
-          });
-          
-          // Force reload to reflect changes
+          adminService.saveUser({ ...currentUserRecord, linkedInventoryIds: updatedLinks });
           await reloadUser();
       }
 
@@ -189,32 +183,41 @@ export const SupplierDashboard: React.FC = () => {
       });
 
       setIsAddModalOpen(false);
-      // Reset form
-      setNewInventory({
-        currency: 'USD',
-        season: 'Off-Peak',
-        category: '4 Star',
-        mealPlan: 'BB',
-        costType: 'Per Room',
-        isActive: true,
-        validFrom: new Date().toISOString().split('T')[0],
-        validTo: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
-      });
       loadData();
-      alert("Inventory added successfully!");
   };
 
   if (!user) return null;
 
-  // --- STATS CALCULATION ---
+  // --- KPI CALCS ---
   const today = new Date().toISOString().split('T')[0];
+  
+  // 1. Arrivals
   const arrivalsToday = reservations.filter(r => r.serviceDate === today && r.status === 'CONFIRMED').length;
+  
+  // 2. In-House (Simulated based on bookings starting in last 3 days)
   const inHouseGuests = reservations.filter(r => {
       const d = new Date(r.serviceDate);
       const now = new Date();
       const diff = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
       return diff >= 0 && diff < 3 && r.status === 'CONFIRMED';
   }).length;
+
+  // 3. Est Revenue (Current Month)
+  const currentMonth = new Date().getMonth();
+  const revenueThisMonth = reservations
+    .filter(r => new Date(r.serviceDate).getMonth() === currentMonth && r.status === 'CONFIRMED')
+    .reduce((sum, r) => sum + (r.netValue || 0), 0);
+
+  // 4. Forecast Chart Data (Next 7 Days)
+  const forecastData = Array.from({length: 7}, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const count = reservations.filter(r => r.serviceDate === dateStr && r.status === 'CONFIRMED').length;
+      return { date: dateStr, count, day: d.toLocaleDateString('en-US', { weekday: 'short' }) };
+  });
+
+  const maxForecast = Math.max(...forecastData.map(d => d.count), 5); // Scale for chart
 
   const filteredReservations = reservations.filter(r => 
       (r.guestName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -227,7 +230,7 @@ export const SupplierDashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Store className="text-brand-600" /> Partner Extranet
+            <Store className="text-brand-600" /> Partner Console
           </h1>
           <p className="text-slate-500">
             {user.companyName || user.name} &bull; <span className="text-brand-600 font-medium">{user.supplierType} Partner</span>
@@ -250,7 +253,7 @@ export const SupplierDashboard: React.FC = () => {
             onClick={() => setActiveTab('DASHBOARD')}
             className={`px-6 py-3 text-sm font-medium border-b-2 transition flex items-center gap-2 ${activeTab === 'DASHBOARD' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
           >
-              <Store size={16} /> Overview
+              <BarChart3 size={16} /> Overview
           </button>
           <button 
             onClick={() => setActiveTab('RESERVATIONS')}
@@ -263,80 +266,143 @@ export const SupplierDashboard: React.FC = () => {
             onClick={() => setActiveTab('INVENTORY')}
             className={`px-6 py-3 text-sm font-medium border-b-2 transition flex items-center gap-2 ${activeTab === 'INVENTORY' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
           >
-              <BedDouble size={16} /> Manage Inventory
+              <BedDouble size={16} /> Manage Rates
           </button>
       </div>
 
       {/* --- DASHBOARD TAB --- */}
       {activeTab === 'DASHBOARD' && (
-          <div className="animate-in fade-in slide-in-from-bottom-2">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6">
+              
+              {/* Top Stats Row */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Arrivals Today</p>
                       <div className="flex items-center justify-between mt-2">
-                          <h3 className="text-3xl font-bold text-slate-900">{arrivalsToday}</h3>
+                          <h3 className="text-2xl font-bold text-slate-900">{arrivalsToday}</h3>
                           <div className="p-2 bg-green-50 text-green-600 rounded-lg"><LogOut size={20} className="rotate-180"/></div>
                       </div>
                   </div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">In-House Guests</p>
                       <div className="flex items-center justify-between mt-2">
-                          <h3 className="text-3xl font-bold text-slate-900">{inHouseGuests}</h3>
+                          <h3 className="text-2xl font-bold text-slate-900">{inHouseGuests}</h3>
                           <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><User size={20}/></div>
                       </div>
                   </div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Inventory</p>
-                      <div className="flex items-center justify-between mt-2">
-                          <h3 className="text-3xl font-bold text-slate-900">{inventory.filter(i => i.isActive).length}</h3>
-                          <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><CheckCircle size={20}/></div>
-                      </div>
-                  </div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Bookings</p>
                       <div className="flex items-center justify-between mt-2">
-                          <h3 className="text-3xl font-bold text-slate-900">{reservations.length}</h3>
+                          <h3 className="text-2xl font-bold text-slate-900">{reservations.length}</h3>
                           <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Clock size={20}/></div>
+                      </div>
+                  </div>
+                  <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-3 opacity-10">
+                          <DollarSign size={60} />
+                      </div>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Est. Revenue (Month)</p>
+                      <div className="flex items-center justify-between mt-2">
+                          <h3 className="text-2xl font-bold text-emerald-700">${revenueThisMonth.toLocaleString()}</h3>
+                          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><TrendingUp size={20}/></div>
                       </div>
                   </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                  <h3 className="font-bold text-slate-900 mb-4">Upcoming Arrivals (Next 7 Days)</h3>
-                  {/* Simplified mini table for dashboard */}
-                  <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
-                          <thead className="bg-slate-50 text-slate-500">
-                              <tr>
-                                  <th className="px-4 py-2">Date</th>
-                                  <th className="px-4 py-2">Guest</th>
-                                  <th className="px-4 py-2">Details</th>
-                                  <th className="px-4 py-2">Status</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              {reservations
-                                  .filter(r => {
-                                      const d = new Date(r.serviceDate);
-                                      const now = new Date();
-                                      const diff = (d.getTime() - now.getTime()) / (1000 * 3600 * 24);
-                                      return diff >= 0 && diff <= 7 && r.status === 'CONFIRMED';
-                                  })
-                                  .slice(0, 5)
-                                  .map((r, i) => (
-                                      <tr key={i} className="border-b border-slate-100 last:border-0">
-                                          <td className="px-4 py-3 font-medium text-slate-700">{r.serviceDate}</td>
-                                          <td className="px-4 py-3">{r.guestName} <span className="text-xs text-slate-400">({r.pax} Pax)</span></td>
-                                          <td className="px-4 py-3 text-slate-600">{r.details}</td>
-                                          <td className="px-4 py-3"><span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">Confirmed</span></td>
-                                      </tr>
-                                  ))}
-                              {reservations.filter(r => new Date(r.serviceDate) >= new Date()).length === 0 && (
-                                  <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No upcoming arrivals in the next 7 days.</td></tr>
-                              )}
-                          </tbody>
-                      </table>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Arrival Forecast Chart */}
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-2">
+                      <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
+                          <Calendar size={18} className="text-brand-600"/> 7-Day Arrival Forecast
+                      </h3>
+                      <div className="flex items-end justify-between h-40 gap-4">
+                          {forecastData.map((d, i) => (
+                              <div key={i} className="flex flex-col items-center flex-1 group">
+                                  <div className="relative w-full flex justify-center">
+                                      <div 
+                                        className="w-full bg-brand-100 rounded-t-lg transition-all duration-500 group-hover:bg-brand-200 relative overflow-hidden" 
+                                        style={{ height: `${(d.count / maxForecast) * 100 * 1.5}px`, minHeight: '4px' }}
+                                      >
+                                          {d.count > 0 && <div className="absolute bottom-0 w-full bg-brand-500 h-1"></div>}
+                                      </div>
+                                      <span className="absolute -top-6 text-xs font-bold text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">{d.count}</span>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-500 mt-2 uppercase">{d.day}</span>
+                                  <span className="text-[9px] text-slate-400">{d.date.split('-')[2]}</span>
+                              </div>
+                          ))}
+                      </div>
                   </div>
+
+                  {/* Quick Inventory Actions */}
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                          <BedDouble size={18} className="text-purple-600"/> Inventory Snapshot
+                      </h3>
+                      <div className="space-y-3">
+                          {inventory.slice(0, 3).map(item => (
+                              <div key={item.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                  <div>
+                                      <p className="text-sm font-medium text-slate-800 line-clamp-1">{'name' in item ? item.name : item.transferName}</p>
+                                      <p className="text-xs text-slate-500">{item.currency} {item.cost.toLocaleString()}</p>
+                                  </div>
+                                  <button 
+                                    onClick={() => { setActiveTab('INVENTORY'); handleEdit(item); }}
+                                    className="text-xs font-bold text-brand-600 hover:text-brand-800 bg-white border border-brand-200 px-3 py-1.5 rounded transition"
+                                  >
+                                      Update
+                                  </button>
+                              </div>
+                          ))}
+                          <button 
+                            onClick={() => setActiveTab('INVENTORY')}
+                            className="w-full py-2 text-xs font-medium text-slate-500 hover:text-brand-600 border border-dashed border-slate-300 rounded-lg mt-2 hover:bg-slate-50 transition"
+                          >
+                              View All Inventory
+                          </button>
+                      </div>
+                  </div>
+              </div>
+
+              {/* Recent Bookings Table (Simplified) */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <h3 className="font-bold text-slate-800">Recent Reservations</h3>
+                      <button onClick={() => setActiveTab('RESERVATIONS')} className="text-xs font-bold text-brand-600 flex items-center gap-1 hover:underline">
+                          View All <ArrowRight size={12} />
+                      </button>
+                  </div>
+                  <table className="w-full text-left text-sm">
+                      <thead className="bg-white text-slate-500 border-b border-slate-100">
+                          <tr>
+                              <th className="px-6 py-3 font-semibold">Guest</th>
+                              <th className="px-6 py-3 font-semibold">Service Date</th>
+                              <th className="px-6 py-3 font-semibold">Status</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                          {reservations.slice(0, 5).map((r, i) => (
+                              <tr key={i} className="hover:bg-slate-50">
+                                  <td className="px-6 py-3">
+                                      <div className="font-medium text-slate-900">{r.guestName}</div>
+                                      <div className="text-xs text-slate-500">{r.serviceName}</div>
+                                  </td>
+                                  <td className="px-6 py-3 text-slate-600">{r.serviceDate}</td>
+                                  <td className="px-6 py-3">
+                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                          r.status === 'CONFIRMED' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-slate-100 text-slate-600 border-slate-200'
+                                      }`}>
+                                          {r.status === 'CONFIRMED' && <CheckCircle size={10} />}
+                                          {r.status}
+                                      </span>
+                                  </td>
+                              </tr>
+                          ))}
+                          {reservations.length === 0 && (
+                              <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-400">No recent activity.</td></tr>
+                          )}
+                      </tbody>
+                  </table>
               </div>
           </div>
       )}
