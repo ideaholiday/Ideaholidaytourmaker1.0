@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -29,7 +30,7 @@ export const Navbar: React.FC = () => {
             {BRANDING.name}
           </span>
           <span className="font-bold text-xl text-slate-900 tracking-tight sm:hidden">
-            IHTM
+            ITM
           </span>
         </Link>
 

@@ -18,7 +18,7 @@ import { ChatPanel } from '../components/ChatPanel';
 import { OperatorQuoteView } from '../components/OperatorQuoteView';
 import { OperatorAssignmentPanel } from '../components/OperatorAssignmentPanel';
 import { BookingWizard } from '../components/agent/BookingWizard'; // Import BookingWizard
-import { ArrowLeft, Sparkles, Calculator, Download, Share2, FileText, Edit, Wallet, Printer, AlertTriangle, CheckCircle, CreditCard, X, EyeOff, Coins, Globe, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Sparkles, Calculator, Download, Share2, FileText, Edit, Wallet, Printer, AlertTriangle, CheckCircle, CreditCard, X, EyeOff, Coins, Globe, RefreshCw, User } from 'lucide-react';
 
 export const QuoteDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -257,6 +257,12 @@ export const QuoteDetail: React.FC = () => {
                 Quote <span className="text-slate-400 font-normal">#{quote.uniqueRefNo}</span>
                 {isQuickQuote && <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded font-bold uppercase">Estimate</span>}
                 </h1>
+                {quote.leadGuestName && (
+                    <div className="text-sm text-slate-600 mt-1 flex items-center gap-1.5 font-medium">
+                        <User size={14} className="text-slate-400"/>
+                        Prepared for: <span className="text-slate-800">{quote.leadGuestName}</span>
+                    </div>
+                )}
             </div>
             <div className="flex gap-2">
               {isAgent && (

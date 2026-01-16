@@ -155,6 +155,7 @@ export interface QuickQuoteTemplate {
 export interface Quote {
   id: string;
   uniqueRefNo: string;
+  leadGuestName?: string; // NEW FIELD: Guest Name
   destination: string;
   travelDate: string;
   paxCount: number;

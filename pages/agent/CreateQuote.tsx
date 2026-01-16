@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
 import { adminService } from '../../services/adminService';
 import { generateItinerary } from '../../services/geminiService';
-import { MapPin, Calendar, Users, ArrowRight, Sparkles, Moon, Briefcase, Loader2 } from 'lucide-react';
+import { MapPin, Calendar, Users, ArrowRight, Sparkles, Moon, Briefcase, Loader2, User } from 'lucide-react';
 
 export const CreateQuote: React.FC = () => {
   const { user } = useAuth();
@@ -17,6 +17,7 @@ export const CreateQuote: React.FC = () => {
     travelDate: '',
     nights: 4,
     pax: 2,
+    guestName: '',
     tripType: 'Leisure',
     useAI: true
   });
@@ -36,7 +37,8 @@ export const CreateQuote: React.FC = () => {
             user, 
             formData.destination, 
             formData.travelDate, 
-            formData.pax
+            formData.pax,
+            formData.guestName
         );
 
         // 2. AI Enhancement (Optional)
@@ -124,19 +126,17 @@ export const CreateQuote: React.FC = () => {
                 </div>
               </div>
 
-              {/* Pax */}
+              {/* Guest Name */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Travellers</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Guest Name / Reference</label>
                 <div className="relative">
-                  <Users className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                  <User className="absolute left-3 top-3.5 text-slate-400" size={20} />
                   <input
-                    required
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={formData.pax}
-                    onChange={(e) => setFormData({...formData, pax: Number(e.target.value)})}
+                    type="text"
+                    value={formData.guestName}
+                    onChange={(e) => setFormData({...formData, guestName: e.target.value})}
                     className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                    placeholder="e.g. Smith Family"
                   />
                 </div>
               </div>
@@ -160,23 +160,40 @@ export const CreateQuote: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Trip Type */}
+                {/* Pax */}
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Trip Type</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Travellers</label>
                     <div className="relative">
-                        <Briefcase className="absolute left-3 top-3.5 text-slate-400" size={20} />
-                        <select
-                            value={formData.tripType}
-                            onChange={(e) => setFormData({...formData, tripType: e.target.value})}
-                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none bg-white"
-                        >
-                            <option value="Leisure">Leisure / Family</option>
-                            <option value="Honeymoon">Honeymoon</option>
-                            <option value="Adventure">Adventure</option>
-                            <option value="Business">Corporate / Business</option>
-                            <option value="Luxury">Luxury</option>
-                        </select>
+                        <Users className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                        <input
+                            required
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={formData.pax}
+                            onChange={(e) => setFormData({...formData, pax: Number(e.target.value)})}
+                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                        />
                     </div>
+                </div>
+            </div>
+
+            {/* Trip Type */}
+            <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Trip Type</label>
+                <div className="relative">
+                    <Briefcase className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                    <select
+                        value={formData.tripType}
+                        onChange={(e) => setFormData({...formData, tripType: e.target.value})}
+                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none bg-white"
+                    >
+                        <option value="Leisure">Leisure / Family</option>
+                        <option value="Honeymoon">Honeymoon</option>
+                        <option value="Adventure">Adventure</option>
+                        <option value="Business">Corporate / Business</option>
+                        <option value="Luxury">Luxury</option>
+                    </select>
                 </div>
             </div>
 

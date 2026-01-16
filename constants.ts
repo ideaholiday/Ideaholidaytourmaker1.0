@@ -2,7 +2,7 @@
 import { User, UserRole, Quote } from './types';
 
 export const BRANDING = {
-  name: "Idea Holiday Tour Maker",
+  name: "Idea Tour Maker",
   legalName: "Idea Holiday Pvt Ltd.",
   email: "info@ideaholiday.com",
   supportPhone: "+91 9696 777 391",

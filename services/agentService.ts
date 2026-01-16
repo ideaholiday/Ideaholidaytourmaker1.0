@@ -53,13 +53,14 @@ class AgentService {
   }
 
   // Create new Quote
-  createQuote(agent: User, destination: string, travelDate: string, pax: number): Quote {
+  createQuote(agent: User, destination: string, travelDate: string, pax: number, leadGuestName?: string): Quote {
     const newQuote: Quote = {
       id: `q_${Date.now()}`,
       uniqueRefNo: `IHT-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
       destination,
       travelDate,
       paxCount: pax,
+      leadGuestName,
       serviceDetails: 'Standard B2B Package (Pending Customization)',
       itinerary: [],
       currency: 'USD', // Default

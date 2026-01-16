@@ -28,7 +28,7 @@ export const getWelcomeEmailHtml = (name: string, dashboardUrl: string) => `
       <div class="h-text">Welcome aboard, ${name}! 🎉</div>
       <p>Congratulations! Your partner account has been verified and fully activated.</p>
       
-      <p>You now have authorized access to the Idea Holiday Tour Maker platform. As a B2B partner, you can execute seamless travel operations with our enterprise tools:</p>
+      <p>You now have authorized access to the Idea Tour Maker platform. As a B2B partner, you can execute seamless travel operations with our enterprise tools:</p>
       
       <ul class="feature-list">
         <li><strong>Smart Itinerary Builder:</strong> Create proposals in minutes.</li>
@@ -48,7 +48,7 @@ export const getWelcomeEmailHtml = (name: string, dashboardUrl: string) => `
     <div class="footer">
       <p><strong>Idea Holiday Pvt Ltd</strong><br>Office No 129, Deva Palace, Lucknow</p>
       <p><a href="mailto:info@ideaholiday.com">info@ideaholiday.com</a></p>
-      <p>&copy; ${new Date().getFullYear()} Idea Holiday Tour Maker. All rights reserved.</p>
+      <p>&copy; ${new Date().getFullYear()} Idea Tour Maker. All rights reserved.</p>
     </div>
   </div>
 </body>

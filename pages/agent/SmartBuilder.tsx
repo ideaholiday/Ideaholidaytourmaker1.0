@@ -8,7 +8,7 @@ import { favoriteTemplateService } from '../../services/favoriteTemplateService'
 import { currencyService } from '../../services/currencyService';
 import { calculatePriceFromNet } from '../../utils/pricingEngine';
 import { ItineraryItem, ItineraryService, Hotel, Activity, Transfer, AgentFavoriteTemplate, ItineraryTemplate, CityVisit, PricingRule } from '../../types';
-import { MapPin, Calendar, Users, Hotel as HotelIcon, ArrowRight, Plus, Trash2, Check, ArrowLeft, DollarSign, Camera, Car, AlertCircle, Info, Plane, Coffee, Star, BedDouble, X, Search, Globe, Route, HelpCircle, Coins } from 'lucide-react';
+import { MapPin, Calendar, Users, Hotel as HotelIcon, ArrowRight, Plus, Trash2, Check, ArrowLeft, DollarSign, Camera, Car, AlertCircle, Info, Plane, Coffee, Star, BedDouble, X, Search, Globe, Route, HelpCircle, Coins, User } from 'lucide-react';
 import { TemplateSelector } from '../../components/TemplateSelector';
 import { FavoriteTemplateModal } from '../../components/FavoriteTemplateModal';
 import { CityNightSelector } from '../../components/CityNightSelector';
@@ -48,7 +48,8 @@ export const SmartBuilder: React.FC = () => {
     adults: 2,
     children: 0,
     childAges: [] as number[],
-    rooms: 1
+    rooms: 1,
+    guestName: ''
   });
 
   // Multi-City State
@@ -454,7 +455,7 @@ export const SmartBuilder: React.FC = () => {
 
   const handleSaveQuote = () => {
       const finalItinerary = JSON.parse(JSON.stringify(itinerary));
-      const newQuote = agentService.createQuote(user!, basics.destinationName, basics.travelDate, basics.adults + basics.children);
+      const newQuote = agentService.createQuote(user!, basics.destinationName, basics.travelDate, basics.adults + basics.children, basics.guestName);
       
       const updatedQuote = {
           ...newQuote,
@@ -584,6 +585,20 @@ export const SmartBuilder: React.FC = () => {
                                 className={`w-full border border-slate-300 p-3.5 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none ${isMultiCity ? 'bg-slate-100 text-slate-500' : 'bg-slate-50'}`}
                                 value={basics.nights} 
                                 onChange={e => !isMultiCity && setBasics({...basics, nights: Number(e.target.value)})} 
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Guest Name / Reference</label>
+                        <div className="relative">
+                            <User className="absolute left-4 top-3.5 text-slate-400" size={20} />
+                            <input
+                                type="text"
+                                className="w-full pl-12 border border-slate-300 p-3.5 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                                value={basics.guestName}
+                                onChange={(e) => setBasics({...basics, guestName: e.target.value})}
+                                placeholder="e.g. Smith Family or Trip Ref"
                             />
                         </div>
                     </div>

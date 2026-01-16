@@ -40,7 +40,8 @@ export const QuoteList: React.FC = () => {
       const matchesSearch = 
           q.destination.toLowerCase().includes(searchTerm.toLowerCase()) || 
           q.uniqueRefNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          q.paxCount.toString().includes(searchTerm);
+          q.paxCount.toString().includes(searchTerm) ||
+          (q.leadGuestName && q.leadGuestName.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesStatus = statusFilter === 'ALL' || q.status === statusFilter;
 
@@ -124,7 +125,7 @@ export const QuoteList: React.FC = () => {
             <Search className="absolute left-3 top-2.5 text-slate-400" size={20} />
             <input 
                 type="text" 
-                placeholder="Search by Quote ID, Destination or Pax..." 
+                placeholder="Search by Quote ID, Guest Name, Destination..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
@@ -180,6 +181,12 @@ export const QuoteList: React.FC = () => {
                 </th>
                 <th 
                   className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort('leadGuestName')}
+                >
+                  <div className="flex items-center">Guest <SortIcon columnKey="leadGuestName"/></div>
+                </th>
+                <th 
+                  className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition"
                   onClick={() => handleSort('destination')}
                 >
                   <div className="flex items-center">Destination <SortIcon columnKey="destination"/></div>
@@ -189,12 +196,6 @@ export const QuoteList: React.FC = () => {
                   onClick={() => handleSort('travelDate')}
                 >
                   <div className="flex items-center">Travel Date <SortIcon columnKey="travelDate"/></div>
-                </th>
-                <th 
-                  className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition"
-                  onClick={() => handleSort('paxCount')}
-                >
-                  <div className="flex items-center">Travellers <SortIcon columnKey="paxCount"/></div>
                 </th>
                 <th 
                   className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition"
@@ -220,9 +221,11 @@ export const QuoteList: React.FC = () => {
                         <span className="font-mono text-brand-600 font-medium">{quote.uniqueRefNo}</span>
                         {quote.type === 'QUICK' && <span className="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] rounded uppercase font-bold">Quick</span>}
                     </td>
+                    <td className="px-6 py-4 font-medium text-slate-800">
+                        {quote.leadGuestName || <span className="text-slate-400 italic">No Name</span>}
+                    </td>
                     <td className="px-6 py-4 font-medium text-slate-900">{quote.destination}</td>
                     <td className="px-6 py-4 text-slate-600">{quote.travelDate || <span className="text-slate-400">Not Set</span>}</td>
-                    <td className="px-6 py-4 text-slate-600">{quote.paxCount}</td>
                     <td className="px-6 py-4 font-bold text-slate-900">
                         {quote.currency} {displayPrice.toLocaleString()}
                     </td>

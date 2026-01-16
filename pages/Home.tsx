@@ -21,7 +21,7 @@ export const Home: React.FC = () => {
             The Ultimate <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-purple-600">Travel Operating System</span>
           </h1>
           <p className="text-xl text-slate-600 mb-10 leading-relaxed max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-3 duration-700">
-            Streamline your travel business with Idea Holiday Tour Maker. 
+            Streamline your travel business with Idea Tour Maker. 
             Connect Admins, Staff, Agents, and Operators in one secure ecosystem.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-in fade-in slide-in-from-bottom-4 duration-1000">

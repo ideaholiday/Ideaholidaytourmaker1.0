@@ -6,19 +6,19 @@ export const Terms: React.FC = () => (
   <div className="container mx-auto px-4 py-12 max-w-4xl">
     <div className="text-center mb-10">
         <h1 className="text-3xl font-bold text-slate-900">📜 TERMS & CONDITIONS</h1>
-        <p className="text-slate-500 mt-2">Idea Holiday Tour Maker</p>
+        <p className="text-slate-500 mt-2">{BRANDING.name}</p>
     </div>
     
     <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-slate-700 space-y-8">
         <div className="border-b border-slate-100 pb-6">
             <p className="text-sm text-slate-500 mb-2">Last updated: 13 January 2026</p>
-            <p>These Terms & Conditions govern the use of <strong>Idea Holiday Tour Maker</strong>, operated by <strong>Idea Holiday Pvt. Ltd.</strong></p>
+            <p>These Terms & Conditions govern the use of <strong>{BRANDING.name}</strong>, operated by <strong>{BRANDING.legalName}</strong></p>
             <p className="mt-2">By accessing or using the platform, you agree to these terms.</p>
         </div>
 
         <section>
             <h3 className="text-lg font-bold text-slate-900 mb-3">1. Platform Nature</h3>
-            <p className="leading-relaxed mb-2">Idea Holiday Tour Maker is a <strong>B2B travel management platform</strong>, intended for:</p>
+            <p className="leading-relaxed mb-2">{BRANDING.name} is a <strong>B2B travel management platform</strong>, intended for:</p>
             <ul className="list-disc pl-5 space-y-1 mb-2">
                 <li>Travel agents</li>
                 <li>Operators</li>
@@ -81,12 +81,12 @@ export const Terms: React.FC = () => (
 
         <section>
             <h3 className="text-lg font-bold text-slate-900 mb-3">7. Intellectual Property</h3>
-            <p>All software, branding, UI, and logic belong to <strong>Idea Holiday Pvt. Ltd.</strong> Unauthorized reproduction is prohibited.</p>
+            <p>All software, branding, UI, and logic belong to <strong>{BRANDING.legalName}</strong> Unauthorized reproduction is prohibited.</p>
         </section>
 
         <section>
             <h3 className="text-lg font-bold text-slate-900 mb-3">8. Limitation of Liability</h3>
-            <p>Idea Holiday Pvt. Ltd. acts as a <strong>technology platform</strong> and is not responsible for:</p>
+            <p>{BRANDING.legalName} acts as a <strong>technology platform</strong> and is not responsible for:</p>
             <ul className="list-disc pl-5 space-y-1">
                 <li>Third-party service failures</li>
                 <li>Visa, airline, or hotel operational issues</li>
@@ -112,13 +112,13 @@ export const Privacy: React.FC = () => (
   <div className="container mx-auto px-4 py-12 max-w-4xl">
     <div className="text-center mb-10">
         <h1 className="text-3xl font-bold text-slate-900">🔐 PRIVACY POLICY</h1>
-        <p className="text-slate-500 mt-2">Idea Holiday Tour Maker</p>
+        <p className="text-slate-500 mt-2">{BRANDING.name}</p>
     </div>
     
     <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-slate-700 space-y-8">
         <div className="border-b border-slate-100 pb-6">
              <p className="text-sm text-slate-500 mb-2">Last updated: 13 January 2026</p>
-             <p>Idea Holiday Pvt. Ltd. (“<strong>Idea Holiday</strong>”, “<strong>we</strong>”, “<strong>our</strong>”, “<strong>us</strong>”) operates the <strong>Idea Holiday Tour Maker</strong>, a B2B travel management and booking platform available at <strong>b2b.ideaholiday.com</strong>.</p>
+             <p>{BRANDING.legalName} (“<strong>Idea Holiday</strong>”, “<strong>we</strong>”, “<strong>our</strong>”, “<strong>us</strong>”) operates the <strong>{BRANDING.name}</strong>, a B2B travel management and booking platform available at <strong>b2b.ideaholiday.com</strong>.</p>
              <p className="mt-2">This Privacy Policy explains how we collect, use, store, and protect information when you use our application.</p>
         </div>
 
