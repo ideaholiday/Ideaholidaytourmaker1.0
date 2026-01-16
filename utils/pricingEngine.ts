@@ -1,14 +1,20 @@
 
 import { PricingInput, PricingBreakdown, PricingRule } from '../types';
 import { roundPrice } from './rounding';
+import { currencyService } from '../services/currencyService';
 
 /**
- * Calculates Supplier Net Cost (Raw Inventory Cost).
- * Admin Only View.
+ * Calculates Supplier Net Cost (Raw Inventory Cost) converted to Target Currency.
  */
 export const calculateSupplierCost = (input: PricingInput): number => {
-  const { travelers, hotel, transfers, activities, visa } = input;
+  const { travelers, hotel, transfers, activities, visa, targetCurrency } = input;
   const totalPax = travelers.adults + travelers.children; 
+  
+  // Helper: Convert amount from Source Currency to Quote Target Currency
+  const toTarget = (amount: number, sourceCurrency?: string) => {
+      const currency = sourceCurrency || 'USD'; // Fallback only if data missing
+      return currencyService.convert(amount, currency, targetCurrency);
+  };
 
   // 1. Hotel Cost
   let hotelCost = 0;
@@ -17,27 +23,31 @@ export const calculateSupplierCost = (input: PricingInput): number => {
   } else {
     hotelCost = hotel.cost * hotel.nights * totalPax;
   }
+  const hotelCostTotal = toTarget(hotelCost, hotel.currency);
 
   // 2. Transfer Cost
-  let transferCost = 0;
+  let transferCostTotal = 0;
   transfers.forEach(t => {
+    let cost = 0;
     if (t.costBasis === 'Per Vehicle') {
-      transferCost += t.cost * t.quantity;
+      cost = t.cost * t.quantity;
     } else {
-      transferCost += t.cost * totalPax;
+      cost = t.cost * totalPax;
     }
+    transferCostTotal += toTarget(cost, t.currency);
   });
 
   // 3. Activity Cost
-  let activityCost = 0;
+  let activityCostTotal = 0;
   activities.forEach(a => {
-    activityCost += (a.costAdult * travelers.adults) + (a.costChild * travelers.children);
+    const cost = (a.costAdult * travelers.adults) + (a.costChild * travelers.children);
+    activityCostTotal += toTarget(cost, a.currency);
   });
 
   // 4. Visa Cost
-  const visaCost = visa.enabled ? (visa.costPerPerson * totalPax) : 0;
+  const visaCostTotal = visa.enabled ? toTarget(visa.costPerPerson * totalPax, visa.currency) : 0;
 
-  return hotelCost + transferCost + activityCost + visaCost;
+  return hotelCostTotal + transferCostTotal + activityCostTotal + visaCostTotal;
 };
 
 /**
@@ -53,11 +63,6 @@ const calculateMarkupValue = (baseAmount: number, markup: number, type: 'Percent
 
 /**
  * Master Calculation Function
- * Flow:
- * 1. Supplier Cost (Raw)
- * 2. + Company Markup = Platform Net (Agent's Cost)
- * 3. + Agent Markup = Subtotal
- * 4. + GST = Final Price
  */
 export const calculateQuotePrice = (input: PricingInput): PricingBreakdown => {
   const supplierCost = calculateSupplierCost(input);
@@ -101,7 +106,7 @@ export const calculateQuotePrice = (input: PricingInput): PricingBreakdown => {
 
 /**
  * Simplified Calculator for direct values (e.g. SmartBuilder live view)
- * Assumes inputs are already summed or raw.
+ * Assumes inputs are already summed/converted to target currency.
  */
 export const calculatePriceFromNet = (
     netCost: number, 
@@ -116,12 +121,10 @@ export const calculatePriceFromNet = (
     const platformNetCost = supplierCost + companyMarkupValue;
     
     const effectiveAgentMarkup = agentMarkupOverride !== undefined ? agentMarkupOverride : rules.agentMarkup;
-    // If override is provided, assume it's a fixed value (flat fee) added to total, OR if percentage logic needed, handle here.
-    // For SmartBuilder, Agent usually adds a FLAT markup.
     
     let agentMarkupValue = 0;
     if (agentMarkupOverride !== undefined) {
-        // Flat markup override
+        // Flat markup override is assumed to be in target currency already
         agentMarkupValue = agentMarkupOverride;
     } else {
         // Use rule

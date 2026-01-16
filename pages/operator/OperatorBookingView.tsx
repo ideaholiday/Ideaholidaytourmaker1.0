@@ -4,10 +4,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { bookingService } from '../../services/bookingService';
 import { bookingOperatorService } from '../../services/bookingOperatorService';
-import { Booking, Message, UserRole } from '../../types';
+import { Booking, Message, UserRole, DriverDetails } from '../../types';
 import { ChatPanel } from '../../components/ChatPanel';
 import { ItineraryView } from '../../components/ItineraryView';
-import { ArrowLeft, MapPin, Calendar, Users, Briefcase, CheckCircle, Flag, XCircle, AlertTriangle, EyeOff, DollarSign, Play } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Users, Briefcase, CheckCircle, Flag, XCircle, AlertTriangle, EyeOff, DollarSign, Play, Car, Phone, Edit2, Save, X } from 'lucide-react';
 
 export const OperatorBookingView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,19 +19,32 @@ export const OperatorBookingView: React.FC = () => {
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
 
+  // Driver Logic
+  const [isEditingDriver, setIsEditingDriver] = useState(false);
+  const [driverForm, setDriverForm] = useState<DriverDetails>({
+      name: '', phone: '', vehicleModel: '', vehicleNumber: ''
+  });
+
   useEffect(() => {
     if (id) {
       const found = bookingService.getBooking(id);
       // Security check: Operator must be assigned
       if (found && found.operatorId === user?.id) {
           setBooking(found);
+          if (found.driverDetails) {
+              setDriverForm(found.driverDetails);
+          }
       }
     }
   }, [id, user]);
 
   if (!booking || !user) return <div className="p-8 text-center">Loading Booking...</div>;
 
-  const refresh = () => setBooking(bookingService.getBooking(booking!.id) || null);
+  const refresh = () => {
+      const found = bookingService.getBooking(booking.id);
+      setBooking(found || null);
+      if (found?.driverDetails) setDriverForm(found.driverDetails);
+  };
 
   const handleSendMessage = (text: string) => {
     const msg: Message = {
@@ -74,6 +87,13 @@ export const OperatorBookingView: React.FC = () => {
       if(!declineReason.trim()) return;
       bookingOperatorService.declineAssignment(booking.id, declineReason, user);
       setShowDeclineModal(false);
+      refresh();
+  };
+
+  const handleSaveDriver = (e: React.FormEvent) => {
+      e.preventDefault();
+      bookingOperatorService.updateDriverDetails(booking.id, driverForm, user);
+      setIsEditingDriver(false);
       refresh();
   };
 
@@ -179,9 +199,9 @@ export const OperatorBookingView: React.FC = () => {
                 <ItineraryView itinerary={booking.itinerary} />
             </div>
 
-            <div className="lg:col-span-1 p-6 flex flex-col h-full">
-                {/* Operator Pricing Box - EXPLICITLY LABELED AS OPERATIONAL REVENUE */}
-                <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">
+            <div className="lg:col-span-1 p-6 flex flex-col h-full space-y-6">
+                {/* Operator Pricing Box */}
+                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                     <h3 className="text-slate-800 font-bold mb-1 flex items-center gap-2"><DollarSign size={18}/> Operational Revenue</h3>
                     <p className="text-xs text-slate-500 mb-4">Amount payable to YOU for these services.</p>
                     
@@ -196,13 +216,94 @@ export const OperatorBookingView: React.FC = () => {
                             <p className="text-sm text-slate-500 italic">Price details pending</p>
                         </div>
                     )}
-                    
-                    <div className="mt-3 p-2 bg-blue-50 border border-blue-100 rounded text-[10px] text-blue-700 leading-tight">
-                        <strong>Privacy Notice:</strong> Client payment status (Advance/Balance) is handled by the platform and hidden from ground operations.
-                    </div>
                 </div>
 
-                <div className="flex-1 flex flex-col">
+                {/* Driver Details Card - Only show if Accepted */}
+                {assignmentStatus === 'ACCEPTED' && (
+                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-slate-800 font-bold flex items-center gap-2"><Car size={18}/> Driver & Vehicle</h3>
+                            {!isEditingDriver && (
+                                <button 
+                                    onClick={() => setIsEditingDriver(true)} 
+                                    className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-2 py-1 rounded transition flex items-center gap-1"
+                                >
+                                    <Edit2 size={12}/> Edit
+                                </button>
+                            )}
+                        </div>
+
+                        {isEditingDriver ? (
+                            <form onSubmit={handleSaveDriver} className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 mb-1">Driver Name</label>
+                                    <input required type="text" value={driverForm.name} onChange={e => setDriverForm({...driverForm, name: e.target.value})} className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 mb-1">Phone Number</label>
+                                    <input required type="text" value={driverForm.phone} onChange={e => setDriverForm({...driverForm, phone: e.target.value})} className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-600 mb-1">Vehicle Model</label>
+                                        <input required type="text" placeholder="e.g. Innova" value={driverForm.vehicleModel} onChange={e => setDriverForm({...driverForm, vehicleModel: e.target.value})} className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-600 mb-1">Vehicle No</label>
+                                        <input required type="text" placeholder="KA-01-AB-1234" value={driverForm.vehicleNumber} onChange={e => setDriverForm({...driverForm, vehicleNumber: e.target.value})} className="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <button type="button" onClick={() => setIsEditingDriver(false)} className="flex-1 py-1.5 bg-slate-100 text-slate-600 rounded text-xs font-medium">Cancel</button>
+                                    <button type="submit" className="flex-1 py-1.5 bg-brand-600 text-white rounded text-xs font-bold flex items-center justify-center gap-1"><Save size={12}/> Save</button>
+                                </div>
+                            </form>
+                        ) : (
+                            booking.driverDetails ? (
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-slate-100 p-2 rounded-full text-slate-500"><Users size={16}/></div>
+                                        <div>
+                                            <p className="font-bold text-slate-900">{booking.driverDetails.name}</p>
+                                            <p className="text-xs text-slate-500">Driver</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-slate-100 p-2 rounded-full text-slate-500"><Phone size={16}/></div>
+                                        <div>
+                                            <p className="font-bold text-slate-900">{booking.driverDetails.phone}</p>
+                                            <p className="text-xs text-slate-500">Contact</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-slate-100 p-2 rounded-full text-slate-500"><Car size={16}/></div>
+                                        <div>
+                                            <p className="font-bold text-slate-900">{booking.driverDetails.vehicleModel}</p>
+                                            <p className="text-xs text-slate-500">{booking.driverDetails.vehicleNumber}</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-green-50 text-green-700 text-xs px-3 py-2 rounded-lg border border-green-100 mt-2 flex items-center gap-2">
+                                        <CheckCircle size={14} /> Assigned & Shared with Agent
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                                    <Car size={24} className="mx-auto text-slate-300 mb-2" />
+                                    <p className="text-xs text-slate-500 mb-3">No driver details assigned yet.</p>
+                                    <button 
+                                        onClick={() => setIsEditingDriver(true)}
+                                        className="text-xs bg-white border border-slate-300 px-3 py-1.5 rounded font-medium text-slate-700 hover:text-brand-600 transition shadow-sm"
+                                    >
+                                        + Assign Driver
+                                    </button>
+                                </div>
+                            )
+                        )}
+                    </div>
+                )}
+
+                <div className="flex-1 flex flex-col min-h-[300px]">
+                    <h3 className="text-slate-800 font-bold mb-3">Communication</h3>
                     <ChatPanel 
                         user={user} 
                         messages={booking.comments} 
@@ -219,7 +320,7 @@ export const OperatorBookingView: React.FC = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
                   <h3 className="text-lg font-bold text-slate-900 mb-2">Decline Booking Assignment</h3>
-                  <p className="text-sm text-slate-500 mb-4">Please provide a reason. This will be sent to admin.</p>
+                  <p className="text-sm text-slate-600 mb-4">Please provide a reason. This will be sent to admin.</p>
                   <textarea 
                       className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-red-500 outline-none h-32 resize-none mb-4"
                       placeholder="e.g. Fully booked for these dates..."

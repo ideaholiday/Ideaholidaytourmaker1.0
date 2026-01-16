@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -121,13 +120,15 @@ export const QuoteDetail: React.FC = () => {
 
   const handleUpdateItinerary = (newItinerary: ItineraryItem[]) => {
     let calculatedCost = 0;
+    const quoteCurrency = quote.currency || 'USD';
+
     newItinerary.forEach(day => {
         if (day.services) {
             day.services.forEach(svc => {
                 if (!svc.isRef) {
-                    // Convert service cost to Base Currency (USD) for storage uniformity
-                    const serviceCostInBase = currencyService.convert(svc.cost, svc.currency || 'USD', 'USD');
-                    calculatedCost += serviceCostInBase; 
+                    // Correct Currency Logic: Convert Item's Currency to Quote's Currency
+                    const serviceCost = currencyService.convert(svc.cost, svc.currency || 'USD', quoteCurrency);
+                    calculatedCost += serviceCost; 
                 }
             });
         }
@@ -136,12 +137,14 @@ export const QuoteDetail: React.FC = () => {
     const hasNewPricing = calculatedCost > 0;
     const b2bPrice = hasNewPricing ? Math.ceil(calculatedCost * 1.15) : (quote.price || 0);
     
+    // Agent markup is stored in quote currency on this page
     const newSellingPrice = b2bPrice + agentMarkupAmount;
 
     const updatedQuote = { 
         ...quote, 
         itinerary: newItinerary,
-        currency: 'USD', // Always store in Base for consistency
+        // Keep quote currency consistent
+        currency: quoteCurrency,
         cost: hasNewPricing ? calculatedCost : quote.cost,
         price: b2bPrice,
         sellingPrice: newSellingPrice,

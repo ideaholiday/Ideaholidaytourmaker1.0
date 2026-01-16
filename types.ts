@@ -392,11 +392,12 @@ export interface PricingRule {
 }
 
 export interface PricingInput {
+  targetCurrency: string; // The currency we want the output in (e.g. Quote Currency)
   travelers: { adults: number; children: number; infants: number };
-  hotel: { nights: number; cost: number; costType: 'Per Room' | 'Per Person'; rooms: number };
-  transfers: { cost: number; quantity: number; costBasis: 'Per Vehicle' | 'Per Person' }[];
-  activities: { costAdult: number; costChild: number }[];
-  visa: { costPerPerson: number; enabled: boolean };
+  hotel: { nights: number; cost: number; costType: 'Per Room' | 'Per Person'; rooms: number; currency: string };
+  transfers: { cost: number; quantity: number; costBasis: 'Per Vehicle' | 'Per Person'; currency: string }[];
+  activities: { costAdult: number; costChild: number; currency: string }[];
+  visa: { costPerPerson: number; enabled: boolean; currency: string };
   rules: PricingRule;
 }
 

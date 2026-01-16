@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import { PricingInput, PricingBreakdown, PricingRule } from '../types';
 import { calculateQuotePrice } from '../utils/pricingEngine';
@@ -14,11 +15,12 @@ const DEFAULT_RULES: PricingRule = {
 };
 
 const DEFAULT_INPUT: PricingInput = {
+  targetCurrency: 'USD',
   travelers: { adults: 2, children: 0, infants: 0 },
-  hotel: { nights: 3, cost: 0, costType: 'Per Room', rooms: 1 },
+  hotel: { nights: 3, cost: 0, costType: 'Per Room', rooms: 1, currency: 'USD' },
   transfers: [],
   activities: [],
-  visa: { costPerPerson: 0, enabled: false },
+  visa: { costPerPerson: 0, enabled: false, currency: 'USD' },
   rules: DEFAULT_RULES
 };
 

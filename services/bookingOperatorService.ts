@@ -1,5 +1,5 @@
 
-import { Booking, User, UserRole, Message } from '../types';
+import { Booking, User, UserRole, Message, DriverDetails } from '../types';
 import { bookingService } from './bookingService';
 import { auditLogService } from './auditLogService';
 
@@ -53,12 +53,6 @@ class BookingOperatorService {
     booking.updatedAt = new Date().toISOString();
 
     // Persist via BookingService (it saves the array ref)
-    // Note: bookingService.save() is private, but modifying the object works if we trigger a save.
-    // We can use a public method on bookingService or assume reference mutation + internal save mechanism.
-    // For this architecture, we'll re-save via bookingService's update mechanism logic (simulated by triggering a status update or just accessing the array if shared).
-    // Better way: Call a method on bookingService to force save.
-    // We will assume `bookingService` uses the shared array reference.
-    // To be safe, let's call a method that triggers save.
     bookingService.updateStatus(booking.id, booking.status, adminUser, 'Operator Assigned');
 
     // Audit Log
@@ -139,6 +133,37 @@ class BookingOperatorService {
         description: `Operator ${operatorUser.name} declined booking. Reason: ${reason}`,
         user: operatorUser,
         newValue: { operatorStatus: 'DECLINED', reason }
+    });
+  }
+
+  // Update Driver Details
+  updateDriverDetails(bookingId: string, details: DriverDetails, user: User) {
+    const booking = bookingService.getBooking(bookingId);
+    if (!booking) throw new Error("Booking not found");
+    if (booking.operatorId !== user.id) throw new Error("Unauthorized");
+
+    booking.driverDetails = details;
+    
+    const msg: Message = {
+        id: `sys_${Date.now()}`,
+        senderId: user.id,
+        senderName: 'System',
+        senderRole: UserRole.ADMIN,
+        content: `Driver Updated: ${details.name} (${details.vehicleModel}).`,
+        timestamp: new Date().toISOString(),
+        isSystem: true
+    };
+    
+    // Saving via comment addition to ensure persistence
+    bookingService.addComment(bookingId, msg);
+
+    auditLogService.logAction({
+        entityType: 'BOOKING',
+        entityId: bookingId,
+        action: 'DRIVER_UPDATED',
+        description: `Driver updated by ${user.name}`,
+        user: user,
+        newValue: details
     });
   }
 }

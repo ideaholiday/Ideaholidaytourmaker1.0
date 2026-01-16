@@ -105,29 +105,29 @@ const INITIAL_ACTIVITIES: Activity[] = [
 
 const INITIAL_TRANSFERS: Transfer[] = [
   // UAE
-  { id: 't1', transferName: 'DXB Airport to Hotel (Deira/Bur Dubai)', destinationId: 'd1', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 85, costBasis: 'Per Vehicle', nightSurcharge: 20, isActive: true, createdBy: 'u1' },
-  { id: 't2', transferName: 'DXB Airport to Hotel (Marina/Palm)', destinationId: 'd1', transferType: 'PVT', vehicleType: 'Minivan', maxPassengers: 6, cost: 160, costBasis: 'Per Vehicle', nightSurcharge: 30, isActive: true, createdBy: 'u1' },
-  { id: 't4', transferName: 'AUH Airport to Abu Dhabi City', destinationId: 'd4', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 120, costBasis: 'Per Vehicle', nightSurcharge: 20, isActive: true, createdBy: 'u1' },
-  { id: 't5', transferName: 'Dubai Hotel to Abu Dhabi City Tour', destinationId: 'd1', transferType: 'PVT', vehicleType: 'SUV', maxPassengers: 6, cost: 500, costBasis: 'Per Vehicle', nightSurcharge: 0, isActive: true, createdBy: 'u1' },
+  { id: 't1', transferName: 'DXB Airport to Hotel (Deira/Bur Dubai)', destinationId: 'd1', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 85, costBasis: 'Per Vehicle', nightSurcharge: 20, isActive: true, createdBy: 'u1', currency: 'AED' },
+  { id: 't2', transferName: 'DXB Airport to Hotel (Marina/Palm)', destinationId: 'd1', transferType: 'PVT', vehicleType: 'Minivan', maxPassengers: 6, cost: 160, costBasis: 'Per Vehicle', nightSurcharge: 30, isActive: true, createdBy: 'u1', currency: 'AED' },
+  { id: 't4', transferName: 'AUH Airport to Abu Dhabi City', destinationId: 'd4', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 120, costBasis: 'Per Vehicle', nightSurcharge: 20, isActive: true, createdBy: 'u1', currency: 'AED' },
+  { id: 't5', transferName: 'Dubai Hotel to Abu Dhabi City Tour', destinationId: 'd1', transferType: 'PVT', vehicleType: 'SUV', maxPassengers: 6, cost: 500, costBasis: 'Per Vehicle', nightSurcharge: 0, isActive: true, createdBy: 'u1', currency: 'AED' },
 
   // Thailand - Phuket
-  { id: 't3', transferName: 'HKT Airport - Patong/Kata/Karon', destinationId: 'd2', transferType: 'PVT', vehicleType: 'Van', maxPassengers: 9, cost: 800, costBasis: 'Per Vehicle', nightSurcharge: 200, isActive: true, createdBy: 'u1' },
+  { id: 't3', transferName: 'HKT Airport - Patong/Kata/Karon', destinationId: 'd2', transferType: 'PVT', vehicleType: 'Van', maxPassengers: 9, cost: 800, costBasis: 'Per Vehicle', nightSurcharge: 200, isActive: true, createdBy: 'u1', currency: 'THB' },
   
   // Thailand - Bangkok
-  { id: 't6', transferName: 'BKK/DMK Airport - Bangkok Hotel', destinationId: 'd3', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 900, costBasis: 'Per Vehicle', nightSurcharge: 200, isActive: true, createdBy: 'u1' },
-  { id: 't7', transferName: 'Bangkok Hotel - Pattaya Hotel', destinationId: 'd3', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 1500, costBasis: 'Per Vehicle', nightSurcharge: 300, isActive: true, createdBy: 'u1' },
+  { id: 't6', transferName: 'BKK/DMK Airport - Bangkok Hotel', destinationId: 'd3', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 900, costBasis: 'Per Vehicle', nightSurcharge: 200, isActive: true, createdBy: 'u1', currency: 'THB' },
+  { id: 't7', transferName: 'Bangkok Hotel - Pattaya Hotel', destinationId: 'd3', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 1500, costBasis: 'Per Vehicle', nightSurcharge: 300, isActive: true, createdBy: 'u1', currency: 'THB' },
 
   // Thailand - Pattaya
-  { id: 't8', transferName: 'UTP Airport - Pattaya Hotel', destinationId: 'd5', transferType: 'PVT', vehicleType: 'Van', maxPassengers: 9, cost: 1200, costBasis: 'Per Vehicle', nightSurcharge: 200, isActive: true, createdBy: 'u1' },
+  { id: 't8', transferName: 'UTP Airport - Pattaya Hotel', destinationId: 'd5', transferType: 'PVT', vehicleType: 'Van', maxPassengers: 9, cost: 1200, costBasis: 'Per Vehicle', nightSurcharge: 200, isActive: true, createdBy: 'u1', currency: 'THB' },
 
   // Thailand - Krabi
-  { id: 't9', transferName: 'KBV Airport - Ao Nang Hotel', destinationId: 'd6', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 600, costBasis: 'Per Vehicle', nightSurcharge: 150, isActive: true, createdBy: 'u1' },
+  { id: 't9', transferName: 'KBV Airport - Ao Nang Hotel', destinationId: 'd6', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 600, costBasis: 'Per Vehicle', nightSurcharge: 150, isActive: true, createdBy: 'u1', currency: 'THB' },
 
   // Vietnam
-  { id: 't10', transferName: 'Noi Bai Airport (HAN) - Hanoi Center', destinationId: 'd7', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 25, costBasis: 'Per Vehicle', nightSurcharge: 5, isActive: true, createdBy: 'u1' },
-  { id: 't11', transferName: 'Hanoi - Ha Long Bay', destinationId: 'd7', transferType: 'SIC', vehicleType: 'Limousine Bus', maxPassengers: 1, cost: 15, costBasis: 'Per Person', nightSurcharge: 0, isActive: true, createdBy: 'u1' },
-  { id: 't12', transferName: 'Da Nang Airport (DAD) - Hotel', destinationId: 'd9', transferType: 'PVT', vehicleType: 'SUV', maxPassengers: 4, cost: 20, costBasis: 'Per Vehicle', nightSurcharge: 5, isActive: true, createdBy: 'u1' },
-  { id: 't13', transferName: 'Tan Son Nhat Airport (SGN) - D1 Hotel', destinationId: 'd10', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 22, costBasis: 'Per Vehicle', nightSurcharge: 5, isActive: true, createdBy: 'u1' },
+  { id: 't10', transferName: 'Noi Bai Airport (HAN) - Hanoi Center', destinationId: 'd7', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 25, costBasis: 'Per Vehicle', nightSurcharge: 5, isActive: true, createdBy: 'u1', currency: 'USD' },
+  { id: 't11', transferName: 'Hanoi - Ha Long Bay', destinationId: 'd7', transferType: 'SIC', vehicleType: 'Limousine Bus', maxPassengers: 1, cost: 15, costBasis: 'Per Person', nightSurcharge: 0, isActive: true, createdBy: 'u1', currency: 'USD' },
+  { id: 't12', transferName: 'Da Nang Airport (DAD) - Hotel', destinationId: 'd9', transferType: 'PVT', vehicleType: 'SUV', maxPassengers: 4, cost: 20, costBasis: 'Per Vehicle', nightSurcharge: 5, isActive: true, createdBy: 'u1', currency: 'USD' },
+  { id: 't13', transferName: 'Tan Son Nhat Airport (SGN) - D1 Hotel', destinationId: 'd10', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 22, costBasis: 'Per Vehicle', nightSurcharge: 5, isActive: true, createdBy: 'u1', currency: 'USD' },
 ];
 
 const INITIAL_VISAS: Visa[] = [

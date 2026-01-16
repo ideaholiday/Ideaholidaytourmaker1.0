@@ -5,9 +5,10 @@ import { useAuth } from '../../context/AuthContext';
 import { adminService } from '../../services/adminService';
 import { agentService } from '../../services/agentService';
 import { favoriteTemplateService } from '../../services/favoriteTemplateService';
+import { currencyService } from '../../services/currencyService';
 import { calculatePriceFromNet } from '../../utils/pricingEngine';
 import { ItineraryItem, ItineraryService, Hotel, Activity, Transfer, AgentFavoriteTemplate, ItineraryTemplate, CityVisit, PricingRule } from '../../types';
-import { MapPin, Calendar, Users, Hotel as HotelIcon, ArrowRight, Plus, Trash2, Check, ArrowLeft, DollarSign, Camera, Car, AlertCircle, Info, Plane, Coffee, Star, BedDouble, X, Search, Globe, Route, HelpCircle } from 'lucide-react';
+import { MapPin, Calendar, Users, Hotel as HotelIcon, ArrowRight, Plus, Trash2, Check, ArrowLeft, DollarSign, Camera, Car, AlertCircle, Info, Plane, Coffee, Star, BedDouble, X, Search, Globe, Route, HelpCircle, Coins } from 'lucide-react';
 import { TemplateSelector } from '../../components/TemplateSelector';
 import { FavoriteTemplateModal } from '../../components/FavoriteTemplateModal';
 import { CityNightSelector } from '../../components/CityNightSelector';
@@ -26,8 +27,18 @@ export const SmartBuilder: React.FC = () => {
       setToast({ msg, type, show: true });
   };
 
-  // --- PRICING RULES ---
+  // --- PRICING RULES & CURRENCY ---
   const [pricingRules, setPricingRules] = useState<PricingRule>(adminService.getPricingRule());
+  const [currency, setCurrency] = useState('USD');
+  const currencies = currencyService.getCurrencies();
+
+  // Helper to format prices dynamically
+  const formatPrice = (amountInUsd: number) => {
+      // Input expected in Quote Currency already for this helper context usually, 
+      // but if we pass raw, we might need conversion. 
+      // The calculateFinancials returns in Quote Currency.
+      return `${currencyService.getSymbol(currency)} ${amountInUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  };
 
   // --- STEP 1: TRIP BASICS ---
   const [basics, setBasics] = useState({
@@ -53,15 +64,12 @@ export const SmartBuilder: React.FC = () => {
   const [roomError, setRoomError] = useState('');
   
   useEffect(() => {
-    // Basic auto-suggest rooms
     if (step === 1 && !roomError) { 
-       // Only auto-set if user hasn't manually messed it up to an error state to avoid fighting the user
        const suggested = Math.ceil(basics.adults / 2);
        if (basics.rooms < suggested) setBasics(prev => ({...prev, rooms: suggested}));
     }
   }, [basics.adults]);
 
-  // Real-time Validation for Step 1
   useEffect(() => {
       if (step === 1) {
           const adultsPerRoom = basics.adults / basics.rooms;
@@ -77,7 +85,6 @@ export const SmartBuilder: React.FC = () => {
       }
   }, [basics.adults, basics.children, basics.rooms, step]);
 
-  // Sync basics.nights with City Visits
   useEffect(() => {
       if (isMultiCity) {
           const totalNights = cityVisits.reduce((acc, visit) => acc + visit.nights, 0);
@@ -114,11 +121,19 @@ export const SmartBuilder: React.FC = () => {
       }
   }, [activeCityTabId, step]);
 
+  // Improved Selection: Allow toggle
   const handleSelectHotelForCity = (visitId: string, hotel: Hotel) => {
-      setCityVisits(prev => prev.map(v => 
-          v.id === visitId ? { ...v, hotelId: hotel.id, hotelName: hotel.name } : v
-      ));
-      showToast(`${hotel.name} selected!`, 'success');
+      setCityVisits(prev => prev.map(v => {
+          if (v.id === visitId) {
+              // Toggle off if same hotel clicked
+              if (v.hotelId === hotel.id) {
+                  return { ...v, hotelId: undefined, hotelName: undefined };
+              }
+              // Select new hotel
+              return { ...v, hotelId: hotel.id, hotelName: hotel.name };
+          }
+          return v;
+      }));
   };
 
   // --- STEP 3: ITINERARY GENERATION ---
@@ -147,7 +162,7 @@ export const SmartBuilder: React.FC = () => {
                     if (isFirstCity) {
                         title = `Day ${dayCounter}: Arrival in ${visit.cityName}`;
                         desc = `Welcome to ${selectedCountry}! Arrive at ${visit.cityName} airport and transfer to hotel.`;
-                        services.push({ id: `trf_arr_${idx}`, type: 'TRANSFER', name: `Airport Transfer to ${visit.cityName} Hotel`, cost: 0, price: 0, isRef: true }); 
+                        services.push({ id: `trf_arr_${idx}`, type: 'TRANSFER', name: `Airport Transfer to ${visit.cityName} Hotel`, cost: 0, price: 0, currency: 'USD', isRef: true }); 
                     } else {
                         title = `Day ${dayCounter}: Transfer to ${visit.cityName}`;
                         desc = `Check out and transfer to ${visit.cityName}. Check in to your hotel.`;
@@ -157,6 +172,7 @@ export const SmartBuilder: React.FC = () => {
                             name: `Intercity Transfer to ${visit.cityName}`, 
                             cost: 0, 
                             price: 0, 
+                            currency: 'USD',
                             isRef: true,
                             meta: { note: 'Auto-suggested transfer' }
                         });
@@ -182,7 +198,7 @@ export const SmartBuilder: React.FC = () => {
             day: dayCounter,
             title: `Day ${dayCounter}: Departure`,
             description: 'Check out and transfer to the airport for your return flight.',
-            services: [{ id: 'trf_dep', type: 'TRANSFER', name: 'Departure Airport Transfer', cost: 0, price: 0, isRef: true }],
+            services: [{ id: 'trf_dep', type: 'TRANSFER', name: 'Departure Airport Transfer', cost: 0, price: 0, currency: 'USD', isRef: true }],
             inclusions: ['Breakfast', 'Airport Transfer'],
             cityId: cityVisits[cityVisits.length - 1].cityId
         });
@@ -222,7 +238,6 @@ export const SmartBuilder: React.FC = () => {
       return (
           <div className="w-full max-w-3xl mx-auto mb-8 px-4">
               <div className="flex items-center justify-between relative">
-                  {/* Line Background */}
                   <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-200 -z-10 rounded-full"></div>
                   <div 
                     className="absolute top-1/2 left-0 h-1 bg-brand-500 -z-10 rounded-full transition-all duration-500 ease-out"
@@ -252,7 +267,6 @@ export const SmartBuilder: React.FC = () => {
       );
   };
 
-  // Helper functions
   const getCityName = (cityId: string) => {
       const dest = allDestinations.find(d => d.id === cityId);
       return dest ? dest.city : 'Unknown';
@@ -274,7 +288,6 @@ export const SmartBuilder: React.FC = () => {
           children: basics.children
       });
 
-      // Map generated items to current cities context if possible, or fallback
       const mapped = generated.map((item, idx) => ({
           ...item,
           cityId: itinerary[idx]?.cityId || cityVisits[0]?.cityId
@@ -341,6 +354,7 @@ export const SmartBuilder: React.FC = () => {
     let cost = 0;
     let name = '';
     let meta = {};
+    const itemCurrency = item.currency || 'USD'; // Capture source currency
     
     if (type === 'ACTIVITY') {
         const act = item as Activity;
@@ -364,8 +378,9 @@ export const SmartBuilder: React.FC = () => {
         id: item.id,
         type,
         name,
-        cost,
+        cost: cost,
         price: cost,
+        currency: itemCurrency, // Store original currency
         isRef: false,
         meta
     };
@@ -387,10 +402,14 @@ export const SmartBuilder: React.FC = () => {
   const calculateFinancials = () => {
     let rawSupplierCost = 0;
 
-    // 1. Sum Itinerary Services
+    // 1. Sum Itinerary Services (Convert each item from its Source Currency to Quote Currency)
     itinerary.forEach(day => {
         day.services?.forEach(svc => {
-            if (!svc.isRef) rawSupplierCost += svc.cost;
+            if (!svc.isRef) {
+                // IMPORTANT: Correct conversion using Item Currency
+                const convertedCost = currencyService.convert(svc.cost, svc.currency || 'USD', currency);
+                rawSupplierCost += convertedCost;
+            }
         });
     });
 
@@ -407,23 +426,28 @@ export const SmartBuilder: React.FC = () => {
                     } else {
                         cityHotelCost = hotel.cost * (basics.adults + basics.children) * visit.nights;
                     }
-                    rawSupplierCost += cityHotelCost;
+                    // IMPORTANT: Correct conversion using Hotel Currency
+                    const hotelCostConverted = currencyService.convert(cityHotelCost, hotel.currency || 'USD', currency);
+                    rawSupplierCost += hotelCostConverted;
                 }
             }
         });
     } else {
         // In REF mode, user manually enters cost. 
-        // This 'manual cost' acts as Supplier Cost for calculations.
-        rawSupplierCost += Number(manualHotel.cost);
+        // We assume they entered it in the selected Quote Currency.
+        const manualCost = Number(manualHotel.cost);
+        rawSupplierCost += manualCost;
     }
 
-    // 3. Use Pricing Engine to Apply Company Markup (Platform Margin) + Agent Markup
-    return calculatePriceFromNet(
+    // 3. Use Pricing Engine
+    const result = calculatePriceFromNet(
         rawSupplierCost, 
         pricingRules, 
         basics.adults + basics.children,
-        agentMarkup // Agent specific override (Flat Fee)
+        agentMarkup // Agent markup is flat and assumed to be in Quote Currency
     );
+
+    return result;
   };
 
   const financials = calculateFinancials();
@@ -438,12 +462,12 @@ export const SmartBuilder: React.FC = () => {
           childAges: basics.childAges,
           itinerary: finalItinerary,
           
-          // Cost Logic: Store the 'Platform Net' as cost for the agent.
+          // Cost Logic: Store converted values in Quote Currency
           cost: financials.platformNetCost, 
-          // Store 'Platform Net' as 'price' (B2B Price)
           price: financials.platformNetCost,
-          // Store 'Final' as Selling Price
           sellingPrice: financials.finalPrice,
+          
+          currency: currency,
           
           hotelMode: hotelMode,
           cityVisits: cityVisits,
@@ -466,12 +490,10 @@ export const SmartBuilder: React.FC = () => {
         </div>
 
         <div className="container mx-auto px-4 py-8">
-            {/* STEP 1: BASICS */}
+            {/* STEP 1: BASICS (Unchanged) */}
             {step === 1 && (
                 <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-8 animate-in fade-in slide-in-from-bottom-4">
                     
-                    {/* ... (Basic inputs same as before) ... */}
-                    {/* I'm keeping the complex logic for step 1 intact, simplified for brevity here */}
                     <div className="bg-slate-50 p-1.5 rounded-xl flex">
                         <button 
                             onClick={() => { setIsMultiCity(false); setCityVisits([]); setBasics(prev => ({...prev, destinationName: ''})); }}
@@ -598,7 +620,23 @@ export const SmartBuilder: React.FC = () => {
                         )}
                     </div>
 
-                    <div className="flex justify-end pt-4">
+                    {/* CURRENCY CONVERTER */}
+                    <div className="flex justify-end items-center gap-3">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                            <Coins size={14} /> Quote Currency:
+                        </label>
+                        <select 
+                            value={currency} 
+                            onChange={(e) => setCurrency(e.target.value)}
+                            className="bg-white border border-slate-300 rounded-lg py-2 pl-3 pr-8 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-brand-500 outline-none cursor-pointer hover:border-brand-300 transition"
+                        >
+                            {currencies.map(c => (
+                                <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
                         <button 
                             disabled={!basics.travelDate || cityVisits.length === 0 || !!roomError}
                             onClick={handleNext} 
@@ -610,7 +648,7 @@ export const SmartBuilder: React.FC = () => {
                 </div>
             )}
 
-            {/* STEP 2: HOTEL - (Keeping largely same logic but ensure connection) */}
+            {/* STEP 2: HOTEL */}
             {step === 2 && (
                 <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-right-4">
                     <div className="flex justify-between items-center">
@@ -670,13 +708,16 @@ export const SmartBuilder: React.FC = () => {
                                         const currentVisit = cityVisits.find(v => v.id === activeCityTabId);
                                         const isSelected = currentVisit?.hotelId === h.id;
                                         
-                                        // Calculate raw cost based on occupancy
-                                        const rawCost = h.costType === 'Per Room' 
+                                        // Calculate cost based on occupancy
+                                        const rawCostSource = h.costType === 'Per Room' 
                                             ? (h.cost * basics.rooms * (currentVisit?.nights || 1))
                                             : (h.cost * (basics.adults + basics.children) * (currentVisit?.nights || 1));
 
-                                        // Apply Pricing Rules for Display
-                                        const calculated = calculatePriceFromNet(rawCost, pricingRules, basics.adults + basics.children);
+                                        // Convert from Hotel Currency to Quote Currency for display
+                                        const rawCostConverted = currencyService.convert(rawCostSource, h.currency || 'USD', currency);
+
+                                        // Apply Pricing Rules (Estimated)
+                                        const calculated = calculatePriceFromNet(rawCostConverted, pricingRules, basics.adults + basics.children);
 
                                         return (
                                             <div 
@@ -696,7 +737,7 @@ export const SmartBuilder: React.FC = () => {
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="font-mono font-bold text-brand-700 text-lg">
-                                                        {h.currency} {calculated.platformNetCost.toLocaleString()}
+                                                        {currencyService.getSymbol(currency)} {calculated.platformNetCost.toLocaleString()}
                                                     </p>
                                                     <p className="text-[10px] text-slate-400 uppercase font-semibold">Net Payable (B2B)</p>
                                                 </div>
@@ -713,9 +754,13 @@ export const SmartBuilder: React.FC = () => {
                             <p className="text-sm text-slate-500 mb-4">Enter a single reference hotel cost. Note: Multi-city manual entry is simplified to total cost.</p>
                             <input type="text" className="w-full border p-3.5 rounded-xl bg-slate-50 mb-3" value={manualHotel.name} onChange={e => setManualHotel({...manualHotel, name: e.target.value})} placeholder="Hotel Name" />
                             <div className="relative">
-                                <DollarSign className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                                {/* DYNAMIC SYMBOL FIX */}
+                                <div className="absolute left-4 top-3.5 text-slate-500 font-bold">{currencyService.getSymbol(currency)}</div>
                                 <input type="number" className="w-full pl-12 border p-3.5 rounded-xl bg-slate-50" value={manualHotel.cost} onChange={e => setManualHotel({...manualHotel, cost: Number(e.target.value)})} placeholder="Total Estimated Cost" />
                             </div>
+                            <p className="text-xs text-slate-400 mt-2 text-right">
+                                Entered cost is assumed to be in <strong>{currency}</strong>.
+                            </p>
                         </div>
                     )}
 
@@ -749,7 +794,7 @@ export const SmartBuilder: React.FC = () => {
                         <div className="flex gap-6 items-center bg-white px-6 py-3 rounded-xl border border-slate-200 shadow-sm">
                             <div className="text-right">
                                 <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Net Payable</p>
-                                <p className="font-bold text-slate-900 text-xl font-mono">{financials.platformNetCost.toLocaleString()}</p>
+                                <p className="font-bold text-slate-900 text-xl font-mono">{formatPrice(financials.platformNetCost)}</p>
                             </div>
                         </div>
                     </div>
@@ -804,8 +849,9 @@ export const SmartBuilder: React.FC = () => {
 
                                         {day.services && day.services.length > 0 ? (
                                             day.services.map((svc, sIdx) => {
-                                                // Calculate dynamic price for this item based on global rules for display
-                                                const itemPrice = calculatePriceFromNet(svc.cost, pricingRules, 1).platformNetCost;
+                                                // Display in Quote Currency, but calculation is based on stored 'svc.currency'
+                                                const costInTarget = currencyService.convert(svc.cost, svc.currency || 'USD', currency);
+                                                const itemPrice = calculatePriceFromNet(costInTarget, pricingRules, 1).platformNetCost;
                                                 
                                                 return (
                                                     <div key={sIdx} className="flex justify-between items-center bg-white p-4 rounded-lg border border-slate-200 hover:shadow-md transition-all hover:border-brand-300 group/card relative">
@@ -822,7 +868,7 @@ export const SmartBuilder: React.FC = () => {
                                                         
                                                         <div className="flex items-center gap-4">
                                                             <span className="font-mono text-sm font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200">
-                                                                {itemPrice.toLocaleString()}
+                                                                {currencyService.getSymbol(currency)} {Math.round(itemPrice).toLocaleString()}
                                                             </span>
                                                             <button 
                                                                 onClick={() => handleRemoveService(dIdx, sIdx)} 
@@ -871,7 +917,7 @@ export const SmartBuilder: React.FC = () => {
                                 <div className="space-y-4 text-sm">
                                     <div className="flex justify-between text-slate-600 pb-2 border-b border-slate-100">
                                         <span>Platform Net Cost</span>
-                                        <span className="font-mono font-bold">{financials.platformNetCost.toLocaleString()}</span>
+                                        <span className="font-mono font-bold">{formatPrice(financials.platformNetCost)}</span>
                                     </div>
                                     
                                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -886,16 +932,17 @@ export const SmartBuilder: React.FC = () => {
                                                 className="w-full pl-8 border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none font-bold text-brand-600 bg-white shadow-sm" 
                                                 placeholder="0"
                                             />
+                                            <div className="absolute right-3 top-3 text-xs text-slate-400 font-bold">{currency}</div>
                                         </div>
                                     </div>
                                     
                                     <div className="bg-slate-900 text-white p-5 rounded-xl shadow-xl mt-4 relative overflow-hidden">
                                         <div className="absolute top-0 right-0 w-20 h-20 bg-white opacity-5 rounded-full -mr-10 -mt-10"></div>
                                         <p className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">Final Package Price</p>
-                                        <p className="text-3xl font-bold font-mono text-emerald-400">{financials.finalPrice.toLocaleString()}</p>
+                                        <p className="text-3xl font-bold font-mono text-emerald-400">{formatPrice(financials.finalPrice)}</p>
                                         <div className="border-t border-slate-700 mt-3 pt-2 flex justify-between text-xs text-slate-400">
                                             <span>Per Person</span>
-                                            <span>{Math.round(financials.finalPrice / (basics.adults + basics.children)).toLocaleString()}</span>
+                                            <span>{formatPrice(Math.round(financials.finalPrice / (basics.adults + basics.children)))}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -910,7 +957,7 @@ export const SmartBuilder: React.FC = () => {
                         </div>
                     </div>
                     
-                    {/* SERVICE SELECTION MODAL - (Keeping existing implementation but using filtered logic) */}
+                    {/* SERVICE SELECTION MODAL */}
                     {serviceModal.isOpen && (
                         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                             <div className="bg-white rounded-xl max-w-lg w-full p-0 shadow-2xl max-h-[80vh] flex flex-col overflow-hidden">
@@ -941,8 +988,10 @@ export const SmartBuilder: React.FC = () => {
                                         filteredActs
                                             .filter(a => a.activityName.toLowerCase().includes(serviceSearch.toLowerCase()))
                                             .map(a => {
-                                                // Calculate single unit cost for display
-                                                const unitCost = calculatePriceFromNet(a.costAdult, pricingRules, 1).platformNetCost;
+                                                // Display in converted quote currency
+                                                const unitCost = currencyService.convert(a.costAdult, a.currency || 'USD', currency);
+                                                const unitNet = calculatePriceFromNet(unitCost, pricingRules, 1).platformNetCost;
+                                                
                                                 return (
                                                     <button key={a.id} onClick={() => handleAddService(a)} className="w-full text-left p-3 hover:bg-pink-50 rounded-lg flex justify-between items-center group border-b border-slate-50 last:border-0 transition">
                                                         <div>
@@ -953,7 +1002,7 @@ export const SmartBuilder: React.FC = () => {
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <span className="text-sm font-mono font-bold text-slate-700 group-hover:text-pink-700">{unitCost}</span>
+                                                            <span className="text-sm font-mono font-bold text-slate-700 group-hover:text-pink-700">{formatPrice(unitNet)}</span>
                                                             <p className="text-[9px] text-slate-400 uppercase">Net B2B</p>
                                                         </div>
                                                     </button>
@@ -965,7 +1014,9 @@ export const SmartBuilder: React.FC = () => {
                                         filteredTrfs
                                             .filter(t => t.transferName.toLowerCase().includes(serviceSearch.toLowerCase()))
                                             .map(t => {
-                                                const unitCost = calculatePriceFromNet(t.cost, pricingRules, 1).platformNetCost;
+                                                const unitCost = currencyService.convert(t.cost, t.currency || 'USD', currency);
+                                                const unitNet = calculatePriceFromNet(unitCost, pricingRules, 1).platformNetCost;
+                                                
                                                 return (
                                                     <button key={t.id} onClick={() => handleAddService(t)} className="w-full text-left p-3 hover:bg-blue-50 rounded-lg flex justify-between items-center group border-b border-slate-50 last:border-0 transition">
                                                         <div>
@@ -975,7 +1026,7 @@ export const SmartBuilder: React.FC = () => {
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <span className="text-sm font-mono font-bold text-slate-700 group-hover:text-blue-700">{unitCost}</span>
+                                                            <span className="text-sm font-mono font-bold text-slate-700 group-hover:text-blue-700">{formatPrice(unitNet)}</span>
                                                             <p className="text-[9px] text-slate-400 uppercase">Net B2B</p>
                                                         </div>
                                                     </button>

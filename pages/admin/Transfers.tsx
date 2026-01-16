@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { adminService } from '../../services/adminService';
+import { currencyService } from '../../services/currencyService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Transfer } from '../../types';
 import { Edit2, Trash2, Plus, X, Car } from 'lucide-react';
@@ -10,6 +11,7 @@ export const Transfers: React.FC = () => {
   const { user } = useAuth();
   const allDestinations = adminService.getDestinations();
   const allTransfers = adminService.getTransfers();
+  const currencies = currencyService.getCurrencies();
   
   // Permissions
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.SUPPLIER;
@@ -51,6 +53,7 @@ export const Transfers: React.FC = () => {
         costBasis: 'Per Vehicle',
         nightSurcharge: 0,
         cost: 0,
+        currency: 'USD',
         description: '',
         notes: ''
       });
@@ -70,6 +73,7 @@ export const Transfers: React.FC = () => {
       vehicleType: formData.vehicleType || 'Sedan',
       maxPassengers: Number(formData.maxPassengers),
       cost: Number(formData.cost),
+      currency: formData.currency || 'USD',
       costBasis: (formData.costBasis || 'Per Vehicle') as any,
       nightSurcharge: Number(formData.nightSurcharge),
       isActive: formData.isActive || false,
@@ -116,7 +120,7 @@ export const Transfers: React.FC = () => {
                 {user?.role !== UserRole.SUPPLIER && (
                     <InventoryImportExport 
                         data={displayedTransfers}
-                        headers={['id', 'transferName', 'destinationId', 'transferType', 'vehicleType', 'maxPassengers', 'cost', 'costBasis', 'nightSurcharge', 'isActive']}
+                        headers={['id', 'transferName', 'destinationId', 'transferType', 'vehicleType', 'maxPassengers', 'cost', 'currency', 'costBasis', 'nightSurcharge', 'isActive']}
                         filename="transfers"
                         onImport={handleBulkImport}
                     />
@@ -167,12 +171,12 @@ export const Transfers: React.FC = () => {
                   </td>
                   {showCost && (
                     <td className="px-6 py-4 font-mono text-slate-900">
-                        {dest?.currency} {transfer.cost} <span className="text-xs text-slate-400">/{transfer.costBasis === 'Per Vehicle' ? 'Veh' : 'Pax'}</span>
+                        {transfer.currency || 'USD'} {transfer.cost} <span className="text-xs text-slate-400">/{transfer.costBasis === 'Per Vehicle' ? 'Veh' : 'Pax'}</span>
                     </td>
                   )}
                   {showCost && (
                     <td className="px-6 py-4 text-slate-600">
-                        {transfer.nightSurcharge > 0 ? <span className="text-amber-600">+{dest?.currency} {transfer.nightSurcharge}</span> : '-'}
+                        {transfer.nightSurcharge > 0 ? <span className="text-amber-600">+{transfer.currency || 'USD'} {transfer.nightSurcharge}</span> : '-'}
                     </td>
                   )}
                   <td className="px-6 py-4">
@@ -240,14 +244,25 @@ export const Transfers: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Cost</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Cost Rate</label>
                 <div className="flex gap-2">
-                    <input required type="number" min="0" value={formData.cost || ''} onChange={e => setFormData({...formData, cost: Number(e.target.value)})} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="0.00" />
-                    <select disabled={user?.role === UserRole.SUPPLIER} value={formData.costBasis} onChange={e => setFormData({...formData, costBasis: e.target.value as any})} className="border p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none text-xs disabled:bg-slate-100">
-                        <option value="Per Vehicle">/ Vehicle</option>
-                        <option value="Per Person">/ Person</option>
+                    <select 
+                      value={formData.currency} 
+                      onChange={e => setFormData({...formData, currency: e.target.value})} 
+                      className="border p-2 rounded-lg text-sm bg-white w-20"
+                    >
+                      {currencies.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
+                    <input required type="number" min="0" value={formData.cost || ''} onChange={e => setFormData({...formData, cost: Number(e.target.value)})} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="0.00" />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Rate Basis</label>
+                <select disabled={user?.role === UserRole.SUPPLIER} value={formData.costBasis} onChange={e => setFormData({...formData, costBasis: e.target.value as any})} className="border w-full p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none disabled:bg-slate-100">
+                    <option value="Per Vehicle">Per Vehicle</option>
+                    <option value="Per Person">Per Person</option>
+                </select>
               </div>
 
               <div>
