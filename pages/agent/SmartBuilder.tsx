@@ -153,14 +153,12 @@ export const SmartBuilder: React.FC = () => {
           showToast(roomError, 'error');
           return;
       }
-      if (step === 2 && hotelMode === 'CMS' && cityVisits.length === 0) {
-          // ensure initial itinerary logic runs if jumping
-      }
       
       // Auto-generate itinerary structure on entering step 3
       if (step === 2) {
           const days: ItineraryItem[] = [];
           let dayCounter = 1;
+          const fullHotelList = adminService.getHotels();
 
           cityVisits.forEach((visit, idx) => {
               const isFirstCity = idx === 0;
@@ -189,8 +187,46 @@ export const SmartBuilder: React.FC = () => {
                               meta: { note: 'Auto-suggested transfer' }
                           });
                       }
-                      if (visit.hotelName) {
-                          desc += `\nCheck-in at ${visit.hotelName}.`;
+                      
+                      // ADD HOTEL SERVICE TO ITINERARY (Critical for Cost Persistence)
+                      if (hotelMode === 'CMS' && visit.hotelId) {
+                          const hotel = fullHotelList.find(h => h.id === visit.hotelId);
+                          if (hotel) {
+                              desc += `\nCheck-in at ${hotel.name}.`;
+                              
+                              // Calculate total hotel cost for this city visit
+                              let stayCost = 0;
+                              if (hotel.costType === 'Per Room') {
+                                  stayCost = hotel.cost * basics.rooms * visit.nights;
+                              } else {
+                                  stayCost = hotel.cost * (basics.adults + basics.children) * visit.nights;
+                              }
+
+                              services.push({
+                                  id: hotel.id,
+                                  type: 'HOTEL',
+                                  name: hotel.name,
+                                  cost: stayCost, // Total Cost for the stay
+                                  price: stayCost,
+                                  currency: hotel.currency || 'USD', // PRESERVE BASE CURRENCY
+                                  meta: { roomType: hotel.roomType, mealPlan: hotel.mealPlan, nights: visit.nights },
+                                  isOperatorInventory: hotel.isOperatorInventory,
+                                  operatorName: hotel.operatorName
+                              });
+                          }
+                      } else if (hotelMode === 'REF' && idx === 0) {
+                          // For Manual Mode, add reference item on Day 1
+                          desc += `\nCheck-in at ${manualHotel.name}.`;
+                          services.push({
+                              id: 'manual_hotel_ref',
+                              type: 'HOTEL',
+                              name: manualHotel.name,
+                              cost: Number(manualHotel.cost),
+                              price: Number(manualHotel.cost),
+                              currency: currency, // Manual entry uses selected Quote Currency
+                              isRef: false,
+                              meta: { note: 'Manual Reference Entry' }
+                          });
                       }
                   }
 
@@ -307,7 +343,8 @@ export const SmartBuilder: React.FC = () => {
   const calculateFinancials = () => {
     let rawSupplierCost = 0;
 
-    // 1. Sum Itinerary Services (Convert each item from its Source Currency to Quote Currency)
+    // Sum Itinerary Services (Convert each item from its Source Currency to Quote Currency)
+    // Note: Since Hotels are now added as services in Step 2 transition, we don't need a separate loop for cityVisits hotels here.
     itinerary.forEach(day => {
         day.services?.forEach(svc => {
             if (!svc.isRef) {
@@ -318,33 +355,7 @@ export const SmartBuilder: React.FC = () => {
         });
     });
 
-    // 2. Sum Hotels
-    if (hotelMode === 'CMS') {
-        const fullHotelList = adminService.getHotels();
-        cityVisits.forEach(visit => {
-            if (visit.hotelId) {
-                const hotel = fullHotelList.find(h => h.id === visit.hotelId);
-                if (hotel) {
-                    let cityHotelCost = 0;
-                    if (hotel.costType === 'Per Room') {
-                        cityHotelCost = hotel.cost * basics.rooms * visit.nights;
-                    } else {
-                        cityHotelCost = hotel.cost * (basics.adults + basics.children) * visit.nights;
-                    }
-                    // IMPORTANT: Correct conversion using Hotel Currency
-                    const hotelCostConverted = currencyService.convert(cityHotelCost, hotel.currency || 'USD', currency);
-                    rawSupplierCost += hotelCostConverted;
-                }
-            }
-        });
-    } else {
-        // In REF mode, user manually enters cost. 
-        // We assume they entered it in the selected Quote Currency.
-        const manualCost = Number(manualHotel.cost);
-        rawSupplierCost += manualCost;
-    }
-
-    // 3. Use Pricing Engine
+    // Use Pricing Engine
     const result = calculatePriceFromNet(
         rawSupplierCost, 
         pricingRules, 
@@ -765,7 +776,7 @@ export const SmartBuilder: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="font-mono font-bold text-brand-700 text-lg">
+                                                    <p className="font-mono font-bold text-brand-700 text-xl">
                                                         {currencyService.getSymbol(currency)} {calculated.platformNetCost.toLocaleString()}
                                                     </p>
                                                     <p className="text-[10px] text-slate-400 uppercase font-semibold">Net Payable (B2B)</p>
@@ -785,9 +796,9 @@ export const SmartBuilder: React.FC = () => {
                             <div className="relative">
                                 {/* DYNAMIC SYMBOL FIX */}
                                 <div className="absolute left-4 top-3.5 text-slate-500 font-bold">{currencyService.getSymbol(currency)}</div>
-                                <input type="number" className="w-full pl-12 border p-3.5 rounded-xl bg-slate-50" value={manualHotel.cost} onChange={e => setManualHotel({...manualHotel, cost: Number(e.target.value)})} placeholder="Total Estimated Cost" />
+                                <input type="number" className="w-full pl-12 border p-3.5 rounded-xl bg-slate-50 font-bold text-lg" value={manualHotel.cost} onChange={e => setManualHotel({...manualHotel, cost: Number(e.target.value)})} placeholder="Total Estimated Cost" />
                             </div>
-                            <p className="text-xs text-slate-400 mt-2 text-right">
+                            <p className="text-xs text-slate-500 mt-2 text-right">
                                 Entered cost is assumed to be in <strong>{currency}</strong>.
                             </p>
                         </div>

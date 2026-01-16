@@ -316,7 +316,7 @@ export const Hotels: React.FC = () => {
                                 type="number" 
                                 value={formData.cost || ''} 
                                 onChange={e => setFormData({...formData, cost: Number(e.target.value)})} 
-                                className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold shadow-sm"
+                                className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono text-xl font-bold shadow-sm"
                                 placeholder="0.00" 
                             />
                         </div>

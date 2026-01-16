@@ -17,7 +17,7 @@ export const QuoteHeader: React.FC<Props> = ({ branding }) => {
       phone: branding?.contactPhone || BRANDING.supportPhone,
       email: BRANDING.email, // Always keep platform email as fallback or use agent's if we add it
       website: branding?.website || BRANDING.website,
-      logoUrl: branding?.logoUrl,
+      logoUrl: branding?.logoUrl || BRANDING.logoUrl, // Fallback to Platform Logo
       primaryColor: branding?.primaryColor || '#0284c7' // brand-600
   };
 

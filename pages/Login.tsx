@@ -103,8 +103,14 @@ export const Login: React.FC = () => {
             
             {/* Header Section */}
             <div className="px-8 pt-10 pb-6 text-center">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-brand-600 text-white shadow-lg mb-6 transform hover:scale-105 transition-transform duration-300">
-                    <Shield size={40} />
+                <div className="inline-flex items-center justify-center mb-6 transform hover:scale-105 transition-transform duration-300">
+                    {BRANDING.logoUrl ? (
+                        <img src={BRANDING.logoUrl} alt="Logo" className="h-20 w-auto drop-shadow-md" />
+                    ) : (
+                        <div className="w-20 h-20 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-lg">
+                            <Shield size={40} />
+                        </div>
+                    )}
                 </div>
                 <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
                     {BRANDING.name}
@@ -161,7 +167,7 @@ export const Login: React.FC = () => {
 
                     <div className="space-y-2">
                         <div className="flex justify-between items-center ml-1">
-                            <label htmlFor="password" class="block text-sm font-bold text-slate-700">
+                            <label htmlFor="password" className="block text-sm font-bold text-slate-700">
                                 Password
                             </label>
                             <Link to="/forgot-password" className="text-xs font-bold text-brand-600 hover:text-brand-700 hover:underline transition-colors">

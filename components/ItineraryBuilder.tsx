@@ -274,8 +274,8 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                 {svc.type === 'TRANSFER' && <Car size={14} />}
                                 <span className="font-medium">{svc.name}</span>
                                 {svc.isOperatorInventory && <OperatorBadge />}
-                                <span className="text-xs opacity-70 border-l border-current pl-2 ml-1 font-mono">
-                                    {Math.round(displayCost).toLocaleString()}
+                                <span className="text-xs opacity-70 border-l border-current pl-2 ml-1 font-mono font-bold">
+                                    {currencyService.getSymbol(displayCurrency)} {Math.round(displayCost).toLocaleString()}
                                 </span>
                                 <button onClick={() => removeServiceFromDay(index, sIdx)} className="hover:text-red-500 ml-1"><X size={14}/></button>
                             </div>
@@ -319,7 +319,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                             <p className="text-sm font-bold text-slate-800 flex items-center gap-2">{a.activityName} {a.isOperatorInventory && <OperatorBadge />}</p>
                                             <p className="text-xs text-slate-500">{a.activityType} {a.ticketIncluded ? '• Ticket Inc' : ''}</p>
                                         </div>
-                                        <span className="text-sm font-mono font-medium text-pink-600">{currencyService.getSymbol(displayCurrency)} {Math.round(displayCost).toLocaleString()}</span>
+                                        <span className="text-sm font-mono font-bold text-pink-600">{currencyService.getSymbol(displayCurrency)} {Math.round(displayCost).toLocaleString()}</span>
                                     </button>
                                 );
                             })}
@@ -332,7 +332,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                             <p className="text-sm font-bold text-slate-800 flex items-center gap-2">{t.transferName} {t.isOperatorInventory && <OperatorBadge />}</p>
                                             <p className="text-xs text-slate-500">{t.vehicleType} • {t.transferType}</p>
                                         </div>
-                                        <span className="text-sm font-mono font-medium text-blue-600">{currencyService.getSymbol(displayCurrency)} {Math.round(displayCost).toLocaleString()}</span>
+                                        <span className="text-sm font-mono font-bold text-blue-600">{currencyService.getSymbol(displayCurrency)} {Math.round(displayCost).toLocaleString()}</span>
                                     </button>
                                 );
                             })}
@@ -345,7 +345,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                             <p className="text-sm font-bold text-slate-800 flex items-center gap-2">{h.name} {h.isOperatorInventory && <OperatorBadge />}</p>
                                             <p className="text-xs text-slate-500">{h.roomType} • {h.mealPlan}</p>
                                         </div>
-                                        <span className="text-sm font-mono font-medium text-indigo-600">{currencyService.getSymbol(displayCurrency)} {Math.round(displayCost).toLocaleString()}</span>
+                                        <span className="text-sm font-mono font-bold text-indigo-600">{currencyService.getSymbol(displayCurrency)} {Math.round(displayCost).toLocaleString()}</span>
                                     </button>
                                 );
                             })}

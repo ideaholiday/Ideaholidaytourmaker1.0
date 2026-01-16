@@ -324,11 +324,11 @@ export const Sightseeing: React.FC = () => {
                       </div>
                       <div>
                           <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Adult Cost</label>
-                          <input required type="number" min="0" value={formData.costAdult || ''} onChange={e => setFormData({...formData, costAdult: Number(e.target.value)})} className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
+                          <input required type="number" min="0" value={formData.costAdult || ''} onChange={e => setFormData({...formData, costAdult: Number(e.target.value)})} className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
                       </div>
                       <div>
                           <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Child Cost</label>
-                          <input required type="number" min="0" value={formData.costChild || ''} onChange={e => setFormData({...formData, costChild: Number(e.target.value)})} className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
+                          <input required type="number" min="0" value={formData.costChild || ''} onChange={e => setFormData({...formData, costChild: Number(e.target.value)})} className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
                       </div>
                   </div>
               </div>

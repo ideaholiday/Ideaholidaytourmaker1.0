@@ -359,7 +359,7 @@ export const Transfers: React.FC = () => {
                             >
                               {currencies.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                             </select>
-                            <input required type="number" min="0" value={formData.cost || ''} onChange={e => setFormData({...formData, cost: Number(e.target.value)})} className="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
+                            <input required type="number" min="0" value={formData.cost || ''} onChange={e => setFormData({...formData, cost: Number(e.target.value)})} className="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
                         </div>
                       </div>
 

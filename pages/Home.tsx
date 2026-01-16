@@ -14,6 +14,16 @@ export const Home: React.FC = () => {
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-100/40 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none"></div>
 
         <div className="container mx-auto text-center max-w-4xl relative z-10">
+          
+          {/* Company Logo */}
+          <div className="flex justify-center mb-8 animate-in fade-in zoom-in duration-1000">
+            <img 
+              src={BRANDING.logoUrl} 
+              alt="Idea Holiday Logo" 
+              className="h-32 md:h-40 w-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+            />
+          </div>
+
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-brand-100 text-brand-600 text-xs font-bold uppercase tracking-wider mb-6 shadow-sm animate-in fade-in slide-in-from-top-4">
             <Award size={14} /> #1 B2B Travel Platform
           </div>

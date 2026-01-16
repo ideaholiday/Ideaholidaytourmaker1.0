@@ -41,9 +41,13 @@ export const Navbar: React.FC = () => {
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link to={getHomeLink()} className="flex items-center gap-2">
-          <div className="bg-brand-600 text-white p-1.5 rounded-lg">
-            <Shield size={20} />
-          </div>
+          {BRANDING.logoUrl ? (
+             <img src={BRANDING.logoUrl} alt="Logo" className="h-10 w-auto object-contain" />
+          ) : (
+             <div className="bg-brand-600 text-white p-1.5 rounded-lg">
+                <Shield size={20} />
+             </div>
+          )}
           <span className="font-bold text-xl text-slate-900 tracking-tight hidden sm:block">
             {BRANDING.name}
           </span>

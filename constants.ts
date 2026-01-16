@@ -4,6 +4,7 @@ import { User, UserRole, Quote } from './types';
 export const BRANDING = {
   name: "Idea Tour Maker",
   legalName: "Idea Holiday Pvt Ltd.",
+  logoUrl: "https://file-service-alpha.vercel.app/file/a8d8e3c0-362c-473d-82d2-282e366184e9/607e4d82-c86e-4171-aa3b-8575027588b3.png",
   email: "info@ideaholiday.com",
   supportPhone: "+91 9696 777 391",
   website: "b2b.ideaholiday.com",
