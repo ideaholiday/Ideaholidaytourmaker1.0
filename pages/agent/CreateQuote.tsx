@@ -18,6 +18,7 @@ export const CreateQuote: React.FC = () => {
     nights: 4,
     pax: 2,
     guestName: '',
+    guestSalutation: 'Mr',
     tripType: 'Leisure',
     useAI: true
   });
@@ -32,13 +33,15 @@ export const CreateQuote: React.FC = () => {
     setLoadingText('Initializing Workspace...');
 
     try {
+        const fullGuestName = `${formData.guestSalutation}. ${formData.guestName}`;
+
         // 1. Create Base Quote
         const newQuote = agentService.createQuote(
             user, 
             formData.destination, 
             formData.travelDate, 
             formData.pax,
-            formData.guestName
+            fullGuestName
         );
 
         // 2. AI Enhancement (Optional)
@@ -128,16 +131,27 @@ export const CreateQuote: React.FC = () => {
 
               {/* Guest Name */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Guest Name / Reference</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3.5 text-slate-400" size={20} />
-                  <input
-                    type="text"
-                    value={formData.guestName}
-                    onChange={(e) => setFormData({...formData, guestName: e.target.value})}
-                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                    placeholder="e.g. Smith Family"
-                  />
+                <label className="block text-sm font-bold text-slate-700 mb-2">Lead Guest Name</label>
+                <div className="flex">
+                    <select
+                        value={formData.guestSalutation}
+                        onChange={(e) => setFormData({...formData, guestSalutation: e.target.value})}
+                        className="rounded-l-xl border border-r-0 border-slate-300 px-3 py-3 bg-slate-50 focus:ring-2 focus:ring-brand-500 outline-none font-medium text-sm"
+                    >
+                        <option value="Mr">Mr.</option>
+                        <option value="Ms">Ms.</option>
+                        <option value="Mrs">Mrs.</option>
+                    </select>
+                    <div className="relative flex-1">
+                        <User className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                        <input
+                            type="text"
+                            value={formData.guestName}
+                            onChange={(e) => setFormData({...formData, guestName: e.target.value})}
+                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-r-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                            placeholder="John Doe"
+                        />
+                    </div>
                 </div>
               </div>
             </div>

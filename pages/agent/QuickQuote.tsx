@@ -7,8 +7,8 @@ import { agentService } from '../../services/agentService';
 import { quickQuoteTemplateService } from '../../services/quickQuoteTemplateService';
 import { calculateQuickEstimate } from '../../services/quickQuotePricing';
 import { calculateRequiredRooms, getDestinationDefaults } from '../../utils/quickQuoteDefaults';
-import { QuickQuoteInputs, Quote, QuickQuoteTemplate } from '../../types';
-import { MapPin, Calendar, Users, Hotel, Coffee, Car, Star, DollarSign, ArrowRight, Sparkles, AlertCircle, Save, X, LayoutTemplate } from 'lucide-react';
+import { QuickQuoteInputs, Quote, QuickQuoteTemplate, ItineraryItem } from '../../types';
+import { MapPin, Calendar, Users, Hotel, Coffee, Car, Star, DollarSign, ArrowRight, Sparkles, AlertCircle, Save, X, LayoutTemplate, User } from 'lucide-react';
 import { TemplateSelector } from '../../components/quickQuote/TemplateSelector';
 
 export const QuickQuote: React.FC = () => {
@@ -20,6 +20,8 @@ export const QuickQuote: React.FC = () => {
   const [destination, setDestination] = useState('');
   const [travelDate, setTravelDate] = useState(new Date().toISOString().split('T')[0]); // Default today
   const [nights, setNights] = useState(4);
+  const [guestName, setGuestName] = useState('');
+  const [guestSalutation, setGuestSalutation] = useState('Mr');
   const [pax, setPax] = useState({ adults: 2, children: 0 });
   
   // Quick Inputs
@@ -101,20 +103,93 @@ export const QuickQuote: React.FC = () => {
       alert("Template Saved Successfully!");
   };
 
+  // Helper to build a skeleton itinerary for PDF generation
+  const generateSkeletonItinerary = (): ItineraryItem[] => {
+      const items: ItineraryItem[] = [];
+      const city = destination.split(',')[0].trim();
+
+      for (let i = 1; i <= nights + 1; i++) {
+          const isArrival = i === 1;
+          const isDeparture = i === nights + 1;
+          const dayServices = [];
+          
+          let title = `Day ${i} - Leisure`;
+          let desc = 'Day at leisure to explore on your own.';
+
+          // Day 1: Arrival
+          if (isArrival) {
+              title = `Arrival in ${city}`;
+              desc = `Welcome to ${city}! Transfer to your hotel.`;
+              if (inputs.transfersIncluded) {
+                  dayServices.push({
+                      id: `t_arr_${Date.now()}`,
+                      type: 'TRANSFER' as const,
+                      name: 'Airport Pickup',
+                      cost: 0, price: 0,
+                      meta: { vehicle: 'Private Sedan' }
+                  });
+              }
+          }
+          // Day N: Departure
+          else if (isDeparture) {
+              title = `Departure from ${city}`;
+              desc = `Check out and transfer to airport. Safe travels!`;
+              if (inputs.transfersIncluded) {
+                  dayServices.push({
+                      id: `t_dep_${Date.now()}`,
+                      type: 'TRANSFER' as const,
+                      name: 'Airport Drop-off',
+                      cost: 0, price: 0,
+                      meta: { vehicle: 'Private Sedan' }
+                  });
+              }
+          }
+          // Middle Days: Sightseeing
+          else {
+              if (inputs.sightseeingIntensity !== 'None') {
+                  title = `City Exploration`;
+                  desc = `Enjoy local sightseeing tours.`;
+                  dayServices.push({
+                      id: `act_${i}_${Date.now()}`,
+                      type: 'ACTIVITY' as const,
+                      name: `${city} City Tour`,
+                      cost: 0, price: 0,
+                      meta: { type: 'City Tour' }
+                  });
+              }
+          }
+
+          items.push({
+              day: i,
+              title,
+              description: desc,
+              inclusions: isArrival ? [] : ['Breakfast'],
+              services: dayServices
+          });
+      }
+      return items;
+  };
+
   const handleCreate = async () => {
       if (!user || !destination) return;
       setIsSubmitting(true);
 
       try {
+          const fullGuestName = `${guestSalutation}. ${guestName}`;
+
           // 1. Create Quote Object
-          const newQuote = agentService.createQuote(user, destination, travelDate, pax.adults + pax.children);
+          const newQuote = agentService.createQuote(user, destination, travelDate, pax.adults + pax.children, fullGuestName);
           
-          // 2. Enhance with Quick Quote Data
+          // 2. Generate Skeleton Itinerary for PDF Support
+          const skeletonItinerary = generateSkeletonItinerary();
+
+          // 3. Enhance with Quick Quote Data
           const quickDetails = {
               ...newQuote,
               type: 'QUICK' as const,
               status: 'ESTIMATE' as const,
               quickQuoteInputs: inputs,
+              itinerary: skeletonItinerary, // Attach generated items
               price: estimates.total, // System Net Estimate (Hidden internal ref)
               sellingPrice: estimates.total, // Suggested Selling
               serviceDetails: `${nights}N Trip to ${destination}. ${inputs.hotelCategory} Hotel (${inputs.mealPlan}). ${inputs.sightseeingIntensity} Sightseeing.`
@@ -226,6 +301,27 @@ export const QuickQuote: React.FC = () => {
                                 <span className="font-bold text-slate-800 w-8 text-center">{nights}</span>
                             </div>
                         </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lead Guest Name</label>
+                            <div className="flex">
+                                <select
+                                    value={guestSalutation}
+                                    onChange={(e) => setGuestSalutation(e.target.value)}
+                                    className="rounded-l-lg border border-r-0 border-slate-300 px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                                >
+                                    <option value="Mr">Mr.</option>
+                                    <option value="Ms">Ms.</option>
+                                    <option value="Mrs">Mrs.</option>
+                                </select>
+                                <input 
+                                    type="text" 
+                                    className="flex-1 w-full border border-slate-300 rounded-r-lg p-2.5 focus:ring-2 focus:ring-brand-500 outline-none"
+                                    placeholder="John Doe"
+                                    value={guestName}
+                                    onChange={e => setGuestName(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -334,6 +430,10 @@ export const QuickQuote: React.FC = () => {
                     </div>
 
                     <div className="space-y-3 mb-8">
+                        <div className="flex items-center gap-3 text-sm text-slate-300">
+                            <User size={16} /> 
+                            <span>{guestSalutation}. {guestName || 'Client Name'}</span>
+                        </div>
                         <div className="flex items-center gap-3 text-sm text-slate-300">
                             <Hotel size={16} /> 
                             <span>{inputs.hotelCategory} Hotels ({inputs.mealPlan})</span>

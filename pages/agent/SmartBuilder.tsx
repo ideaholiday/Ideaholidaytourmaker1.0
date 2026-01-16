@@ -34,9 +34,6 @@ export const SmartBuilder: React.FC = () => {
 
   // Helper to format prices dynamically
   const formatPrice = (amountInUsd: number) => {
-      // Input expected in Quote Currency already for this helper context usually, 
-      // but if we pass raw, we might need conversion. 
-      // The calculateFinancials returns in Quote Currency.
       return `${currencyService.getSymbol(currency)} ${amountInUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   };
 
@@ -49,7 +46,8 @@ export const SmartBuilder: React.FC = () => {
     children: 0,
     childAges: [] as number[],
     rooms: 1,
-    guestName: ''
+    guestName: '',
+    guestSalutation: 'Mr'
   });
 
   // Multi-City State
@@ -146,128 +144,91 @@ export const SmartBuilder: React.FC = () => {
   const [serviceSearch, setServiceSearch] = useState('');
   const [isFavModalOpen, setIsFavModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (step === 3 && itinerary.length === 0) {
-        const days: ItineraryItem[] = [];
-        let dayCounter = 1;
-
-        cityVisits.forEach((visit, idx) => {
-            const isFirstCity = idx === 0;
-            
-            for (let n = 1; n <= visit.nights; n++) {
-                let title = `Day ${dayCounter}: ${visit.cityName} Exploration`;
-                let desc = '';
-                const services: ItineraryService[] = [];
-
-                if (n === 1) {
-                    if (isFirstCity) {
-                        title = `Day ${dayCounter}: Arrival in ${visit.cityName}`;
-                        desc = `Welcome to ${selectedCountry}! Arrive at ${visit.cityName} airport and transfer to hotel.`;
-                        services.push({ id: `trf_arr_${idx}`, type: 'TRANSFER', name: `Airport Transfer to ${visit.cityName} Hotel`, cost: 0, price: 0, currency: 'USD', isRef: true }); 
-                    } else {
-                        title = `Day ${dayCounter}: Transfer to ${visit.cityName}`;
-                        desc = `Check out and transfer to ${visit.cityName}. Check in to your hotel.`;
-                        services.push({ 
-                            id: `trf_inter_${idx}`, 
-                            type: 'TRANSFER', 
-                            name: `Intercity Transfer to ${visit.cityName}`, 
-                            cost: 0, 
-                            price: 0, 
-                            currency: 'USD',
-                            isRef: true,
-                            meta: { note: 'Auto-suggested transfer' }
-                        });
-                    }
-                    if (visit.hotelName) {
-                        desc += `\nCheck-in at ${visit.hotelName}.`;
-                    }
-                }
-
-                days.push({
-                    day: dayCounter,
-                    title: title,
-                    description: desc,
-                    inclusions: n === 1 && isFirstCity ? ['Airport Transfer'] : ['Breakfast'],
-                    services: services,
-                    cityId: visit.cityId
-                });
-                dayCounter++;
-            }
-        });
-
-        days.push({
-            day: dayCounter,
-            title: `Day ${dayCounter}: Departure`,
-            description: 'Check out and transfer to the airport for your return flight.',
-            services: [{ id: 'trf_dep', type: 'TRANSFER', name: 'Departure Airport Transfer', cost: 0, price: 0, currency: 'USD', isRef: true }],
-            inclusions: ['Breakfast', 'Airport Transfer'],
-            cityId: cityVisits[cityVisits.length - 1].cityId
-        });
-
-        setItinerary(days);
-        showToast('Itinerary generated successfully!', 'success');
-        
-        const targetIds = cityVisits.map(v => v.cityId);
-        setAvailableActivities(adminService.getActivities().filter(a => targetIds.includes(a.destinationId)));
-        setAvailableTransfers(adminService.getTransfers().filter(t => targetIds.includes(t.destinationId)));
-    }
-  }, [step, cityVisits, selectedCountry]);
-
   // --- STEP 4: COSTING ---
   const [agentMarkup, setAgentMarkup] = useState(0);
 
   // --- HANDLERS ---
-
   const handleNext = () => {
       if (step === 1 && roomError) {
           showToast(roomError, 'error');
           return;
       }
+      if (step === 2 && hotelMode === 'CMS' && cityVisits.length === 0) {
+          // ensure initial itinerary logic runs if jumping
+      }
+      
+      // Auto-generate itinerary structure on entering step 3
+      if (step === 2) {
+          const days: ItineraryItem[] = [];
+          let dayCounter = 1;
+
+          cityVisits.forEach((visit, idx) => {
+              const isFirstCity = idx === 0;
+              
+              for (let n = 1; n <= visit.nights; n++) {
+                  let title = `Day ${dayCounter}: ${visit.cityName} Exploration`;
+                  let desc = '';
+                  const services: ItineraryService[] = [];
+
+                  if (n === 1) {
+                      if (isFirstCity) {
+                          title = `Day ${dayCounter}: Arrival in ${visit.cityName}`;
+                          desc = `Welcome to ${selectedCountry}! Arrive at ${visit.cityName} airport and transfer to hotel.`;
+                          services.push({ id: `trf_arr_${idx}`, type: 'TRANSFER', name: `Airport Transfer to ${visit.cityName} Hotel`, cost: 0, price: 0, currency: 'USD', isRef: true }); 
+                      } else {
+                          title = `Day ${dayCounter}: Transfer to ${visit.cityName}`;
+                          desc = `Check out and transfer to ${visit.cityName}. Check in to your hotel.`;
+                          services.push({ 
+                              id: `trf_inter_${idx}`, 
+                              type: 'TRANSFER', 
+                              name: `Intercity Transfer to ${visit.cityName}`, 
+                              cost: 0, 
+                              price: 0, 
+                              currency: 'USD',
+                              isRef: true,
+                              meta: { note: 'Auto-suggested transfer' }
+                          });
+                      }
+                      if (visit.hotelName) {
+                          desc += `\nCheck-in at ${visit.hotelName}.`;
+                      }
+                  }
+
+                  days.push({
+                      day: dayCounter,
+                      title: title,
+                      description: desc,
+                      inclusions: n === 1 && isFirstCity ? ['Airport Transfer'] : ['Breakfast'],
+                      services: services,
+                      cityId: visit.cityId
+                  });
+                  dayCounter++;
+              }
+          });
+
+          // Departure Day
+          days.push({
+              day: dayCounter,
+              title: `Day ${dayCounter}: Departure`,
+              description: 'Check out and transfer to the airport for your return flight.',
+              services: [{ id: 'trf_dep', type: 'TRANSFER', name: 'Departure Airport Transfer', cost: 0, price: 0, currency: 'USD', isRef: true }],
+              inclusions: ['Breakfast', 'Airport Transfer'],
+              cityId: cityVisits[cityVisits.length - 1]?.cityId
+          });
+
+          if (itinerary.length === 0) setItinerary(days);
+          
+          const targetIds = cityVisits.map(v => v.cityId);
+          setAvailableActivities(adminService.getActivities().filter(a => targetIds.includes(a.destinationId)));
+          setAvailableTransfers(adminService.getTransfers().filter(t => targetIds.includes(t.destinationId)));
+      }
+
       setStep(prev => prev + 1);
   };
+
   const handleBack = () => setStep(prev => prev - 1);
 
-  // --- WIZARD COMPONENTS ---
-  const Stepper = () => {
-      const steps = [
-          { id: 1, label: 'Basics', icon: Globe },
-          { id: 2, label: 'Hotels', icon: HotelIcon },
-          { id: 3, label: 'Itinerary', icon: Calendar },
-          { id: 4, label: 'Quote', icon: DollarSign },
-      ];
-
-      return (
-          <div className="w-full max-w-3xl mx-auto mb-8 px-4">
-              <div className="flex items-center justify-between relative">
-                  <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-200 -z-10 rounded-full"></div>
-                  <div 
-                    className="absolute top-1/2 left-0 h-1 bg-brand-500 -z-10 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${((step - 1) / 3) * 100}%` }}
-                  ></div>
-
-                  {steps.map((s) => {
-                      const isActive = s.id <= step;
-                      const isCurrent = s.id === step;
-                      const Icon = s.icon;
-                      
-                      return (
-                          <div key={s.id} className="flex flex-col items-center gap-2 bg-slate-50 px-2">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                                  isActive ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 scale-110' : 'bg-white border-2 border-slate-300 text-slate-400'
-                              }`}>
-                                  <Icon size={18} />
-                              </div>
-                              <span className={`text-xs font-bold transition-colors ${isCurrent ? 'text-brand-700' : isActive ? 'text-slate-700' : 'text-slate-400'}`}>
-                                  {s.label}
-                              </span>
-                          </div>
-                      );
-                  })}
-              </div>
-          </div>
-      );
-  };
-
+  // --- HELPER FUNCTIONS ---
   const getCityName = (cityId: string) => {
       const dest = allDestinations.find(d => d.id === cityId);
       return dest ? dest.city : 'Unknown';
@@ -278,64 +239,7 @@ export const SmartBuilder: React.FC = () => {
       setServiceSearch('');
   };
 
-  const handleApplySystemTemplate = (template: ItineraryTemplate) => {
-      const inventory = {
-          activities: adminService.getActivities(),
-          transfers: adminService.getTransfers()
-      };
-      
-      const generated = generateItineraryFromTemplate(template, inventory, { 
-          adults: basics.adults, 
-          children: basics.children
-      });
-
-      const mapped = generated.map((item, idx) => ({
-          ...item,
-          cityId: itinerary[idx]?.cityId || cityVisits[0]?.cityId
-      }));
-      
-      setItinerary(mapped);
-      showToast('System template applied!', 'success');
-  };
-
-  const handleApplyFavoriteTemplate = (fav: AgentFavoriteTemplate) => {
-      const { itinerary: hydrated, warnings } = favoriteTemplateService.hydrateTemplate(
-          fav, 
-          { adults: basics.adults, children: basics.children, infants: 0 }
-      );
-      
-      const mapped = hydrated.map((item, idx) => ({
-          ...item,
-          cityId: itinerary[idx]?.cityId || cityVisits[0]?.cityId
-      }));
-
-      setItinerary(mapped);
-      
-      if (warnings.length > 0) {
-          showToast(`Applied with ${warnings.length} warnings.`, 'info');
-      } else {
-          showToast('Favorite template applied!', 'success');
-      }
-  };
-
-  const handleSaveFavorite = (name: string, note: string) => {
-      if (!user) return;
-      const fav: AgentFavoriteTemplate = {
-          id: `fav_${Date.now()}`,
-          agentId: user.id,
-          templateName: name,
-          note,
-          destinationId: cityVisits[0]?.cityId || '',
-          destinationName: basics.destinationName,
-          nights: basics.nights,
-          itinerary,
-          createdAt: new Date().toISOString()
-      };
-      favoriteTemplateService.saveTemplate(fav);
-      setIsFavModalOpen(false);
-      showToast('Saved to favorites!', 'success');
-  };
-
+  // --- SERVICE ADD/REMOVE ---
   const getFilteredInventory = () => {
       const currentDayItem = itinerary[serviceModal.dayIndex];
       const contextCityId = currentDayItem?.cityId;
@@ -455,7 +359,8 @@ export const SmartBuilder: React.FC = () => {
 
   const handleSaveQuote = () => {
       const finalItinerary = JSON.parse(JSON.stringify(itinerary));
-      const newQuote = agentService.createQuote(user!, basics.destinationName, basics.travelDate, basics.adults + basics.children, basics.guestName);
+      const fullGuestName = `${basics.guestSalutation}. ${basics.guestName}`;
+      const newQuote = agentService.createQuote(user!, basics.destinationName, basics.travelDate, basics.adults + basics.children, fullGuestName);
       
       const updatedQuote = {
           ...newQuote,
@@ -482,6 +387,104 @@ export const SmartBuilder: React.FC = () => {
 
   const { acts: filteredActs, trfs: filteredTrfs } = getFilteredInventory();
 
+  // --- TEMPLATE HANDLERS ---
+  const handleApplySystemTemplate = (template: ItineraryTemplate) => {
+      const inventory = {
+          activities: adminService.getActivities(),
+          transfers: adminService.getTransfers()
+      };
+      
+      const generated = generateItineraryFromTemplate(
+          template, 
+          inventory, 
+          { adults: basics.adults, children: basics.children }
+      );
+      
+      // Preserve city IDs if they exist in current slots to match destination logic
+      const mappedItinerary = generated.map((item, idx) => ({
+          ...item,
+          cityId: cityVisits[0]?.cityId // Defaulting to first city as system templates are usually single dest
+      }));
+
+      setItinerary(mappedItinerary);
+      showToast("System template applied!", 'success');
+  };
+
+  const handleApplyFavoriteTemplate = (template: AgentFavoriteTemplate) => {
+      const { itinerary: hydrated, warnings } = favoriteTemplateService.hydrateTemplate(
+          template,
+          { adults: basics.adults, children: basics.children, infants: 0 }
+      );
+      
+      setItinerary(hydrated);
+      if (warnings.length > 0) {
+          showToast(`Applied with ${warnings.length} warnings (items removed)`, 'info');
+      } else {
+          showToast("Favorite template loaded!", 'success');
+      }
+  };
+
+  const handleSaveFavorite = (name: string, note: string) => {
+      if (!user) return;
+      
+      const favTemplate: AgentFavoriteTemplate = {
+          id: `fav_${Date.now()}`,
+          agentId: user.id,
+          templateName: name,
+          note: note,
+          destinationId: cityVisits[0]?.cityId || 'mix',
+          destinationName: basics.destinationName,
+          nights: basics.nights,
+          itinerary: itinerary,
+          createdAt: new Date().toISOString()
+      };
+
+      favoriteTemplateService.saveTemplate(favTemplate);
+      setIsFavModalOpen(false);
+      showToast("Itinerary saved as favorite!", 'success');
+  };
+
+  // --- UI RENDER ---
+  const Stepper = () => {
+      const steps = [
+          { id: 1, label: 'Basics', icon: Globe },
+          { id: 2, label: 'Hotels', icon: HotelIcon },
+          { id: 3, label: 'Itinerary', icon: Calendar },
+          { id: 4, label: 'Quote', icon: DollarSign },
+      ];
+
+      return (
+          <div className="w-full max-w-3xl mx-auto mb-8 px-4">
+              <div className="flex items-center justify-between relative">
+                  <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-200 -z-10 rounded-full"></div>
+                  <div 
+                    className="absolute top-1/2 left-0 h-1 bg-brand-500 -z-10 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${((step - 1) / 3) * 100}%` }}
+                  ></div>
+
+                  {steps.map((s) => {
+                      const isActive = s.id <= step;
+                      const isCurrent = s.id === step;
+                      const Icon = s.icon;
+                      
+                      return (
+                          <div key={s.id} className="flex flex-col items-center gap-2 bg-slate-50 px-2">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                                  isActive ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 scale-110' : 'bg-white border-2 border-slate-300 text-slate-400'
+                              }`}>
+                                  <Icon size={18} />
+                              </div>
+                              <span className={`text-xs font-bold transition-colors ${isCurrent ? 'text-brand-700' : isActive ? 'text-slate-700' : 'text-slate-400'}`}>
+                                  {s.label}
+                              </span>
+                          </div>
+                      );
+                  })}
+              </div>
+          </div>
+      );
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
         <div className="bg-white border-b border-slate-200 sticky top-16 z-30 shadow-sm">
@@ -491,7 +494,7 @@ export const SmartBuilder: React.FC = () => {
         </div>
 
         <div className="container mx-auto px-4 py-8">
-            {/* STEP 1: BASICS (Unchanged) */}
+            {/* STEP 1: BASICS */}
             {step === 1 && (
                 <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-8 animate-in fade-in slide-in-from-bottom-4">
                     
@@ -590,16 +593,27 @@ export const SmartBuilder: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Guest Name / Reference</label>
-                        <div className="relative">
-                            <User className="absolute left-4 top-3.5 text-slate-400" size={20} />
-                            <input
-                                type="text"
-                                className="w-full pl-12 border border-slate-300 p-3.5 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
-                                value={basics.guestName}
-                                onChange={(e) => setBasics({...basics, guestName: e.target.value})}
-                                placeholder="e.g. Smith Family or Trip Ref"
-                            />
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Lead Guest Name</label>
+                        <div className="flex">
+                            <select
+                                value={basics.guestSalutation}
+                                onChange={(e) => setBasics({...basics, guestSalutation: e.target.value})}
+                                className="rounded-l-xl border border-r-0 border-slate-300 px-3 py-3.5 bg-slate-50 focus:ring-2 focus:ring-brand-500 outline-none font-medium text-sm"
+                            >
+                                <option value="Mr">Mr.</option>
+                                <option value="Ms">Ms.</option>
+                                <option value="Mrs">Mrs.</option>
+                            </select>
+                            <div className="relative flex-1">
+                                <User className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                                <input
+                                    type="text"
+                                    className="w-full pl-10 border border-slate-300 p-3.5 rounded-r-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                                    value={basics.guestName}
+                                    onChange={(e) => setBasics({...basics, guestName: e.target.value})}
+                                    placeholder="e.g. Smith Family"
+                                />
+                            </div>
                         </div>
                     </div>
 

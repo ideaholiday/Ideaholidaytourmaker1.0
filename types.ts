@@ -329,8 +329,18 @@ export interface Activity {
   notes?: string;
   isOperatorInventory?: boolean;
   operatorName?: string;
-  contractId?: string; // New
-  supplierId?: string; // New
+  contractId?: string; 
+  supplierId?: string;
+  
+  // Enhanced Visibility Fields
+  duration?: string;       // e.g. "4 Hours", "Full Day"
+  startTime?: string;      // e.g. "09:00 AM", "Flexible"
+  imageUrl?: string;       // URL for thumbnail
+  
+  // Validity
+  season?: 'Peak' | 'Off-Peak' | 'Shoulder' | 'All Year';
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface Transfer {
@@ -351,8 +361,18 @@ export interface Transfer {
   currency?: string;
   isOperatorInventory?: boolean;
   operatorName?: string;
-  contractId?: string; // New
-  supplierId?: string; // New
+  contractId?: string; 
+  supplierId?: string;
+
+  // Enhanced Visibility Fields
+  luggageCapacity?: number; // Number of bags
+  meetingPoint?: string;    // e.g. "Gate 4, Pillar B"
+  imageUrl?: string;        // Vehicle image
+  
+  // Validity
+  season?: 'Peak' | 'Off-Peak' | 'Shoulder' | 'All Year';
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface Visa {

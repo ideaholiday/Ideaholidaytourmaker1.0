@@ -18,7 +18,7 @@ import { ChatPanel } from '../components/ChatPanel';
 import { OperatorQuoteView } from '../components/OperatorQuoteView';
 import { OperatorAssignmentPanel } from '../components/OperatorAssignmentPanel';
 import { BookingWizard } from '../components/agent/BookingWizard'; // Import BookingWizard
-import { ArrowLeft, Sparkles, Calculator, Download, Share2, FileText, Edit, Wallet, Printer, AlertTriangle, CheckCircle, CreditCard, X, EyeOff, Coins, Globe, RefreshCw, User } from 'lucide-react';
+import { ArrowLeft, Sparkles, Calculator, Download, Share2, FileText, Edit, Wallet, Printer, AlertTriangle, CheckCircle, CreditCard, X, EyeOff, Coins, Globe, RefreshCw, User, Save } from 'lucide-react';
 
 export const QuoteDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +30,10 @@ export const QuoteDetail: React.FC = () => {
   // UI Tabs & Modes
   const [activeTab, setActiveTab] = useState<'ITINERARY' | 'COSTING'>('ITINERARY');
   const [isEditingItinerary, setIsEditingItinerary] = useState(false);
+
+  // Guest Name Editing
+  const [isEditingGuestName, setIsEditingGuestName] = useState(false);
+  const [tempGuestName, setTempGuestName] = useState('');
 
   // Agent Markup State
   const [agentMarkupAmount, setAgentMarkupAmount] = useState<number>(0);
@@ -58,6 +62,7 @@ export const QuoteDetail: React.FC = () => {
 
     if (found) {
         setQuote(found);
+        setTempGuestName(found.leadGuestName || '');
         setDisplayCurrency(found.currency || 'USD');
         
         // Initialize Markup State for Agents
@@ -173,6 +178,13 @@ export const QuoteDetail: React.FC = () => {
       agentService.updateQuote(updatedQuote);
   }
 
+  const handleSaveGuestName = () => {
+      const updatedQuote = { ...quote, leadGuestName: tempGuestName };
+      setQuote(updatedQuote);
+      agentService.updateQuote(updatedQuote);
+      setIsEditingGuestName(false);
+  };
+
   const handleCopyWhatsApp = () => {
     // Use converted prices
     const priceToShare = isAgent ? convertedSellingPrice : convertedPrice;
@@ -257,10 +269,26 @@ export const QuoteDetail: React.FC = () => {
                 Quote <span className="text-slate-400 font-normal">#{quote.uniqueRefNo}</span>
                 {isQuickQuote && <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded font-bold uppercase">Estimate</span>}
                 </h1>
-                {quote.leadGuestName && (
-                    <div className="text-sm text-slate-600 mt-1 flex items-center gap-1.5 font-medium">
+                
+                {isEditingGuestName ? (
+                    <div className="flex items-center gap-2 mt-1">
                         <User size={14} className="text-slate-400"/>
-                        Prepared for: <span className="text-slate-800">{quote.leadGuestName}</span>
+                        <input 
+                            type="text" 
+                            value={tempGuestName} 
+                            onChange={e => setTempGuestName(e.target.value)} 
+                            className="border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                            placeholder="Enter Guest Name"
+                            autoFocus
+                        />
+                        <button onClick={handleSaveGuestName} className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200"><CheckCircle size={16} /></button>
+                        <button onClick={() => setIsEditingGuestName(false)} className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-200"><X size={16} /></button>
+                    </div>
+                ) : (
+                    <div className="text-sm text-slate-600 mt-1 flex items-center gap-1.5 font-medium group cursor-pointer" onClick={() => canEdit && setIsEditingGuestName(true)}>
+                        <User size={14} className="text-slate-400"/>
+                        Prepared for: <span className="text-slate-800">{quote.leadGuestName || 'Client Name'}</span>
+                        {canEdit && <Edit size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
                     </div>
                 )}
             </div>
@@ -375,7 +403,7 @@ export const QuoteDetail: React.FC = () => {
                             )}
                         </div>
                        {quote.itinerary && quote.itinerary.length > 0 ? (
-                         <ItineraryView itinerary={quote.itinerary} />
+                         <ItineraryView itinerary={quote.itinerary} startDate={quote.travelDate} />
                        ) : (
                          <div className="prose prose-slate max-w-none text-sm whitespace-pre-wrap bg-slate-50 p-4 rounded-lg border border-slate-100">
                              <h4 className="font-bold text-slate-700 mb-2">Package Inclusions (Estimate):</h4>

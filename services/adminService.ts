@@ -35,14 +35,109 @@ const INITIAL_HOTELS: Hotel[] = [
 ];
 
 const INITIAL_ACTIVITIES: Activity[] = [
-  { id: 'a1', activityName: 'Desert Safari', destinationId: 'd1', activityType: 'Adventure', costAdult: 120, costChild: 100, ticketIncluded: true, transferIncluded: true, isActive: true, createdBy: 'u1', currency: 'AED', description: 'Dune bashing, BBQ dinner' },
-  { id: 'a2', activityName: 'Burj Khalifa 124th Floor', destinationId: 'd1', activityType: 'City Tour', costAdult: 150, costChild: 110, ticketIncluded: true, transferIncluded: false, isActive: true, createdBy: 'u1', currency: 'AED', description: 'Non-prime hours ticket' },
-  { id: 'a3', activityName: 'Phi Phi Island Tour', destinationId: 'd2', activityType: 'Adventure', costAdult: 1800, costChild: 1200, ticketIncluded: true, transferIncluded: true, isActive: true, createdBy: 'u1', currency: 'THB', description: 'By Speedboat + Lunch' }
+  { 
+    id: 'a1', 
+    activityName: 'Desert Safari', 
+    destinationId: 'd1', 
+    activityType: 'Adventure', 
+    costAdult: 120, 
+    costChild: 100, 
+    ticketIncluded: true, 
+    transferIncluded: true, 
+    isActive: true, 
+    createdBy: 'u1', 
+    currency: 'AED', 
+    description: 'Dune bashing, BBQ dinner', 
+    duration: '6 Hours', 
+    startTime: '3:00 PM',
+    imageUrl: 'https://images.unsplash.com/photo-1547234935-80c7142ee969?auto=format&fit=crop&q=80&w=400',
+    season: 'All Year',
+    validFrom: '2024-01-01',
+    validTo: '2024-12-31'
+  },
+  { 
+    id: 'a2', 
+    activityName: 'Burj Khalifa 124th Floor', 
+    destinationId: 'd1', 
+    activityType: 'City Tour', 
+    costAdult: 150, 
+    costChild: 110, 
+    ticketIncluded: true, 
+    transferIncluded: false, 
+    isActive: true, 
+    createdBy: 'u1', 
+    currency: 'AED', 
+    description: 'Non-prime hours ticket',
+    duration: '2 Hours',
+    startTime: 'Flexible',
+    imageUrl: 'https://images.unsplash.com/photo-1582672060674-bc2bd808a8b5?auto=format&fit=crop&q=80&w=400',
+    season: 'All Year',
+    validFrom: '2024-01-01',
+    validTo: '2024-12-31'
+  },
+  { 
+    id: 'a3', 
+    activityName: 'Phi Phi Island Tour', 
+    destinationId: 'd2', 
+    activityType: 'Adventure', 
+    costAdult: 1800, 
+    costChild: 1200, 
+    ticketIncluded: true, 
+    transferIncluded: true, 
+    isActive: true, 
+    createdBy: 'u1', 
+    currency: 'THB', 
+    description: 'By Speedboat + Lunch',
+    duration: 'Full Day',
+    startTime: '8:00 AM',
+    imageUrl: 'https://images.unsplash.com/photo-1537956965359-3578dddd1292?auto=format&fit=crop&q=80&w=400',
+    season: 'Peak',
+    validFrom: '2024-11-01',
+    validTo: '2025-04-30'
+  }
 ];
 
 const INITIAL_TRANSFERS: Transfer[] = [
-  { id: 't1', transferName: 'DXB Airport Arrival', destinationId: 'd1', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 100, currency: 'AED', costBasis: 'Per Vehicle', nightSurcharge: 20, isActive: true, createdBy: 'u1' },
-  { id: 't2', transferName: 'HKT Airport Arrival', destinationId: 'd2', transferType: 'PVT', vehicleType: 'Van', maxPassengers: 8, cost: 800, currency: 'THB', costBasis: 'Per Vehicle', nightSurcharge: 200, isActive: true, createdBy: 'u1' }
+  { 
+    id: 't1', 
+    transferName: 'DXB Airport Arrival', 
+    destinationId: 'd1', 
+    transferType: 'PVT', 
+    vehicleType: 'Sedan', 
+    maxPassengers: 3, 
+    cost: 100, 
+    currency: 'AED', 
+    costBasis: 'Per Vehicle', 
+    nightSurcharge: 20, 
+    isActive: true, 
+    createdBy: 'u1',
+    luggageCapacity: 2,
+    meetingPoint: 'Arrival Hall, Pillar 5',
+    imageUrl: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=400',
+    season: 'All Year',
+    validFrom: '2024-01-01',
+    validTo: '2024-12-31'
+  },
+  { 
+    id: 't2', 
+    transferName: 'HKT Airport Arrival', 
+    destinationId: 'd2', 
+    transferType: 'PVT', 
+    vehicleType: 'Van', 
+    maxPassengers: 8, 
+    cost: 800, 
+    currency: 'THB', 
+    costBasis: 'Per Vehicle', 
+    nightSurcharge: 200, 
+    isActive: true, 
+    createdBy: 'u1',
+    luggageCapacity: 6,
+    meetingPoint: 'Exit Gate 2',
+    imageUrl: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?auto=format&fit=crop&q=80&w=400',
+    season: 'All Year',
+    validFrom: '2024-01-01',
+    validTo: '2024-12-31'
+  }
 ];
 
 const INITIAL_VISAS: Visa[] = [

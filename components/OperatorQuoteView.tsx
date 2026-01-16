@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Quote, User, UserRole, Message } from '../types';
 import { ItineraryView } from './ItineraryView';
 import { ChatPanel } from './ChatPanel';
-import { CheckCircle, XCircle, AlertTriangle, Briefcase, MapPin, Calendar, Users, DollarSign, Send, EyeOff } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, Briefcase, MapPin, Calendar, Users, DollarSign, Send, EyeOff, User as UserIcon } from 'lucide-react';
 
 interface Props {
   quote: Quote;
@@ -52,6 +52,7 @@ export const OperatorQuoteView: React.FC<Props> = ({ quote, user, onUpdateStatus
                       <div className="flex items-center gap-1.5"><MapPin size={14}/> {quote.destination}</div>
                       <div className="flex items-center gap-1.5"><Calendar size={14}/> {quote.travelDate}</div>
                       <div className="flex items-center gap-1.5"><Users size={14}/> {quote.paxCount} Pax</div>
+                      <div className="flex items-center gap-1.5 font-medium text-white"><UserIcon size={14}/> {quote.leadGuestName || 'Guest'}</div>
                   </div>
               </div>
            </div>

@@ -3,7 +3,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { BRANDING } from '../constants';
-import { LogOut, Shield, LayoutDashboard, FileText, PlusCircle, Settings, Store, UserPlus } from 'lucide-react';
+import { LogOut, Shield, LayoutDashboard, FileText, PlusCircle, Store, UserPlus } from 'lucide-react';
 import { UserRole } from '../types';
 
 export const Navbar: React.FC = () => {
@@ -19,10 +19,28 @@ export const Navbar: React.FC = () => {
   const isAgent = user?.role === UserRole.AGENT;
   const isSupplier = user?.role === UserRole.SUPPLIER;
 
+  // Determine Home Link based on Role
+  const getHomeLink = () => {
+    if (!user) return '/';
+    switch (user.role) {
+      case UserRole.ADMIN:
+      case UserRole.STAFF:
+        return '/admin/dashboard';
+      case UserRole.AGENT:
+        return '/agent/dashboard';
+      case UserRole.OPERATOR:
+        return '/operator/dashboard';
+      case UserRole.SUPPLIER:
+        return '/supplier/dashboard';
+      default:
+        return '/dashboard';
+    }
+  };
+
   return (
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to={getHomeLink()} className="flex items-center gap-2">
           <div className="bg-brand-600 text-white p-1.5 rounded-lg">
             <Shield size={20} />
           </div>
