@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ResendVerification } from '../components/ResendVerification';
-import { Shield, Lock, Mail, AlertCircle, CheckCircle, Loader2, ArrowRight } from 'lucide-react';
+import { Shield, Lock, Mail, AlertCircle, CheckCircle, Loader2, ArrowRight, Globe } from 'lucide-react';
 import { UserRole } from '../types';
 import { BRANDING } from '../constants';
 
@@ -104,13 +104,9 @@ export const Login: React.FC = () => {
             {/* Header Section */}
             <div className="px-8 pt-10 pb-6 text-center">
                 <div className="inline-flex items-center justify-center mb-6 transform hover:scale-105 transition-transform duration-300">
-                    {BRANDING.logoUrl ? (
-                        <img src={BRANDING.logoUrl} alt="Logo" className="h-20 w-auto drop-shadow-md" />
-                    ) : (
-                        <div className="w-20 h-20 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-lg">
-                            <Shield size={40} />
-                        </div>
-                    )}
+                    <div className="w-20 h-20 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-lg">
+                        <Globe size={40} />
+                    </div>
                 </div>
                 <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
                     {BRANDING.name}

@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { BRANDING } from '../constants';
-import { Loader2, CheckCircle, XCircle, ArrowRight, ShieldCheck, Lock, Mail } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, ArrowRight, ShieldCheck, Lock, Mail, Globe } from 'lucide-react';
 
 type ActionStatus = 'PROCESSING' | 'SUCCESS' | 'ERROR';
 
@@ -104,7 +104,7 @@ export const AuthActionHandler: React.FC = () => {
         <div className="mb-8 text-center">
             <div className="flex justify-center mb-3">
                 <div className="bg-brand-600 p-3 rounded-xl text-white shadow-lg">
-                    <ShieldCheck size={32} />
+                    <Globe size={32} />
                 </div>
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">{BRANDING.name}</h1>

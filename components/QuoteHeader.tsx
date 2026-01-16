@@ -33,7 +33,7 @@ export const QuoteHeader: React.FC<Props> = ({ branding }) => {
                <img src={displayBrand.logoUrl} alt={displayBrand.name} className="h-12 w-auto object-contain" />
            ) : (
                <div className="text-white p-2 rounded-lg" style={{ backgroundColor: displayBrand.primaryColor }}>
-                 <Shield size={24} />
+                 <Globe size={24} />
                </div>
            )}
            <h1 className="text-2xl font-bold text-slate-900">{displayBrand.name}</h1>
