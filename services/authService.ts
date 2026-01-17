@@ -25,21 +25,41 @@ class AuthService {
 
   constructor() {
     const stored = localStorage.getItem(STORAGE_KEY_USERS);
-    const storedUsers = stored ? JSON.parse(stored) : [];
+    const storedUsers: User[] = stored ? JSON.parse(stored) : [];
     
-    // MOCK DATA MIGRATION: Ensure Mock Users have uniqueId
-    const initialEmails = new Set(storedUsers.map((u: User) => u.email.toLowerCase()));
+    // DATA CONSISTENCY FIX:
+    // Merge stored users with MOCK_USERS constants.
+    // If a stored user matches a Mock User ID or Email, FORCE update their Role and Configuration 
+    // from the constant. This fixes "stale role" bugs (e.g., Supplier appearing as Agent).
     
-    const defaults = MOCK_USERS.map(u => {
+    const mergedUsers = storedUsers.map(u => {
+        const mockConstant = MOCK_USERS.find(m => m.id === u.id || m.email.toLowerCase() === u.email.toLowerCase());
+        if (mockConstant) {
+            return {
+                ...u,
+                // Enforce critical fields from code constants
+                role: mockConstant.role, 
+                supplierType: mockConstant.supplierType || u.supplierType,
+                linkedInventoryIds: mockConstant.linkedInventoryIds || u.linkedInventoryIds,
+                assignedDestinations: mockConstant.assignedDestinations || u.assignedDestinations
+            };
+        }
+        return u;
+    });
+
+    // Add any new MOCK_USERS that aren't in storage yet
+    const existingIds = new Set(mergedUsers.map(u => u.id));
+    const newMocks = MOCK_USERS.filter(m => !existingIds.has(m.id)).map(u => {
         if (!u.uniqueId) {
-            // Assign ID if missing (First run migration for mock data)
             u.uniqueId = idGeneratorService.generateUniqueId(u.role);
         }
         return u;
-    }).filter(u => !initialEmails.has(u.email.toLowerCase()));
+    });
 
-    this.users = [...defaults, ...storedUsers];
-    if (!stored || defaults.length > 0) this.saveUsers();
+    this.users = [...mergedUsers, ...newMocks];
+    
+    // Always save back to ensure storage is fresh
+    this.saveUsers();
   }
 
   private saveUsers() {
@@ -53,7 +73,7 @@ class AuthService {
   resolveDashboardPath(role: UserRole): string {
       switch(role) {
           case UserRole.ADMIN: return '/admin/dashboard';
-          case UserRole.STAFF: return '/admin/dashboard';
+          case UserRole.STAFF: return '/admin/dashboard'; // Staff shares Admin Dashboard with limited permissions
           case UserRole.AGENT: return '/agent/dashboard';
           case UserRole.OPERATOR: return '/operator/dashboard';
           case UserRole.SUPPLIER: return '/supplier/dashboard';
@@ -226,14 +246,29 @@ class AuthService {
           }
       }
 
-      // 3. Hydrate or Create Local User
+      // 3. OVERRIDE FROM MOCK CONSTANTS (Codebase Authority for System Accounts)
+      // This fix ensures that if a developer/admin logs in with a system email, 
+      // the role defined in constants.ts takes precedence over any stale DB/Local data.
+      const mockConstant = MOCK_USERS.find(m => m.email.toLowerCase() === fbUser.email?.toLowerCase());
+      if (mockConstant) {
+          console.log(`[Auth] Enforcing system role for ${mockConstant.email}: ${mockConstant.role}`);
+          remoteRole = mockConstant.role;
+          // Merge specific fields from constant if needed
+          if (remoteData) {
+              remoteData.role = mockConstant.role;
+              remoteData.assignedDestinations = mockConstant.assignedDestinations || remoteData.assignedDestinations;
+              remoteData.linkedInventoryIds = mockConstant.linkedInventoryIds || remoteData.linkedInventoryIds;
+              remoteData.supplierType = mockConstant.supplierType || remoteData.supplierType;
+          } else {
+              // Create pseudo remote data if missing
+              remoteData = { ...mockConstant };
+          }
+      }
+
+      // 4. Hydrate or Create Local User
       if (remoteRole) {
           if (user) {
-              // Update local user with authoritative remote data
-              // We overwrite role even if it matches to ensure consistency
-              if (user.role !== remoteRole) {
-                  console.log(`[Auth] Role correction: ${user.role} -> ${remoteRole}`);
-              }
+              // Update local user with authoritative remote/constant data
               user.role = remoteRole;
               user.name = remoteData.displayName || remoteData.name || user.name;
               user.companyName = remoteData.companyName || user.companyName;
@@ -264,7 +299,7 @@ class AuthService {
               this.saveUsers();
           }
       } else {
-          // 4. Fallback: No Remote Data & No Provisioning
+          // 5. Fallback: No Remote Data & No Provisioning
           // If user exists locally, we trust local and sync UP to cloud.
           if (user) {
               this.syncUserToFirestore(user).catch(console.warn);
@@ -302,9 +337,30 @@ class AuthService {
   }
 
   private mockLogin(email: string, password: string): User {
+      // Reload from storage to ensure we have the latest list including constructor updates
       const stored = localStorage.getItem(STORAGE_KEY_USERS);
       if (stored) this.users = JSON.parse(stored);
-      const user = this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      
+      const userIndex = this.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+      
+      // CRITICAL FIX: Force role update from constants before login check
+      // This handles cases where local storage has an old version of the mock user (e.g. cached as Agent)
+      const mockConstant = MOCK_USERS.find(m => m.email.toLowerCase() === email.toLowerCase());
+      
+      if (userIndex !== -1 && mockConstant) {
+          // Update the stored user with the role/config from constants
+          this.users[userIndex] = {
+              ...this.users[userIndex],
+              role: mockConstant.role,
+              supplierType: mockConstant.supplierType || this.users[userIndex].supplierType,
+              assignedDestinations: mockConstant.assignedDestinations || this.users[userIndex].assignedDestinations,
+              linkedInventoryIds: mockConstant.linkedInventoryIds || this.users[userIndex].linkedInventoryIds
+          };
+          this.saveUsers();
+      }
+
+      const user = this.users[userIndex];
+      
       if (!user || password !== 'password123') throw new Error("Invalid credentials.");
       apiClient.setSession(`sess_${Date.now()}_${user.id}`);
       return user;
