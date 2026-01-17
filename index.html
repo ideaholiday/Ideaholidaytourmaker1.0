@@ -25,6 +25,10 @@
                 800: '#075985',
                 900: '#0c4a6e',
               }
+            },
+            animation: {
+              'spin-slow': 'spin-slow 20s linear infinite',
+              'float': 'float 6s ease-in-out infinite',
             }
           }
         }
@@ -32,6 +36,25 @@
     </script>
     <style>
       body { font-family: 'Inter', sans-serif; }
+      
+      @keyframes spin-slow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      
+      @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+      }
+
+      .animate-spin-slow {
+        animation: spin-slow 20s linear infinite;
+      }
+      
+      .animate-float {
+        animation: float 6s ease-in-out infinite;
+      }
     </style>
   <script type="importmap">
 {

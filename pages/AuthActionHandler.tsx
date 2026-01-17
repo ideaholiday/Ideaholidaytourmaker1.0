@@ -103,8 +103,8 @@ export const AuthActionHandler: React.FC = () => {
         {/* Header */}
         <div className="mb-8 text-center">
             <div className="flex justify-center mb-3">
-                <div className="bg-brand-600 p-3 rounded-xl text-white shadow-lg">
-                    <Globe size={32} />
+                <div className="bg-brand-600 p-3 rounded-xl text-white shadow-lg rotate-12">
+                    <Globe size={32} className="animate-spin-slow" />
                 </div>
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">{BRANDING.name}</h1>

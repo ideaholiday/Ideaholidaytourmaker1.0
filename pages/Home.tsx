@@ -15,10 +15,16 @@ export const Home: React.FC = () => {
 
         <div className="container mx-auto text-center max-w-4xl relative z-10">
           
-          {/* Company Logo Icon */}
+          {/* Company Logo Icon - Refined & Animated */}
           <div className="flex justify-center mb-8 animate-in fade-in zoom-in duration-1000">
-            <div className="w-32 h-32 bg-white rounded-full shadow-2xl flex items-center justify-center text-brand-600 border-4 border-white/50 backdrop-blur-sm">
-                <Globe size={64} strokeWidth={1.5} />
+            <div className="relative animate-float">
+                <div className="absolute inset-0 bg-brand-400 rounded-full blur-xl opacity-30 animate-pulse"></div>
+                {/* Tilted Axis Wrapper */}
+                <div className="rotate-12 transform-gpu">
+                    <div className="w-32 h-32 bg-white rounded-full shadow-2xl flex items-center justify-center text-brand-600 border-4 border-white/50 backdrop-blur-sm relative z-10">
+                        <Globe size={64} strokeWidth={1.5} className="animate-spin-slow" />
+                    </div>
+                </div>
             </div>
           </div>
 
@@ -58,8 +64,8 @@ export const Home: React.FC = () => {
               </div>
             </div>
             <div className="flex flex-col items-center text-center gap-3 group">
-              <div className="p-4 bg-white rounded-2xl shadow-sm text-blue-600 mb-1 group-hover:scale-110 transition-transform duration-300">
-                <Globe size={28} strokeWidth={2} />
+              <div className="p-4 bg-white rounded-2xl shadow-sm text-blue-600 mb-1 group-hover:scale-110 transition-transform duration-300 rotate-12">
+                <Globe size={28} strokeWidth={2} className="group-hover:animate-spin-slow" />
               </div>
               <div>
                 <h3 className="font-bold text-slate-900">Global Network</h3>
@@ -115,7 +121,7 @@ export const Home: React.FC = () => {
               desc="Automated booking flows, status updates, and voucher generation."
             />
              <FeatureCard 
-              icon={<Globe className="w-6 h-6 text-green-600" />}
+              icon={<div className="rotate-12"><Globe className="w-6 h-6 text-green-600 animate-spin-slow" /></div>}
               title="Direct Inventory"
               desc="Connect directly with ground suppliers for the best net rates."
             />

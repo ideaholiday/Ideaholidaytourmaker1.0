@@ -40,9 +40,12 @@ export const Navbar: React.FC = () => {
   return (
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to={getHomeLink()} className="flex items-center gap-2">
-          <div className="bg-brand-600 text-white p-1.5 rounded-lg shadow-sm">
-             <Globe size={20} />
+        <Link to={getHomeLink()} className="flex items-center gap-2 group">
+          <div className="relative">
+             {/* Tilted Axis Container for Earth-like effect */}
+             <div className="bg-brand-600 text-white p-1.5 rounded-lg shadow-sm transition-transform group-hover:scale-105 rotate-12">
+                <Globe size={20} className="animate-spin-slow" />
+             </div>
           </div>
           <span className="font-bold text-xl text-slate-900 tracking-tight hidden sm:block">
             {BRANDING.name}

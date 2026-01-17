@@ -104,8 +104,8 @@ export const Login: React.FC = () => {
             {/* Header Section */}
             <div className="px-8 pt-10 pb-6 text-center">
                 <div className="inline-flex items-center justify-center mb-6 transform hover:scale-105 transition-transform duration-300">
-                    <div className="w-20 h-20 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-lg">
-                        <Globe size={40} />
+                    <div className="w-20 h-20 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-lg rotate-12">
+                        <Globe size={40} className="animate-spin-slow" />
                     </div>
                 </div>
                 <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
