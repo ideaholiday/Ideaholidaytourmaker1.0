@@ -6,6 +6,7 @@ import { ResendVerification } from '../components/ResendVerification';
 import { Shield, Lock, Mail, AlertCircle, CheckCircle, Loader2, ArrowRight, Globe, Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '../types';
 import { BRANDING } from '../constants';
+import { authService } from '../services/authService';
 
 export const Login: React.FC = () => {
   const { login, user, reloadUser } = useAuth();
@@ -36,9 +37,6 @@ export const Login: React.FC = () => {
   useEffect(() => {
       const checkAndRedirect = async () => {
           if (user) {
-              // Optimization: Login just happened, user state is fresh.
-              // Removed redundant `await reloadUser()` to speed up redirect.
-              
               if (user.isVerified) {
                   setIsRedirecting(true);
                   // Determine proper dashboard based on role
@@ -70,8 +68,20 @@ export const Login: React.FC = () => {
     
     try {
       await login(email, password);
-      // Navigation is handled by the useEffect above
+      
+      // Check immediately if we need to handle unverified status manually
+      // because context update might be async or blocked.
+      const currentUser = await authService.getCurrentUser();
+      
+      if (currentUser && !currentUser.isVerified) {
+          setIsSubmitting(false);
+          setShowResend(true);
+          setSuccessMsg("Login successful, but email verification is pending.");
+      } 
+      // If verified, the useEffect hook will handle the redirect.
+      
     } catch (err: any) {
+      console.error("Login Error UI:", err);
       const msg = err.message.replace('Firebase: ', '').replace('auth/', '');
       
       if (msg.includes('not verified') || msg.includes('email-not-verified')) {

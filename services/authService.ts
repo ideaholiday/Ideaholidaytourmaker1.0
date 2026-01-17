@@ -79,8 +79,12 @@ class AuthService {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         return this.handleFirebaseUser(userCredential.user);
     } catch (error: any) {
+        console.error("Login Error:", error);
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
             throw new Error("Invalid email or password.");
+        }
+        if (error.code === 'auth/network-request-failed') {
+            throw new Error("Network error. Please check your connection.");
         }
         throw new Error(error.message || "Login failed.");
     }
@@ -146,8 +150,8 @@ class AuthService {
     this.users.push(newUser);
     this.saveUsers();
     
-    // Sync to Firestore to create initial document (triggers nothing yet as verified=false)
-    await this.syncUserToFirestore(newUser);
+    // Non-blocking sync
+    this.syncUserToFirestore(newUser).catch(e => console.warn("Register sync failed", e));
 
     if (process.env.NODE_ENV === 'development') {
        await emailVerificationService.sendVerificationEmail(newUser);
@@ -157,7 +161,7 @@ class AuthService {
   }
 
   private async handleFirebaseUser(fbUser: FirebaseUser): Promise<User> {
-      // Logic same as before...
+      // Ensure we have latest local data
       const stored = localStorage.getItem(STORAGE_KEY_USERS);
       if (stored) this.users = JSON.parse(stored);
 
@@ -165,16 +169,14 @@ class AuthService {
       if (!user) user = this.users.find(u => u.email.toLowerCase() === fbUser.email?.toLowerCase());
 
       if (user) {
-          // If verifying now
-          if ((fbUser.emailVerified || user.isVerified) && user.status === 'PENDING_VERIFICATION') {
+          // Sync Firebase Verified Status to Local User
+          if (fbUser.emailVerified && !user.isVerified) {
               user.isVerified = true;
               user.status = 'ACTIVE';
               this.saveUsers();
-              // CRITICAL: Update Firestore to trigger Welcome Email
-              await this.syncUserToFirestore(user);
           }
       } else {
-          // New/Restored User
+          // New/Restored User (Login on new device)
           const uniqueId = idGeneratorService.generateUniqueId(UserRole.AGENT);
           user = {
               id: fbUser.uid,
@@ -183,14 +185,16 @@ class AuthService {
               email: fbUser.email || '',
               role: UserRole.AGENT,
               isVerified: fbUser.emailVerified,
-              status: 'ACTIVE',
+              status: fbUser.emailVerified ? 'ACTIVE' : 'PENDING_VERIFICATION',
               joinedAt: new Date().toISOString(),
               companyName: 'Restored Account'
           };
           this.users.push(user);
           this.saveUsers();
-          await this.syncUserToFirestore(user);
       }
+
+      // Fire-and-forget sync to avoid blocking login if Firestore is slow/offline
+      this.syncUserToFirestore(user).catch(err => console.warn("Background sync warning:", err));
 
       apiClient.setSession(`sess_${Date.now()}_${user.id}`);
       return user;
@@ -241,8 +245,22 @@ class AuthService {
               if (fbUser) {
                   const stored = localStorage.getItem(STORAGE_KEY_USERS);
                   if (stored) this.users = JSON.parse(stored);
+                  
                   let user = this.users.find(u => u.id === fbUser.uid);
-                  resolve(user || null);
+                  
+                  // Recovery for new device where local storage is empty but Firebase has user
+                  if (!user) {
+                      user = await this.handleFirebaseUser(fbUser);
+                  }
+                  
+                  // Ensure verified status is sync
+                  if (fbUser.emailVerified && !user.isVerified) {
+                      user.isVerified = true;
+                      user.status = 'ACTIVE';
+                      this.saveUsers();
+                  }
+
+                  resolve(user);
               } else {
                   resolve(null);
               }
@@ -258,7 +276,8 @@ class AuthService {
               user.isVerified = true;
               user.status = 'ACTIVE';
               this.saveUsers();
-              await this.syncUserToFirestore(user);
+              // Non-blocking sync
+              this.syncUserToFirestore(user).catch(console.warn);
               emailVerificationService.invalidateToken(token);
               return true;
           }
