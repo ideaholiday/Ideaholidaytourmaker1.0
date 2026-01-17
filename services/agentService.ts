@@ -11,8 +11,18 @@ class AgentService {
 
   constructor() {
     const stored = localStorage.getItem(STORAGE_KEY_QUOTES);
-    // Merge initial mock quotes with local storage
-    this.quotes = stored ? JSON.parse(stored) : [...INITIAL_QUOTES];
+    
+    // Safety Logic: Merge stored quotes with Initial Mock Quotes
+    // If we have stored data, use it. If code introduces NEW initial quotes (rare), we can merge them here.
+    // For quotes, typically we just load stored, but to be consistent with adminService:
+    if (stored) {
+        const storedQuotes = JSON.parse(stored) as Quote[];
+        const storedIds = new Set(storedQuotes.map(q => q.id));
+        const newDefaults = INITIAL_QUOTES.filter(q => !storedIds.has(q.id));
+        this.quotes = [...storedQuotes, ...newDefaults];
+    } else {
+        this.quotes = [...INITIAL_QUOTES];
+    }
   }
 
   private save() {

@@ -4,10 +4,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { bookingService } from '../../services/bookingService';
 import { agentService } from '../../services/agentService'; // Import Agent Service for Quotes
+import { currencyService } from '../../services/currencyService';
 import { Booking, Quote } from '../../types';
 import { AssignedBookingsTable } from '../../components/operator/AssignedBookingsTable';
 import { AssignedQuotesTable } from '../../components/operator/AssignedQuotesTable';
-import { Briefcase, Calendar, CheckCircle, AlertTriangle, RefreshCw, ArrowRight, FileText, PlayCircle, Book } from 'lucide-react';
+import { Briefcase, Calendar, CheckCircle, AlertTriangle, RefreshCw, ArrowRight, FileText, PlayCircle, Book, DollarSign, TrendingUp } from 'lucide-react';
 
 export const OperatorDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -56,8 +57,21 @@ export const OperatorDashboard: React.FC = () => {
   // 3. Active Operations (Currently In Progress)
   const activeJobsCount = bookings.filter(b => b.status === 'IN_PROGRESS').length;
 
-  // 4. Completed Tasks (Finished Bookings)
-  const completedTasksCount = bookings.filter(b => b.status === 'COMPLETED').length;
+  // 4. Earnings Calculation (Converted to USD for aggregation)
+  const calculateEarnings = (statusList: string[]) => {
+      return bookings.reduce((sum, b) => {
+          if (statusList.includes(b.status)) {
+              // Priority: Fixed Operator Price -> Net Cost (if visible) -> 0
+              const rawPrice = b.operatorPrice !== undefined ? b.operatorPrice : (b.netCostVisibleToOperator ? b.netCost : 0);
+              // Convert to USD base
+              return sum + currencyService.convert(rawPrice, b.currency || 'USD', 'USD');
+          }
+          return sum;
+      }, 0);
+  };
+
+  const realizedEarnings = calculateEarnings(['COMPLETED']);
+  const pipelineEarnings = calculateEarnings(['CONFIRMED', 'IN_PROGRESS']);
 
   const StatCard = ({ label, value, subtext, icon, color }: any) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-start justify-between hover:shadow-md transition-shadow">
@@ -129,10 +143,10 @@ export const OperatorDashboard: React.FC = () => {
           color="bg-indigo-600" 
         />
         <StatCard 
-          label="Completed Tasks" 
-          value={completedTasksCount} 
-          subtext="Total fulfilled orders" 
-          icon={<CheckCircle size={24} />} 
+          label="Total Earnings" 
+          value={`$${Math.round(realizedEarnings).toLocaleString()}`} 
+          subtext={`+ $${Math.round(pipelineEarnings).toLocaleString()} pending`} 
+          icon={<DollarSign size={24} />} 
           color="bg-emerald-600" 
         />
       </div>

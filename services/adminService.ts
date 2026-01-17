@@ -186,10 +186,28 @@ const KEYS = {
 
 class AdminService {
   
-  // Generic Getter
-  private getData<T>(key: string, defaults: T[]): T[] {
+  /**
+   * Enhanced Getter that merges Stored Data with Code Defaults.
+   * This ensures new code deployments (adding new default hotels/tours) appear
+   * without deleting or overwriting user-modified data.
+   */
+  private getData<T extends { id: string }>(key: string, defaults: T[]): T[] {
     const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : defaults;
+    if (!stored) return defaults;
+
+    try {
+        const storedData = JSON.parse(stored) as T[];
+        const storedIds = new Set(storedData.map(item => item.id));
+        
+        // Find defaults that are NOT in storage (newly added in code)
+        const newDefaults = defaults.filter(d => !storedIds.has(d.id));
+        
+        // Return Stored Data + New Code Defaults
+        return [...storedData, ...newDefaults];
+    } catch (e) {
+        console.error("Error parsing storage", e);
+        return defaults;
+    }
   }
 
   // Generic Setter
@@ -199,7 +217,7 @@ class AdminService {
 
   // --- DESTINATIONS ---
   getDestinations(): Destination[] {
-    return this.getData(KEYS.DESTINATIONS, INITIAL_DESTINATIONS);
+    return this.getData<Destination>(KEYS.DESTINATIONS, INITIAL_DESTINATIONS);
   }
   saveDestination(dest: Destination) {
     const list = this.getDestinations();
@@ -216,7 +234,7 @@ class AdminService {
 
   // --- HOTELS ---
   getHotels(): Hotel[] {
-    return this.getData(KEYS.HOTELS, INITIAL_HOTELS);
+    return this.getData<Hotel>(KEYS.HOTELS, INITIAL_HOTELS);
   }
   saveHotel(hotel: Hotel) {
     const list = this.getHotels();
@@ -231,7 +249,7 @@ class AdminService {
 
   // --- ACTIVITIES ---
   getActivities(): Activity[] {
-    return this.getData(KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
+    return this.getData<Activity>(KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
   }
   saveActivity(activity: Activity) {
     const list = this.getActivities();
@@ -246,7 +264,7 @@ class AdminService {
 
   // --- TRANSFERS ---
   getTransfers(): Transfer[] {
-    return this.getData(KEYS.TRANSFERS, INITIAL_TRANSFERS);
+    return this.getData<Transfer>(KEYS.TRANSFERS, INITIAL_TRANSFERS);
   }
   saveTransfer(transfer: Transfer) {
     const list = this.getTransfers();
@@ -261,7 +279,7 @@ class AdminService {
 
   // --- VISAS ---
   getVisas(): Visa[] {
-    return this.getData(KEYS.VISAS, INITIAL_VISAS);
+    return this.getData<Visa>(KEYS.VISAS, INITIAL_VISAS);
   }
   saveVisa(visa: Visa) {
     const list = this.getVisas();
@@ -276,7 +294,7 @@ class AdminService {
 
   // --- FIXED PACKAGES ---
   getFixedPackages(): FixedPackage[] {
-    return this.getData(KEYS.PACKAGES, INITIAL_PACKAGES);
+    return this.getData<FixedPackage>(KEYS.PACKAGES, INITIAL_PACKAGES);
   }
   saveFixedPackage(pkg: FixedPackage) {
     const list = this.getFixedPackages();
@@ -291,7 +309,7 @@ class AdminService {
 
   // --- SYSTEM TEMPLATES ---
   getSystemTemplates(): ItineraryTemplate[] {
-    return this.getData(KEYS.TEMPLATES, INITIAL_TEMPLATES);
+    return this.getData<ItineraryTemplate>(KEYS.TEMPLATES, INITIAL_TEMPLATES);
   }
   saveSystemTemplate(template: ItineraryTemplate) {
     const list = this.getSystemTemplates();
