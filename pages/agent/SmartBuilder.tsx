@@ -8,7 +8,7 @@ import { favoriteTemplateService } from '../../services/favoriteTemplateService'
 import { currencyService } from '../../services/currencyService';
 import { calculatePriceFromNet } from '../../utils/pricingEngine';
 import { ItineraryItem, ItineraryService, Hotel, Activity, Transfer, AgentFavoriteTemplate, ItineraryTemplate, CityVisit, PricingRule } from '../../types';
-import { MapPin, Calendar, Users, Hotel as HotelIcon, ArrowRight, Plus, Trash2, Check, ArrowLeft, DollarSign, Camera, Car, AlertCircle, Info, Plane, Coffee, Star, BedDouble, X, Search, Globe, Route, HelpCircle, Coins, User } from 'lucide-react';
+import { MapPin, Calendar, Users, Hotel as HotelIcon, ArrowRight, Plus, Trash2, Check, ArrowLeft, DollarSign, Camera, Car, AlertCircle, Info, Plane, Coffee, Star, BedDouble, X, Search, Globe, Route, HelpCircle, Coins, User, CheckCircle } from 'lucide-react';
 import { TemplateSelector } from '../../components/TemplateSelector';
 import { FavoriteTemplateModal } from '../../components/FavoriteTemplateModal';
 import { CityNightSelector } from '../../components/CityNightSelector';
@@ -763,20 +763,25 @@ export const SmartBuilder: React.FC = () => {
                                             <div 
                                                 key={h.id} 
                                                 onClick={() => handleSelectHotelForCity(activeCityTabId, h)}
-                                                className={`group p-4 border rounded-xl cursor-pointer flex justify-between items-center transition-all ${isSelected ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'bg-white border-slate-200 hover:border-brand-300 hover:shadow-md'}`}
+                                                className={`group p-4 border rounded-xl cursor-pointer flex justify-between items-center transition-all ${
+                                                    isSelected 
+                                                    ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500 shadow-sm' 
+                                                    : 'bg-white border-slate-200 hover:border-brand-300 hover:shadow-md'
+                                                }`}
                                             >
                                                 <div>
-                                                    <p className="font-bold text-slate-900 flex items-center gap-2">
+                                                    <p className="font-bold text-slate-900 flex items-center gap-2 text-lg">
                                                         {h.name}
-                                                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-600 border border-slate-200">{h.category}</span>
+                                                        {isSelected && <CheckCircle size={18} className="text-brand-600 animate-in zoom-in" />}
                                                     </p>
                                                     <div className="flex gap-2 mt-1">
+                                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-medium">{h.category}</span>
                                                         <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">{h.mealPlan}</span>
                                                         <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">{h.roomType}</span>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="font-mono font-bold text-brand-700 text-xl">
+                                                    <p className={`font-mono font-bold text-xl ${isSelected ? 'text-brand-700' : 'text-slate-700'}`}>
                                                         {currencyService.getSymbol(currency)} {calculated.platformNetCost.toLocaleString()}
                                                     </p>
                                                     <p className="text-[10px] text-slate-400 uppercase font-semibold">Net Payable (B2B)</p>

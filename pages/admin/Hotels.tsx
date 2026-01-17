@@ -302,7 +302,7 @@ export const Hotels: React.FC = () => {
                   
                   <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Cost</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Cost (Base Rate)</label>
                         <div className="flex gap-2">
                             <select 
                                 value={formData.currency} 
@@ -320,6 +320,7 @@ export const Hotels: React.FC = () => {
                                 placeholder="0.00" 
                             />
                         </div>
+                        <p className="text-[10px] text-slate-500 mt-1 ml-1">Select Currency is critical for accurate quotes.</p>
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Rate Basis</label>

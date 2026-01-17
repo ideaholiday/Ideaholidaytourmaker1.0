@@ -11,7 +11,8 @@ const COLORS = {
     secondary: [15, 23, 42], // Slate 900
     accent: [240, 249, 255], // Brand 50
     text: [51, 65, 85],      // Slate 700
-    lightText: [100, 116, 139] // Slate 500
+    lightText: [100, 116, 139], // Slate 500
+    tableHeader: [241, 245, 249] // Slate 100
 };
 
 interface BrandingOptions {
@@ -87,11 +88,11 @@ export const generateQuotePDF = (
   }
 
   // Company Name
-  doc.setFontSize(14);
+  doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(COLORS.secondary[0], COLORS.secondary[1], COLORS.secondary[2]);
   const nameX = branding.logoUrl ? 45 : 20;
-  doc.text(branding.companyName, nameX, 28);
+  doc.text(branding.companyName, nameX, 25, { maxWidth: 45 });
   
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
@@ -99,7 +100,7 @@ export const generateQuotePDF = (
   doc.text("Travel Partner", nameX, 33);
 
   // Document Title (Right Side on Blue)
-  doc.setFontSize(24);
+  doc.setFontSize(22);
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   const docTitle = role === UserRole.OPERATOR ? "SERVICE ORDER" : "TRAVEL PROPOSAL";
@@ -116,13 +117,13 @@ export const generateQuotePDF = (
   doc.setDrawColor(226, 232, 240); // Slate 200
   doc.roundedRect(15, yPos, 180, 28, 3, 3, 'FD');
 
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setTextColor(COLORS.lightText[0], COLORS.lightText[1], COLORS.lightText[2]);
   doc.text("Destination", 20, yPos + 8);
   doc.text("Travel Date", 80, yPos + 8);
   doc.text("Guests", 140, yPos + 8);
 
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setTextColor(COLORS.secondary[0], COLORS.secondary[1], COLORS.secondary[2]);
   doc.setFont("helvetica", "bold");
   doc.text(quote.destination, 20, yPos + 16);
@@ -147,55 +148,57 @@ export const generateQuotePDF = (
       currentDate.setDate(startDate.getDate() + (item.day - 1));
       const dateStr = currentDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', weekday: 'short' });
 
-      // Row 1: Day Header
+      // 1. Day Header Row
       tableBody.push([{ 
           content: `Day ${item.day}  |  ${dateStr}  -  ${item.title}`, 
           colSpan: 2, 
           styles: { 
               fontStyle: 'bold', 
-              fillColor: [241, 245, 249], // Slate 100
-              textColor: [15, 23, 42],
-              cellPadding: 3
+              fontSize: 10,
+              fillColor: COLORS.tableHeader, 
+              textColor: COLORS.secondary,
+              cellPadding: { top: 5, bottom: 5, left: 5 }
           } 
       }]);
       
-      // Row 2: Description
+      // 2. Description Row
       if(item.description) {
           tableBody.push([{ 
               content: item.description, 
               colSpan: 2, 
               styles: { 
-                  fontStyle: 'normal', 
-                  textColor: [71, 85, 105],
-                  cellPadding: { top: 2, bottom: 4, left: 3, right: 3 }
+                  fontStyle: 'italic', 
+                  textColor: COLORS.text,
+                  cellPadding: { top: 2, bottom: 5, left: 5, right: 5 }
               } 
           }]);
       }
 
-      // Row 3+: Services
+      // 3. Services Rows
       if(item.services && item.services.length > 0) {
           item.services.forEach(svc => {
               let details = "";
-              if (svc.type === 'TRANSFER' && svc.meta?.vehicle) details = `[${svc.meta.vehicle}]`;
-              else if (svc.type === 'HOTEL' && svc.meta?.roomType) details = `[${svc.meta.roomType} - ${svc.meta.mealPlan}]`;
-              else if (svc.type === 'ACTIVITY' && svc.meta?.type) details = `[${svc.meta.type}]`;
+              if (svc.type === 'TRANSFER' && svc.meta?.vehicle) details = ` • ${svc.meta.vehicle}`;
+              else if (svc.type === 'HOTEL' && svc.meta?.roomType) details = ` • ${svc.meta.roomType} (${svc.meta.mealPlan})`;
+              else if (svc.type === 'ACTIVITY' && svc.meta?.type) details = ` • ${svc.meta.type}`;
 
-              // Price Logic
+              // Price Logic (Strictly controlled)
               let priceText = "";
-              if (role !== UserRole.OPERATOR && !svc.isRef) {
-                   if (role === UserRole.ADMIN || role === UserRole.STAFF) {
-                      const converted = currencyService.convert(svc.cost, svc.currency || 'USD', quote.currency || 'USD');
-                      priceText = `${quote.currency || 'USD'} ${Math.round(converted).toLocaleString()}`;
-                   } else {
-                      priceText = "Included";
-                   }
+              // Admins see line items. Agents see "Included". Operators see nothing/masked.
+              if (role === UserRole.ADMIN || role === UserRole.STAFF) {
+                  // For Admin PDF, show converted line item price
+                  const converted = currencyService.convert(svc.cost, svc.currency || 'USD', quote.currency || 'USD');
+                  priceText = `${quote.currency || 'USD'} ${Math.round(converted).toLocaleString()}`;
+              } else if (role === UserRole.AGENT) {
+                  priceText = "Included";
               }
 
-              const typeIcon = svc.type === 'HOTEL' ? '🏨' : svc.type === 'TRANSFER' ? '🚗' : '📷';
+              // Icons
+              const typeIcon = svc.type === 'HOTEL' ? 'HOTEL' : svc.type === 'TRANSFER' ? 'TRANSFER' : 'ACTIVITY';
 
               tableBody.push([
-                  { content: `${typeIcon}  ${svc.name} ${details}`, styles: { textColor: [51, 65, 85] } }, 
-                  { content: priceText, styles: { halign: 'right', fontStyle: 'bold', textColor: primaryRGB as any } }
+                  { content: `${typeIcon}: ${svc.name}${details}`, styles: { textColor: COLORS.secondary, fontSize: 9 } }, 
+                  { content: priceText, styles: { halign: 'right', fontStyle: 'bold', textColor: primaryRGB as any, fontSize: 8 } }
               ]);
           });
       }
@@ -204,13 +207,13 @@ export const generateQuotePDF = (
     autoTable(doc, {
       startY: yPos,
       body: tableBody,
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 3, valign: 'middle', lineColor: [226, 232, 240] }, // Slate 200
-      columnStyles: { 0: { cellWidth: 145 }, 1: { cellWidth: 35 } },
+      theme: 'plain', // Clean look
+      styles: { fontSize: 9, cellPadding: 2, valign: 'middle' },
+      columnStyles: { 0: { cellWidth: 150 }, 1: { cellWidth: 30 } },
       didParseCell: (data) => {
-          // Remove borders for inner content to look cleaner
-          if (data.row.index % 2 !== 0) { 
-             data.cell.styles.lineWidth = 0; 
+          // Add border only at bottom of day block if needed, or leave clean
+          if (data.row.cells[0].raw && typeof data.row.cells[0].raw === 'object' && (data.row.cells[0].raw as any).content.startsWith('Day')) {
+             // Header styling already applied
           }
       }
     });
@@ -232,9 +235,9 @@ export const generateQuotePDF = (
           yPos = 40;
       }
 
-      // Price Box
+      // Price Box (Right Aligned)
       doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.roundedRect(120, yPos, 75, 25, 2, 2, 'F');
+      doc.roundedRect(120, yPos, 75, 28, 2, 2, 'F');
       
       doc.setFontSize(10);
       doc.setTextColor(255, 255, 255);
@@ -243,25 +246,26 @@ export const generateQuotePDF = (
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
       doc.text(`${currencySymbol} ${displayPrice.toLocaleString()}`, 130, yPos + 18);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text("(Inclusive of all taxes)", 130, yPos + 23);
       
-      // Contact Box
+      // Contact Box (Left Aligned)
+      doc.setFontSize(10);
+      doc.setTextColor(COLORS.secondary[0], COLORS.secondary[1], COLORS.secondary[2]);
+      doc.setFont("helvetica", "bold");
+      doc.text("Contact & Booking", 15, yPos + 8);
+      
       doc.setFontSize(9);
       doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
       doc.setFont("helvetica", "normal");
       
-      let contactY = yPos + 35;
-      doc.text("For bookings and queries:", 15, contactY);
-      doc.setFont("helvetica", "bold");
-      doc.text(branding.phone, 15, contactY + 5);
-      doc.text(branding.email, 15, contactY + 10);
-      if(branding.address) {
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(8);
-          doc.text(branding.address, 15, contactY + 16, { maxWidth: 100 });
-      }
+      doc.text(branding.phone, 15, yPos + 15);
+      doc.text(branding.email, 15, yPos + 20);
+      if(branding.website) doc.text(branding.website, 15, yPos + 25);
   }
 
-  // Page Numbers
+  // Footer on all pages
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
