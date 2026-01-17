@@ -48,6 +48,7 @@ class AuthService {
 
   /**
    * CENTRALIZED ROLE RESOLVER
+   * Maps User Roles to their specific dashboard paths.
    */
   resolveDashboardPath(role: UserRole): string {
       switch(role) {
@@ -96,7 +97,7 @@ class AuthService {
 
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        // Force fresh sync on login
+        // Force fresh sync on login to prevent stale role caching
         return this.handleFirebaseUser(userCredential.user, true);
     } catch (error: any) {
         console.error("Login Error:", error);
@@ -181,7 +182,7 @@ class AuthService {
   }
 
   private async handleFirebaseUser(fbUser: FirebaseUser, forceSync: boolean = false): Promise<User> {
-      // Ensure we have latest local data
+      // Reload local data to ensure we aren't working with stale memory state
       const stored = localStorage.getItem(STORAGE_KEY_USERS);
       if (stored) this.users = JSON.parse(stored);
 
@@ -229,7 +230,7 @@ class AuthService {
       if (remoteRole) {
           if (user) {
               // Update local user with authoritative remote data
-              // We overwrite role even if it matches, to be safe, along with other critical fields
+              // We overwrite role even if it matches to ensure consistency
               if (user.role !== remoteRole) {
                   console.log(`[Auth] Role correction: ${user.role} -> ${remoteRole}`);
               }
@@ -264,7 +265,7 @@ class AuthService {
           }
       } else {
           // 4. Fallback: No Remote Data & No Provisioning
-          // If user exists locally, we trust local and sync UP to cloud (Self-Repair).
+          // If user exists locally, we trust local and sync UP to cloud.
           if (user) {
               this.syncUserToFirestore(user).catch(console.warn);
           } else {
@@ -328,8 +329,8 @@ class AuthService {
   async logout(user?: User | null, reason: string = 'User initiated'): Promise<void> {
     await signOut(auth);
     apiClient.clearSession();
-    // Do NOT clear STORAGE_KEY_USERS as it acts as our persistence layer for non-firebase parts
-    // But we should ensure next login fetches fresh data.
+    // Do not clear STORAGE_KEY_USERS completely as it simulates the DB,
+    // but we can optionally force a refresh on next load.
   }
 
   async requestPasswordReset(email: string): Promise<void> {
@@ -345,7 +346,7 @@ class AuthService {
           const unsubscribe = auth.onAuthStateChanged(async (fbUser) => {
               unsubscribe();
               if (fbUser) {
-                  // Always force sync on session restore to prevent stale role caching
+                  // Always force sync on session restore to fix stale roles
                   const user = await this.handleFirebaseUser(fbUser, true);
                   resolve(user);
               } else {

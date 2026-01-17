@@ -83,7 +83,6 @@ const DashboardRedirect = () => {
     const { user } = useAuth();
     if (!user) return <Navigate to="/login" replace />;
 
-    // Use centralized resolver to avoid logic fragmentation
     const targetPath = authService.resolveDashboardPath(user.role);
     return <Navigate to={targetPath} replace />;
 };

@@ -311,6 +311,14 @@ export interface Hotel {
   operatorName?: string;
   contractId?: string; // New
   supplierId?: string; // New
+  
+  // Enhanced Fields
+  description?: string;
+  imageUrl?: string;
+  address?: string;
+  contactPhone?: string;
+  email?: string;
+  website?: string;
 }
 
 export interface Activity {
@@ -384,6 +392,11 @@ export interface Visa {
   documentsRequired: string[];
   isActive: boolean;
   createdBy?: string;
+  
+  // Enhanced Fields
+  validity?: string; // e.g. "60 Days"
+  entryType?: 'Single' | 'Multiple';
+  description?: string;
 }
 
 export interface FixedPackage {
@@ -397,6 +410,11 @@ export interface FixedPackage {
   validDates: string[];
   isActive: boolean;
   createdBy?: string;
+  
+  // Enhanced Fields
+  description?: string;
+  imageUrl?: string;
+  category?: string; // e.g. "Honeymoon", "Family"
 }
 
 // --- System ---

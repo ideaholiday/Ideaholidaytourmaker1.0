@@ -4,7 +4,7 @@ import { adminService } from '../../services/adminService';
 import { currencyService } from '../../services/currencyService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Hotel } from '../../types';
-import { Edit2, Trash2, Plus, X, Search, Hotel as HotelIcon, Calendar, Check, DollarSign } from 'lucide-react';
+import { Edit2, Trash2, Plus, X, Search, Hotel as HotelIcon, Calendar, Check, DollarSign, Image as ImageIcon, Phone, Mail, MapPin } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 
 export const Hotels: React.FC = () => {
@@ -52,7 +52,13 @@ export const Hotels: React.FC = () => {
         season: 'Off-Peak',
         currency: 'USD',
         validFrom: new Date().toISOString().split('T')[0],
-        validTo: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
+        validTo: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+        description: '',
+        imageUrl: '',
+        address: '',
+        contactPhone: '',
+        email: '',
+        website: ''
       });
     }
     setIsModalOpen(true);
@@ -76,7 +82,14 @@ export const Hotels: React.FC = () => {
       validFrom: formData.validFrom || new Date().toISOString().split('T')[0],
       validTo: formData.validTo || new Date().toISOString().split('T')[0],
       isActive: formData.isActive || false,
-      createdBy: editingHotel?.createdBy || user?.id
+      createdBy: editingHotel?.createdBy || user?.id,
+      // Enhanced fields
+      description: formData.description,
+      imageUrl: formData.imageUrl,
+      address: formData.address,
+      contactPhone: formData.contactPhone,
+      email: formData.email,
+      website: formData.website
     });
 
     const freshAll = adminService.getHotels();
@@ -154,8 +167,12 @@ export const Hotels: React.FC = () => {
                 <tr key={hotel.id} className="hover:bg-brand-50/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-                            <HotelIcon size={20} />
+                        <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 overflow-hidden">
+                            {hotel.imageUrl ? (
+                                <img src={hotel.imageUrl} alt={hotel.name} className="w-full h-full object-cover" />
+                            ) : (
+                                <HotelIcon size={20} />
+                            )}
                         </div>
                         <div>
                             <p className="font-bold text-slate-900 text-base">{hotel.name}</p>
@@ -208,7 +225,7 @@ export const Hotels: React.FC = () => {
 
       {isModalOpen && canEdit && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-0 overflow-hidden transform scale-100 transition-all max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-0 overflow-hidden transform scale-100 transition-all max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10 backdrop-blur-md">
               <h2 className="text-xl font-bold text-slate-900">{editingHotel ? 'Edit Rate' : 'Add Hotel Rate'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition"><X size={24}/></button>
@@ -255,6 +272,67 @@ export const Hotels: React.FC = () => {
                         </select>
                     </div>
                 </div>
+              </div>
+
+              <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <HotelIcon size={14} /> Description & Contact
+                  </h3>
+                  <div>
+                      <textarea 
+                          rows={2}
+                          value={formData.description || ''} 
+                          onChange={e => setFormData({...formData, description: e.target.value})} 
+                          className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white shadow-sm"
+                          placeholder="Short description of the property..."
+                      />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                      <div className="relative">
+                          <ImageIcon size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                          <input 
+                              type="text" 
+                              value={formData.imageUrl || ''} 
+                              onChange={e => setFormData({...formData, imageUrl: e.target.value})} 
+                              className="w-full pl-10 border border-slate-300 rounded-xl py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                              placeholder="Image URL"
+                          />
+                      </div>
+                      <div className="relative">
+                          <MapPin size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                          <input 
+                              type="text" 
+                              value={formData.address || ''} 
+                              onChange={e => setFormData({...formData, address: e.target.value})} 
+                              className="w-full pl-10 border border-slate-300 rounded-xl py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                              placeholder="Address"
+                          />
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                      <div className="relative">
+                          <Phone size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                          <input 
+                              type="text" 
+                              value={formData.contactPhone || ''} 
+                              onChange={e => setFormData({...formData, contactPhone: e.target.value})} 
+                              className="w-full pl-10 border border-slate-300 rounded-xl py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                              placeholder="Front Desk Phone"
+                          />
+                      </div>
+                      <div className="relative">
+                          <Mail size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                          <input 
+                              type="email" 
+                              value={formData.email || ''} 
+                              onChange={e => setFormData({...formData, email: e.target.value})} 
+                              className="w-full pl-10 border border-slate-300 rounded-xl py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                              placeholder="Reservations Email"
+                          />
+                      </div>
+                  </div>
               </div>
 
               <hr className="border-slate-100" />

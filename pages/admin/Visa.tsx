@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Visa } from '../../types';
-import { Edit2, Trash2, Plus, X, FileText, CheckCircle } from 'lucide-react';
+import { Edit2, Trash2, Plus, X, FileText, CheckCircle, Clock, BookOpen, AlertCircle } from 'lucide-react';
 
 export const VisaPage: React.FC = () => {
   const { user } = useAuth();
@@ -42,6 +42,9 @@ export const VisaPage: React.FC = () => {
         visaType: '',
         processingTime: '',
         cost: 0,
+        validity: '30 Days',
+        entryType: 'Single',
+        description: '',
         documentsText: ''
       });
     }
@@ -61,6 +64,9 @@ export const VisaPage: React.FC = () => {
       visaType: formData.visaType!,
       processingTime: formData.processingTime || 'TBD',
       cost: Number(formData.cost),
+      validity: formData.validity,
+      entryType: formData.entryType,
+      description: formData.description,
       documentsRequired: docs,
       isActive: formData.isActive || false,
       createdBy: editingVisa?.createdBy || user?.id
@@ -97,9 +103,9 @@ export const VisaPage: React.FC = () => {
             <tr>
               <th className="px-6 py-4 font-semibold">Country</th>
               <th className="px-6 py-4 font-semibold">Visa Type</th>
+              <th className="px-6 py-4 font-semibold">Details</th>
               <th className="px-6 py-4 font-semibold">Processing</th>
               {showCost && <th className="px-6 py-4 font-semibold">Cost</th>}
-              <th className="px-6 py-4 font-semibold">Documents</th>
               <th className="px-6 py-4 font-semibold">Status</th>
               {canEdit && <th className="px-6 py-4 font-semibold text-right">Actions</th>}
             </tr>
@@ -113,12 +119,18 @@ export const VisaPage: React.FC = () => {
                     {visa.country}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-slate-600">{visa.visaType}</td>
+                <td className="px-6 py-4 text-slate-600">
+                    <span className="font-medium text-slate-800">{visa.visaType}</span>
+                    <div className="text-xs text-slate-400">{visa.entryType || 'Single'} Entry</div>
+                </td>
+                <td className="px-6 py-4 text-slate-600">
+                    <div className="flex flex-col gap-1 text-xs">
+                        {visa.validity && <span className="flex items-center gap-1"><Clock size={10}/> {visa.validity}</span>}
+                        <span className="flex items-center gap-1"><BookOpen size={10}/> {visa.documentsRequired.length} Docs</span>
+                    </div>
+                </td>
                 <td className="px-6 py-4 text-slate-600">{visa.processingTime}</td>
                 {showCost && <td className="px-6 py-4 font-mono text-slate-900">{visa.cost}</td>}
-                <td className="px-6 py-4 text-xs text-slate-500">
-                  {visa.documentsRequired.length} documents listed
-                </td>
                 <td className="px-6 py-4">
                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${visa.isActive ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
                     {visa.isActive ? 'Active' : 'Inactive'}
@@ -149,7 +161,7 @@ export const VisaPage: React.FC = () => {
 
       {isModalOpen && canEdit && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full p-6">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-slate-900">{editingVisa ? 'Edit' : 'Add'} Visa Requirement</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
@@ -166,6 +178,19 @@ export const VisaPage: React.FC = () => {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Validity (Stay Period)</label>
+                <input type="text" value={formData.validity || ''} onChange={e => setFormData({...formData, validity: e.target.value})} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="e.g. 30 Days" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Entry Type</label>
+                <select value={formData.entryType} onChange={e => setFormData({...formData, entryType: e.target.value as any})} className="w-full border p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                    <option value="Single">Single Entry</option>
+                    <option value="Multiple">Multiple Entry</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Processing Time</label>
                 <input required type="text" value={formData.processingTime || ''} onChange={e => setFormData({...formData, processingTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="e.g. 3-4 Working Days" />
               </div>
@@ -173,6 +198,17 @@ export const VisaPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cost</label>
                 <input required type="number" min="0" value={formData.cost || ''} onChange={e => setFormData({...formData, cost: Number(e.target.value)})} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description / Notes</label>
+                <textarea 
+                  rows={2}
+                  value={formData.description || ''} 
+                  onChange={e => setFormData({...formData, description: e.target.value})} 
+                  className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                  placeholder="Additional details..."
+                />
               </div>
 
               <div className="col-span-2">

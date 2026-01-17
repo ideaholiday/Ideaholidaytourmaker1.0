@@ -31,7 +31,11 @@ const INITIAL_DESTINATIONS: Destination[] = [
 const INITIAL_HOTELS: Hotel[] = [
   // India - Delhi
   { id: 'h16', name: 'Taj Palace', destinationId: 'd11', category: 'Luxury', roomType: 'Superior Room', mealPlan: 'BB', cost: 12000, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2024-12-31', isActive: true, createdBy: 'u1', currency: 'INR' },
-  { id: 'h1', name: 'Marina Byblos', destinationId: 'd1', category: '4 Star', roomType: 'Deluxe Room', mealPlan: 'BB', cost: 350, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2024-12-31', isActive: true, createdBy: 'u1', currency: 'AED' },
+  { 
+    id: 'h1', name: 'Marina Byblos', destinationId: 'd1', category: '4 Star', roomType: 'Deluxe Room', mealPlan: 'BB', cost: 350, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2024-12-31', isActive: true, createdBy: 'u1', currency: 'AED',
+    description: 'Located in Dubai Marina with easy access to JBR Beach.',
+    imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=400'
+  },
   { id: 'h2', name: 'Atlantis The Palm', destinationId: 'd1', category: 'Luxury', roomType: 'Ocean King', mealPlan: 'HB', cost: 1500, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2024-12-31', isActive: true, createdBy: 'u1', currency: 'AED' },
   { id: 'h3', name: 'Phuket Graceland', destinationId: 'd2', category: '4 Star', roomType: 'Superior', mealPlan: 'BB', cost: 2500, costType: 'Per Room', season: 'Off-Peak', validFrom: '2023-01-01', validTo: '2024-12-31', isActive: true, createdBy: 'u1', currency: 'THB' }
 ];
@@ -143,7 +147,18 @@ const INITIAL_TRANSFERS: Transfer[] = [
 ];
 
 const INITIAL_VISAS: Visa[] = [
-  { id: 'v1', country: 'UAE', visaType: 'Tourist 30 Days', processingTime: '2-3 Days', cost: 350, documentsRequired: ['Passport Front/Back', 'Photo'], isActive: true, createdBy: 'u1' },
+  { 
+    id: 'v1', 
+    country: 'UAE', 
+    visaType: 'Tourist 30 Days', 
+    processingTime: '2-3 Days', 
+    cost: 350, 
+    documentsRequired: ['Passport Front/Back', 'Photo'], 
+    isActive: true, 
+    createdBy: 'u1',
+    validity: '30 Days from Entry',
+    entryType: 'Single'
+  },
   { id: 'v2', country: 'Thailand', visaType: 'E-Visa', processingTime: '4-5 Days', cost: 2000, documentsRequired: ['Passport', 'Flight Ticket', 'Hotel Voucher'], isActive: true, createdBy: 'u1' }
 ];
 
@@ -169,7 +184,9 @@ const INITIAL_PACKAGES: FixedPackage[] = [
     fixedPrice: 1250, 
     validDates: ['2023-11-15', '2023-12-05'], 
     isActive: true, 
-    createdBy: 'u1' 
+    createdBy: 'u1',
+    description: 'A budget friendly package covering all essentials.',
+    category: 'Budget'
   }
 ];
 
