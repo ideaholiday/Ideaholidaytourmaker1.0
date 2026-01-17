@@ -61,6 +61,11 @@ class AuthService {
               role: user.role,
               emailVerified: user.isVerified,
               companyName: user.companyName || '',
+              // Important: Persist advanced role fields
+              permissions: user.permissions || [],
+              assignedDestinations: user.assignedDestinations || [],
+              linkedInventoryIds: user.linkedInventoryIds || [],
+              supplierType: user.supplierType || null,
               updatedAt: new Date().toISOString()
           }, { merge: true });
       } catch (e) {
@@ -168,33 +173,109 @@ class AuthService {
       let user = this.users.find(u => u.id === fbUser.uid);
       if (!user) user = this.users.find(u => u.email.toLowerCase() === fbUser.email?.toLowerCase());
 
-      if (user) {
-          // Sync Firebase Verified Status to Local User
-          if (fbUser.emailVerified && !user.isVerified) {
-              user.isVerified = true;
-              user.status = 'ACTIVE';
+      let remoteRole: UserRole | null = null;
+      let remoteData: any = null;
+
+      // 1. Fetch Profile from 'users' collection (The Source of Truth)
+      try {
+          const userRef = doc(db, 'users', fbUser.uid);
+          const snapshot = await getDoc(userRef);
+          
+          if (snapshot.exists()) {
+              remoteData = snapshot.data();
+              if (remoteData?.role) {
+                  remoteRole = remoteData.role as UserRole;
+              }
+          }
+      } catch (err) {
+          console.warn("Failed to fetch user profile from Firestore:", err);
+      }
+
+      // 2. If 'users' profile missing, check 'user_roles' (Pre-provisioned by Admin)
+      if (!remoteData && fbUser.email) {
+          try {
+              const roleRef = doc(db, 'user_roles', fbUser.email.toLowerCase());
+              const roleSnapshot = await getDoc(roleRef);
+              if (roleSnapshot.exists()) {
+                  const roleData = roleSnapshot.data();
+                  remoteRole = roleData.role as UserRole;
+                  remoteData = roleData; // Hydrate with provisioned data
+                  console.log(`[Auth] Recovered role from provisioning: ${remoteRole}`);
+              }
+          } catch (err) {
+              console.warn("Failed to fetch provisioned role:", err);
+          }
+      }
+
+      // 3. Hydrate or Create Local User
+      if (remoteRole) {
+          if (user) {
+              // Fix Mismatch: Update local user if role/data doesn't match remote
+              if (user.role !== remoteRole) {
+                  console.log(`[Auth] Role mismatch. Updating local: ${user.role} -> ${remoteRole}`);
+                  user.role = remoteRole;
+              }
+              // Sync critical fields that might be updated by admin
+              user.name = remoteData.displayName || remoteData.name || user.name;
+              user.companyName = remoteData.companyName || user.companyName;
+              user.permissions = remoteData.permissions || user.permissions;
+              user.assignedDestinations = remoteData.assignedDestinations || user.assignedDestinations;
+              user.linkedInventoryIds = remoteData.linkedInventoryIds || user.linkedInventoryIds;
+              user.supplierType = remoteData.supplierType || user.supplierType;
+              
+              this.saveUsers();
+          } else {
+              // New Device Login: Create Local from Remote
+              user = {
+                  id: fbUser.uid,
+                  uniqueId: remoteData.uniqueId || idGeneratorService.generateUniqueId(remoteRole),
+                  name: remoteData.displayName || remoteData.name || fbUser.displayName || 'User',
+                  email: fbUser.email || '',
+                  role: remoteRole,
+                  isVerified: fbUser.emailVerified,
+                  status: remoteData.status || (fbUser.emailVerified ? 'ACTIVE' : 'PENDING_VERIFICATION'),
+                  joinedAt: remoteData.joinedAt || new Date().toISOString(),
+                  companyName: remoteData.companyName || '',
+                  permissions: remoteData.permissions || [],
+                  assignedDestinations: remoteData.assignedDestinations || [],
+                  linkedInventoryIds: remoteData.linkedInventoryIds || [],
+                  supplierType: remoteData.supplierType || undefined
+              };
+              this.users.push(user);
               this.saveUsers();
           }
       } else {
-          // New/Restored User (Login on new device)
-          const uniqueId = idGeneratorService.generateUniqueId(UserRole.AGENT);
-          user = {
-              id: fbUser.uid,
-              uniqueId,
-              name: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
-              email: fbUser.email || '',
-              role: UserRole.AGENT,
-              isVerified: fbUser.emailVerified,
-              status: fbUser.emailVerified ? 'ACTIVE' : 'PENDING_VERIFICATION',
-              joinedAt: new Date().toISOString(),
-              companyName: 'Restored Account'
-          };
-          this.users.push(user);
-          this.saveUsers();
+          // 4. Fallback: No Remote Data & No Provisioning
+          // If user exists locally, we trust local and sync UP to cloud.
+          if (user) {
+              this.syncUserToFirestore(user).catch(console.warn);
+          } else {
+              // BRAND NEW UNKNOWN USER -> Default to Agent
+              const uniqueId = idGeneratorService.generateUniqueId(UserRole.AGENT);
+              user = {
+                  id: fbUser.uid,
+                  uniqueId,
+                  name: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
+                  email: fbUser.email || '',
+                  role: UserRole.AGENT, // Default Fallback
+                  isVerified: fbUser.emailVerified,
+                  status: fbUser.emailVerified ? 'ACTIVE' : 'PENDING_VERIFICATION',
+                  joinedAt: new Date().toISOString(),
+                  companyName: 'Restored Account'
+              };
+              this.users.push(user);
+              this.saveUsers();
+              this.syncUserToFirestore(user).catch(console.warn);
+          }
       }
 
-      // Fire-and-forget sync to avoid blocking login if Firestore is slow/offline
-      this.syncUserToFirestore(user).catch(err => console.warn("Background sync warning:", err));
+      // Final verification sync
+      if (user && fbUser.emailVerified && !user.isVerified) {
+          user.isVerified = true;
+          user.status = 'ACTIVE';
+          this.saveUsers();
+          this.syncUserToFirestore(user).catch(console.warn);
+      }
 
       apiClient.setSession(`sess_${Date.now()}_${user.id}`);
       return user;

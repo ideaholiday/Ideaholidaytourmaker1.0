@@ -3,6 +3,8 @@ import { Destination, Hotel, PricingRule, Transfer, Activity, Visa, FixedPackage
 import { MOCK_USERS } from '../constants';
 import { INITIAL_TEMPLATES } from '../data/itineraryTemplates';
 import { idGeneratorService } from './idGenerator';
+import { db } from './firebase'; // Import Firebase DB
+import { doc, setDoc, deleteDoc } from 'firebase/firestore'; // Firestore functions
 
 // Mock Initial Data
 const INITIAL_DESTINATIONS: Destination[] = [
@@ -350,14 +352,17 @@ class AdminService {
     const list = this.getUsers();
     const index = list.findIndex(u => u.id === user.id);
     
+    let userToSave: User;
+
     if (index >= 0) {
-      list[index] = { ...list[index], ...user };
+      userToSave = { ...list[index], ...user } as User;
+      list[index] = userToSave;
     } else {
       // New User
       const role = user.role || UserRole.AGENT;
       const uniqueId = idGeneratorService.generateUniqueId(role);
       
-      const newUser: User = {
+      userToSave = {
         id: user.id || `u_${Date.now()}`,
         uniqueId,
         name: user.name || 'New User',
@@ -368,15 +373,37 @@ class AdminService {
         joinedAt: new Date().toISOString(),
         ...user
       } as User;
-      list.push(newUser);
+      list.push(userToSave);
     }
     
     localStorage.setItem(KEYS.USERS, JSON.stringify(list));
+
+    // CRITICAL: Pre-provision role in Firestore so Auth Service picks it up on new device
+    // We store minimal role data keyed by EMAIL, because we might not know the UID yet 
+    // if the user hasn't registered in Firebase Auth but Admin created them here.
+    if (userToSave.email) {
+        const roleRef = doc(db, 'user_roles', userToSave.email.toLowerCase());
+        setDoc(roleRef, {
+            email: userToSave.email.toLowerCase(),
+            role: userToSave.role,
+            assignedDestinations: userToSave.assignedDestinations || [],
+            permissions: userToSave.permissions || [],
+            companyName: userToSave.companyName || '',
+            updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(err => console.warn("Failed to sync role to cloud:", err));
+    }
   }
 
   deleteUser(id: string) {
-    const list = this.getUsers().filter(u => u.id !== id);
-    localStorage.setItem(KEYS.USERS, JSON.stringify(list));
+    const list = this.getUsers();
+    const user = list.find(u => u.id === id);
+    if (user && user.email) {
+        // Remove role provisioning
+        deleteDoc(doc(db, 'user_roles', user.email.toLowerCase())).catch(console.warn);
+    }
+    
+    const filteredList = list.filter(u => u.id !== id);
+    localStorage.setItem(KEYS.USERS, JSON.stringify(filteredList));
   }
 }
 
