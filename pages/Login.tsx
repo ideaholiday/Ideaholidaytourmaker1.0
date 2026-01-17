@@ -39,15 +39,8 @@ export const Login: React.FC = () => {
           if (user) {
               if (user.isVerified) {
                   setIsRedirecting(true);
-                  // Determine proper dashboard based on role
-                  let target = '/dashboard'; // Default
-                  switch(user.role) {
-                      case UserRole.AGENT: target = '/agent/dashboard'; break;
-                      case UserRole.OPERATOR: target = '/operator/dashboard'; break;
-                      case UserRole.ADMIN: 
-                      case UserRole.STAFF: target = '/admin/dashboard'; break;
-                      case UserRole.SUPPLIER: target = '/supplier/dashboard'; break;
-                  }
+                  // Use centralized resolver to ensure correct dashboard
+                  const target = authService.resolveDashboardPath(user.role);
                   
                   // Add small delay for UX only if we displayed a success message (like from verification)
                   const delay = successMsg ? 1000 : 0;

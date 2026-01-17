@@ -19,6 +19,7 @@ import { QuoteDetail } from './pages/QuoteDetail';
 import { Terms, Privacy, Support, Faq } from './pages/StaticPages';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UserRole } from './types';
+import { authService } from './services/authService';
 
 // Admin CMS Imports
 import { AdminLayout } from './pages/admin/AdminLayout';
@@ -82,14 +83,9 @@ const DashboardRedirect = () => {
     const { user } = useAuth();
     if (!user) return <Navigate to="/login" replace />;
 
-    switch(user.role) {
-        case UserRole.ADMIN: return <Navigate to="/admin/dashboard" replace />;
-        case UserRole.STAFF: return <Navigate to="/admin/dashboard" replace />;
-        case UserRole.SUPPLIER: return <Navigate to="/supplier/dashboard" replace />;
-        case UserRole.AGENT: return <Navigate to="/agent/dashboard" replace />;
-        case UserRole.OPERATOR: return <Navigate to="/operator/dashboard" replace />;
-        default: return <Navigate to="/unauthorized" replace />;
-    }
+    // Use centralized resolver to avoid logic fragmentation
+    const targetPath = authService.resolveDashboardPath(user.role);
+    return <Navigate to={targetPath} replace />;
 };
 
 // Universal Booking Router Helper

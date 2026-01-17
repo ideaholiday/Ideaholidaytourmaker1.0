@@ -47,6 +47,20 @@ class AuthService {
   }
 
   /**
+   * CENTRALIZED ROLE RESOLVER
+   */
+  resolveDashboardPath(role: UserRole): string {
+      switch(role) {
+          case UserRole.ADMIN: return '/admin/dashboard';
+          case UserRole.STAFF: return '/admin/dashboard';
+          case UserRole.AGENT: return '/agent/dashboard';
+          case UserRole.OPERATOR: return '/operator/dashboard';
+          case UserRole.SUPPLIER: return '/supplier/dashboard';
+          default: return '/dashboard';
+      }
+  }
+
+  /**
    * SYNC TO FIRESTORE (Triggers Cloud Functions)
    */
   private async syncUserToFirestore(user: User) {
@@ -76,13 +90,14 @@ class AuthService {
   async login(email: string, password: string): Promise<User> {
     await apiClient.request('/auth/login', { method: 'POST' });
 
-    // Mock Login
+    // Mock Login check (Optional fallback)
     const mockUser = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (mockUser) return this.mockLogin(email, password);
 
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        return this.handleFirebaseUser(userCredential.user);
+        // Force fresh sync on login
+        return this.handleFirebaseUser(userCredential.user, true);
     } catch (error: any) {
         console.error("Login Error:", error);
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
@@ -165,7 +180,7 @@ class AuthService {
     return newUser;
   }
 
-  private async handleFirebaseUser(fbUser: FirebaseUser): Promise<User> {
+  private async handleFirebaseUser(fbUser: FirebaseUser, forceSync: boolean = false): Promise<User> {
       // Ensure we have latest local data
       const stored = localStorage.getItem(STORAGE_KEY_USERS);
       if (stored) this.users = JSON.parse(stored);
@@ -177,18 +192,21 @@ class AuthService {
       let remoteData: any = null;
 
       // 1. Fetch Profile from 'users' collection (The Source of Truth)
-      try {
-          const userRef = doc(db, 'users', fbUser.uid);
-          const snapshot = await getDoc(userRef);
-          
-          if (snapshot.exists()) {
-              remoteData = snapshot.data();
-              if (remoteData?.role) {
-                  remoteRole = remoteData.role as UserRole;
+      // We perform this check if we don't have a user OR if we want to force-sync role (e.g. on login/refresh)
+      if (!user || forceSync) {
+          try {
+              const userRef = doc(db, 'users', fbUser.uid);
+              const snapshot = await getDoc(userRef);
+              
+              if (snapshot.exists()) {
+                  remoteData = snapshot.data();
+                  if (remoteData?.role) {
+                      remoteRole = remoteData.role as UserRole;
+                  }
               }
+          } catch (err) {
+              console.warn("Failed to fetch user profile from Firestore:", err);
           }
-      } catch (err) {
-          console.warn("Failed to fetch user profile from Firestore:", err);
       }
 
       // 2. If 'users' profile missing, check 'user_roles' (Pre-provisioned by Admin)
@@ -210,12 +228,12 @@ class AuthService {
       // 3. Hydrate or Create Local User
       if (remoteRole) {
           if (user) {
-              // Fix Mismatch: Update local user if role/data doesn't match remote
+              // Update local user with authoritative remote data
+              // We overwrite role even if it matches, to be safe, along with other critical fields
               if (user.role !== remoteRole) {
-                  console.log(`[Auth] Role mismatch. Updating local: ${user.role} -> ${remoteRole}`);
-                  user.role = remoteRole;
+                  console.log(`[Auth] Role correction: ${user.role} -> ${remoteRole}`);
               }
-              // Sync critical fields that might be updated by admin
+              user.role = remoteRole;
               user.name = remoteData.displayName || remoteData.name || user.name;
               user.companyName = remoteData.companyName || user.companyName;
               user.permissions = remoteData.permissions || user.permissions;
@@ -246,11 +264,12 @@ class AuthService {
           }
       } else {
           // 4. Fallback: No Remote Data & No Provisioning
-          // If user exists locally, we trust local and sync UP to cloud.
+          // If user exists locally, we trust local and sync UP to cloud (Self-Repair).
           if (user) {
               this.syncUserToFirestore(user).catch(console.warn);
           } else {
               // BRAND NEW UNKNOWN USER -> Default to Agent
+              console.warn("[Auth] New user with no role assignment. Defaulting to Agent.");
               const uniqueId = idGeneratorService.generateUniqueId(UserRole.AGENT);
               user = {
                   id: fbUser.uid,
@@ -309,6 +328,8 @@ class AuthService {
   async logout(user?: User | null, reason: string = 'User initiated'): Promise<void> {
     await signOut(auth);
     apiClient.clearSession();
+    // Do NOT clear STORAGE_KEY_USERS as it acts as our persistence layer for non-firebase parts
+    // But we should ensure next login fetches fresh data.
   }
 
   async requestPasswordReset(email: string): Promise<void> {
@@ -324,23 +345,8 @@ class AuthService {
           const unsubscribe = auth.onAuthStateChanged(async (fbUser) => {
               unsubscribe();
               if (fbUser) {
-                  const stored = localStorage.getItem(STORAGE_KEY_USERS);
-                  if (stored) this.users = JSON.parse(stored);
-                  
-                  let user = this.users.find(u => u.id === fbUser.uid);
-                  
-                  // Recovery for new device where local storage is empty but Firebase has user
-                  if (!user) {
-                      user = await this.handleFirebaseUser(fbUser);
-                  }
-                  
-                  // Ensure verified status is sync
-                  if (fbUser.emailVerified && !user.isVerified) {
-                      user.isVerified = true;
-                      user.status = 'ACTIVE';
-                      this.saveUsers();
-                  }
-
+                  // Always force sync on session restore to prevent stale role caching
+                  const user = await this.handleFirebaseUser(fbUser, true);
                   resolve(user);
               } else {
                   resolve(null);
