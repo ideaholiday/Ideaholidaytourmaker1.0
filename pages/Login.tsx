@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ResendVerification } from '../components/ResendVerification';
-import { Shield, Lock, Mail, AlertCircle, CheckCircle, Loader2, ArrowRight, Globe } from 'lucide-react';
+import { Shield, Lock, Mail, AlertCircle, CheckCircle, Loader2, ArrowRight, Globe, Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '../types';
 import { BRANDING } from '../constants';
 
@@ -14,6 +14,8 @@ export const Login: React.FC = () => {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,8 +36,8 @@ export const Login: React.FC = () => {
   useEffect(() => {
       const checkAndRedirect = async () => {
           if (user) {
-              // Refresh user token to get latest emailVerified status
-              await reloadUser();
+              // Optimization: Login just happened, user state is fresh.
+              // Removed redundant `await reloadUser()` to speed up redirect.
               
               if (user.isVerified) {
                   setIsRedirecting(true);
@@ -49,15 +51,15 @@ export const Login: React.FC = () => {
                       case UserRole.SUPPLIER: target = '/supplier/dashboard'; break;
                   }
                   
-                  // Add small delay for UX if we just showed a success message
-                  const delay = successMsg ? 1500 : 0;
+                  // Add small delay for UX only if we displayed a success message (like from verification)
+                  const delay = successMsg ? 1000 : 0;
                   setTimeout(() => navigate(target, { replace: true }), delay);
               }
           }
       };
       
       checkAndRedirect();
-  }, [user, navigate, successMsg, reloadUser]);
+  }, [user, navigate, successMsg]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,14 +179,22 @@ export const Login: React.FC = () => {
                             <input
                                 id="password"
                                 name="password"
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 autoComplete="current-password"
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="block w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 focus:bg-white transition-all duration-200 font-semibold shadow-sm"
+                                className="block w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 focus:bg-white transition-all duration-200 font-semibold shadow-sm"
                                 placeholder="••••••••"
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                                tabIndex={-1}
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
                         </div>
                     </div>
 

@@ -40,7 +40,8 @@ class ApiClient {
    */
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     // 1. SIMULATE NETWORK LATENCY
-    await new Promise(resolve => setTimeout(resolve, 400));
+    // Reduced to 50ms for snappier UI response while still async
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     // 2. SIMULATE SECURITY CHECK (Middleware)
     // Public endpoints that don't require auth
