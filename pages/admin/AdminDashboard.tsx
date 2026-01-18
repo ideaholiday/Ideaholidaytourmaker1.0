@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 import { Users, BookCheck, Briefcase, DollarSign, Store, Shield, UserPlus } from 'lucide-react';
 import { SupplierDashboard } from '../supplier/SupplierDashboard';
+import { StaffDashboard } from '../staff/StaffDashboard';
 
 export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -18,7 +19,12 @@ export const AdminDashboard: React.FC = () => {
       return <SupplierDashboard />;
   }
 
-  // --- ADMIN / STAFF VIEW ---
+  // --- STAFF VIEW ---
+  if (user.role === UserRole.STAFF) {
+      return <StaffDashboard />;
+  }
+
+  // --- ADMIN VIEW ---
   const stats = profileService.getAdminDashboardStats();
   const destinations = adminService.getDestinations().length;
   const hotels = adminService.getHotels().length;

@@ -32,9 +32,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (currentUser) {
           setUser(currentUser);
           setSessionStart(Date.now()); 
+        } else {
+          // Explicitly clear if no user found on init
+          setUser(null);
+          setSessionStart(null);
         }
       } catch (e) {
         console.error("Session check failed", e);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -54,11 +59,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const login = async (email: string, password: string) => {
+    // RESET STATE BEFORE LOGIN ATTEMPT
+    setUser(null);
+    setSessionStart(null);
     setIsLoading(true);
+    
     try {
       const loggedInUser = await authService.login(email, password);
+      // VALIDATE ROLE EXISTS
+      if (!loggedInUser.role) {
+          throw new Error("User role undefined. Login aborted.");
+      }
       setUser(loggedInUser);
       setSessionStart(Date.now());
+    } catch (error) {
+      console.error("Context Login Error", error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -74,9 +90,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = (reason: string = "User initiated logout") => {
+    // 1. Call service to clear backend/storage
     authService.logout(user, reason);
+    
+    // 2. Clear Context State Immediately
     setUser(null);
     setSessionStart(null);
+    
+    // 3. Force reload if needed to clear in-memory caches of other components
+    // window.location.reload(); // Optional: Drastic but effective for clearing global state variables
   };
 
   const verifyEmail = async (token: string): Promise<boolean> => {
@@ -102,11 +124,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const reloadUser = async (): Promise<void> => {
-      // Force refresh Firebase User to get latest claims (emailVerified)
       if (auth.currentUser) {
           try {
               await auth.currentUser.reload();
-              // Re-fetch our app user object (which wraps Firebase user)
               const refreshed = await authService.getCurrentUser();
               if (refreshed) setUser(refreshed);
           } catch (e) {

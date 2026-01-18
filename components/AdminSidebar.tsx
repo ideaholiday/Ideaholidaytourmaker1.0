@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, Hotel, Car, Camera, FileText, DollarSign, LogOut, Package, Users, Layers, BookCheck, Briefcase, UserCog, ShieldCheck, FileBarChart, Building, FileSpreadsheet, PieChart, ListChecks, Coins, Shield, Bell, Sparkles, Box, ScrollText, PenTool } from 'lucide-react';
+import { LayoutDashboard, Map, Hotel, Car, Camera, FileText, DollarSign, LogOut, Package, Users, Layers, BookCheck, Briefcase, UserCog, ShieldCheck, FileBarChart, Building, FileSpreadsheet, PieChart, ListChecks, Coins, Shield, Bell, Sparkles, Box, ScrollText, PenTool, Store, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 
@@ -41,6 +41,7 @@ export const AdminSidebar: React.FC = () => {
     // Operator Specific
     { icon: <ListChecks size={20} />, label: 'Work Queue', path: '/operator/work-queue', roles: [UserRole.OPERATOR] },
     { icon: <Box size={20} />, label: 'My Inventory', path: '/operator/inventory', roles: [UserRole.OPERATOR] },
+    { icon: <User size={20} />, label: 'My Profile', path: '/operator/profile', roles: [UserRole.OPERATOR] }, // Added
 
     // Inventory
     { icon: <Map size={20} />, label: 'Destinations', path: '/admin/destinations', roles: [UserRole.ADMIN, UserRole.STAFF, UserRole.AGENT, UserRole.OPERATOR] },
@@ -102,4 +103,3 @@ export const AdminSidebar: React.FC = () => {
     </aside>
   );
 };
-import { Store } from 'lucide-react';

@@ -7,7 +7,7 @@ import { bookingOperatorService } from '../../services/bookingOperatorService';
 import { Booking, Message, UserRole, DriverDetails } from '../../types';
 import { ChatPanel } from '../../components/ChatPanel';
 import { ItineraryView } from '../../components/ItineraryView';
-import { ArrowLeft, MapPin, Calendar, Users, Briefcase, CheckCircle, Flag, XCircle, AlertTriangle, EyeOff, DollarSign, Play, Car, Phone, Edit2, Save, X } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Users, Briefcase, CheckCircle, Flag, XCircle, AlertTriangle, EyeOff, DollarSign, Play, Car, Phone, Edit2, Save, X, User as UserIcon } from 'lucide-react';
 
 export const OperatorBookingView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -105,6 +105,11 @@ export const OperatorBookingView: React.FC = () => {
   const isCancelled = booking.status.includes('CANCEL');
   const assignmentStatus = booking.operatorStatus || 'ASSIGNED';
 
+  // Lead Guest Logic
+  const leadGuest = booking.travelers?.[0] 
+    ? `${booking.travelers[0].title} ${booking.travelers[0].firstName} ${booking.travelers[0].lastName}`
+    : 'Guest';
+
   return (
     <div className="container mx-auto px-4 py-8">
       <button onClick={() => navigate('/operator/assigned-bookings')} className="flex items-center text-slate-500 hover:text-slate-800 mb-6">
@@ -160,10 +165,11 @@ export const OperatorBookingView: React.FC = () => {
                         {isCancelled ? 'CANCELLED' : booking.status.replace('_', ' ')}
                     </span>
                 </div>
-                <div className="flex gap-4 mt-2 text-sm text-slate-300">
-                    <span className="flex items-center gap-1"><MapPin size={14}/> {booking.destination}</span>
-                    <span className="flex items-center gap-1"><Calendar size={14}/> {booking.travelDate}</span>
-                    <span className="flex items-center gap-1"><Users size={14}/> {booking.paxCount} Pax</span>
+                <div className="flex flex-wrap gap-4 mt-4 text-sm text-slate-300">
+                    <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded"><UserIcon size={14}/> <strong>Guest: {leadGuest}</strong></div>
+                    <span className="flex items-center gap-1.5"><MapPin size={14}/> {booking.destination}</span>
+                    <span className="flex items-center gap-1.5"><Calendar size={14}/> {booking.travelDate}</span>
+                    <span className="flex items-center gap-1.5"><Users size={14}/> {booking.paxCount} Pax</span>
                 </div>
             </div>
             

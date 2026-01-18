@@ -3,13 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ResendVerification } from '../components/ResendVerification';
-import { Shield, Lock, Mail, AlertCircle, CheckCircle, Loader2, ArrowRight, Globe, Eye, EyeOff } from 'lucide-react';
-import { UserRole } from '../types';
+import { AlertCircle, CheckCircle, Loader2, ArrowRight, Globe, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { BRANDING } from '../constants';
 import { authService } from '../services/authService';
 
 export const Login: React.FC = () => {
-  const { login, user, reloadUser } = useAuth();
+  const { login, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -23,34 +22,28 @@ export const Login: React.FC = () => {
   const [showResend, setShowResend] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // 1. Handle Messages from Redirects (e.g., "Account active!")
+  // Handle flash messages
   useEffect(() => {
       const msg = (location.state as any)?.message;
       if (msg) {
           setSuccessMsg(msg);
-          // Clear state from history so refresh doesn't show it again
           window.history.replaceState({}, document.title);
       }
   }, [location]);
 
-  // 2. AUTO-REDIRECT LOGIC
+  // AUTO-REDIRECT
   useEffect(() => {
-      const checkAndRedirect = async () => {
-          if (user) {
-              if (user.isVerified) {
-                  setIsRedirecting(true);
-                  // Use centralized resolver to ensure correct dashboard
-                  const target = authService.resolveDashboardPath(user.role);
-                  
-                  // Add small delay for UX only if we displayed a success message (like from verification)
-                  const delay = successMsg ? 1000 : 0;
-                  setTimeout(() => navigate(target, { replace: true }), delay);
-              }
+      if (isAuthenticated && user && !isRedirecting) {
+          if (user.isVerified) {
+              setIsRedirecting(true);
+              const target = authService.resolveDashboardPath(user.role);
+              console.log(`[Login] Authenticated as ${user.role}. Redirecting to ${target}`);
+              
+              // Ensure immediate redirect without leaking previous state
+              navigate(target, { replace: true });
           }
-      };
-      
-      checkAndRedirect();
-  }, [user, navigate, successMsg]);
+      }
+  }, [isAuthenticated, user, navigate, isRedirecting]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,18 +54,7 @@ export const Login: React.FC = () => {
     
     try {
       await login(email, password);
-      
-      // Check immediately if we need to handle unverified status manually
-      // because context update might be async or blocked.
-      const currentUser = await authService.getCurrentUser();
-      
-      if (currentUser && !currentUser.isVerified) {
-          setIsSubmitting(false);
-          setShowResend(true);
-          setSuccessMsg("Login successful, but email verification is pending.");
-      } 
-      // If verified, the useEffect hook will handle the redirect.
-      
+      // Redirect handled by useEffect
     } catch (err: any) {
       console.error("Login Error UI:", err);
       const msg = err.message.replace('Firebase: ', '').replace('auth/', '');

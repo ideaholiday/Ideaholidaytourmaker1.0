@@ -3,7 +3,7 @@ import React from 'react';
 import { Booking } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { OperatorBookingActions } from './OperatorBookingActions';
-import { MapPin, Calendar, Briefcase, EyeOff, CheckCircle, Clock, XCircle, PlayCircle, Hotel, Car, Camera } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, EyeOff, CheckCircle, Clock, XCircle, PlayCircle, Hotel, Car, Camera, User } from 'lucide-react';
 
 interface Props {
   bookings: Booking[];
@@ -91,6 +91,7 @@ export const AssignedBookingsTable: React.FC<Props> = ({ bookings, onRefresh }) 
           <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase text-xs tracking-wider">
             <tr>
               <th className="px-6 py-4 font-semibold">Ref No</th>
+              <th className="px-6 py-4 font-semibold">Guest Name</th>
               <th className="px-6 py-4 font-semibold">Destination</th>
               <th className="px-6 py-4 font-semibold">Travel Date</th>
               <th className="px-6 py-4 font-semibold">Services</th>
@@ -100,51 +101,64 @@ export const AssignedBookingsTable: React.FC<Props> = ({ bookings, onRefresh }) 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {bookings.map((booking) => (
-              <tr 
-                key={booking.id} 
-                className="hover:bg-slate-50 transition cursor-pointer"
-                onClick={() => navigate(`/booking/${booking.id}`)}
-              >
-                <td className="px-6 py-4 font-mono font-medium text-brand-600">
-                  {booking.uniqueRefNo}
-                </td>
-                <td className="px-6 py-4 text-slate-900">
-                  <div className="flex items-center gap-2">
-                      <MapPin size={14} className="text-slate-400" />
-                      {booking.destination}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-slate-600">
-                  <div className="flex items-center gap-2">
-                      <Calendar size={14} className="text-slate-400" />
-                      {booking.travelDate}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                    <div className="flex flex-wrap max-w-[200px]">
-                        {getServiceBadges(booking)}
+            {bookings.map((booking) => {
+              const leadGuest = booking.travelers?.[0] 
+                ? `${booking.travelers[0].title} ${booking.travelers[0].firstName} ${booking.travelers[0].lastName}`
+                : 'Guest';
+
+              return (
+                <tr 
+                  key={booking.id} 
+                  className="hover:bg-slate-50 transition cursor-pointer"
+                  onClick={() => navigate(`/booking/${booking.id}`)}
+                >
+                  <td className="px-6 py-4 font-mono font-medium text-brand-600">
+                    {booking.uniqueRefNo}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 font-medium text-slate-900">
+                        <User size={14} className="text-slate-400" />
+                        {leadGuest}
                     </div>
-                </td>
-                <td className="px-6 py-4">
-                    {getPriceDisplay(booking)}
-                </td>
-                <td className="px-6 py-4">
-                    {getStatusBadge(booking)}
-                </td>
-                <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                        <OperatorBookingActions booking={booking} onRefresh={onRefresh} />
-                        <button 
-                            onClick={() => navigate(`/booking/${booking.id}`)}
-                            className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition"
-                        >
-                            View
-                        </button>
+                    <div className="text-xs text-slate-500 pl-6">{booking.paxCount} Pax</div>
+                  </td>
+                  <td className="px-6 py-4 text-slate-900">
+                    <div className="flex items-center gap-2">
+                        <MapPin size={14} className="text-slate-400" />
+                        {booking.destination}
                     </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    <div className="flex items-center gap-2">
+                        <Calendar size={14} className="text-slate-400" />
+                        {booking.travelDate}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                      <div className="flex flex-wrap max-w-[200px]">
+                          {getServiceBadges(booking)}
+                      </div>
+                  </td>
+                  <td className="px-6 py-4">
+                      {getPriceDisplay(booking)}
+                  </td>
+                  <td className="px-6 py-4">
+                      {getStatusBadge(booking)}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          <OperatorBookingActions booking={booking} onRefresh={onRefresh} />
+                          <button 
+                              onClick={() => navigate(`/booking/${booking.id}`)}
+                              className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition"
+                          >
+                              View
+                          </button>
+                      </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

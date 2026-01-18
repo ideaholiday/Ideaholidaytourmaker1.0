@@ -70,6 +70,7 @@ import { AssignedBookings } from './pages/operator/AssignedBookings';
 import { WorkQueue } from './pages/operator/WorkQueue'; 
 import { OperatorGuideBook } from './pages/operator/OperatorGuideBook'; 
 import { InventoryManager } from './pages/operator/InventoryManager'; 
+import { OperatorProfilePage } from './pages/operator/OperatorProfilePage';
 
 // Supplier Panel Imports
 import { SupplierDashboard } from './pages/supplier/SupplierDashboard';
@@ -180,6 +181,7 @@ const App: React.FC = () => {
                     <Route path="/operator/work-queue" element={<WorkQueue />} />
                     <Route path="/operator/guidebook" element={<OperatorGuideBook />} />
                     <Route path="/operator/inventory" element={<InventoryManager />} />
+                    <Route path="/operator/profile" element={<OperatorProfilePage />} />
                 </Route>
 
                 {/* Supplier Specific */}

@@ -3,7 +3,7 @@ import React from 'react';
 import { Quote } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { OperatorQuoteActions } from './OperatorQuoteActions';
-import { MapPin, Calendar, Briefcase, EyeOff, CheckCircle, Clock, XCircle, PlayCircle, Hotel, Car, Camera, Eye } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, EyeOff, CheckCircle, Clock, XCircle, PlayCircle, Hotel, Car, Camera, Eye, User } from 'lucide-react';
 
 interface Props {
   quotes: Quote[];
@@ -98,6 +98,7 @@ export const AssignedQuotesTable: React.FC<Props> = ({ quotes, onRefresh }) => {
           <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase text-xs tracking-wider">
             <tr>
               <th className="px-6 py-4 font-semibold">Quote Ref</th>
+              <th className="px-6 py-4 font-semibold">Lead Guest</th>
               <th className="px-6 py-4 font-semibold">Destination</th>
               <th className="px-6 py-4 font-semibold">Travel Date</th>
               <th className="px-6 py-4 font-semibold">Services</th>
@@ -115,6 +116,13 @@ export const AssignedQuotesTable: React.FC<Props> = ({ quotes, onRefresh }) => {
               >
                 <td className="px-6 py-4 font-mono font-medium text-brand-600 whitespace-nowrap">
                   {quote.uniqueRefNo}
+                </td>
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 font-medium text-slate-900">
+                        <User size={14} className="text-slate-400" />
+                        {quote.leadGuestName || 'Guest'}
+                    </div>
+                    <div className="text-xs text-slate-500 pl-6">{quote.paxCount} Pax</div>
                 </td>
                 <td className="px-6 py-4 text-slate-900">
                   <div className="flex items-center gap-2">

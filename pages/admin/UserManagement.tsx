@@ -3,9 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import { permissionService, ALL_PERMISSIONS } from '../../services/permissionService';
+import { bookingService } from '../../services/bookingService';
+import { agentService } from '../../services/agentService';
 import { useAuth } from '../../context/AuthContext';
 import { User, UserRole, Permission, Destination, Hotel, Transfer } from '../../types';
-import { Users, Edit2, Trash2, Plus, X, Shield, Briefcase, User as UserIcon, Lock, Check, Search, MapPin, CreditCard, Building, Store, Hotel as HotelIcon, Car, KeyRound, AlertTriangle, Globe, Image } from 'lucide-react';
+import { Users, Edit2, Trash2, Plus, X, Shield, Briefcase, User as UserIcon, Lock, Check, Search, MapPin, CreditCard, Building, Store, Hotel as HotelIcon, Car, KeyRound, AlertTriangle, Globe, Activity, CheckCircle, XCircle } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -21,7 +23,7 @@ export const UserManagement: React.FC = () => {
   // UI State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
+  const [activeTab, setActiveTab] = useState<UserRole | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
   
   // Form State
@@ -31,12 +33,12 @@ export const UserManagement: React.FC = () => {
     loadData();
   }, []);
 
-  // Handle URL params for quick actions (e.g. from Dashboard)
+  // Handle URL params for quick actions
   useEffect(() => {
     const createRole = searchParams.get('createRole');
     if (createRole && Object.values(UserRole).includes(createRole as UserRole)) {
+        setActiveTab(createRole as UserRole); // Switch tab to the role being created
         handleOpenModal(undefined, createRole as UserRole);
-        // Clean URL without refresh
         window.history.replaceState(null, '', window.location.hash.split('?')[0]);
     }
   }, [searchParams]);
@@ -62,7 +64,7 @@ export const UserManagement: React.FC = () => {
       setEditingUser(null);
       setFormData({
         role: defaultRole,
-        isVerified: true, // Auto-verify manually created users
+        isVerified: true,
         status: 'ACTIVE',
         name: '',
         email: '',
@@ -83,7 +85,6 @@ export const UserManagement: React.FC = () => {
     e.preventDefault();
     if (!formData.email || !formData.name || !formData.role) return;
 
-    // STRICT DATA SANITIZATION: Only save fields relevant to the selected role
     const cleanUser: any = {
       id: editingUser?.id || '',
       email: formData.email,
@@ -116,15 +117,13 @@ export const UserManagement: React.FC = () => {
         cleanUser.linkedInventoryIds = formData.linkedInventoryIds || [];
     }
 
-    // Preserve mock password if editing, or set default for new
     if (editingUser?.password) {
         cleanUser.password = editingUser.password;
     } else if (!editingUser) {
-        cleanUser.password = 'password123'; // Default mock password
+        cleanUser.password = 'password123'; 
     }
 
     adminService.saveUser(cleanUser);
-
     loadData();
     setIsModalOpen(false);
   };
@@ -148,41 +147,25 @@ export const UserManagement: React.FC = () => {
   };
 
   // --- FORM HANDLERS ---
-
   const togglePermission = (perm: Permission) => {
       const current = formData.permissions || [];
-      const updated = current.includes(perm) 
-        ? current.filter(p => p !== perm) 
-        : [...current, perm];
+      const updated = current.includes(perm) ? current.filter(p => p !== perm) : [...current, perm];
       setFormData({ ...formData, permissions: updated });
   };
 
   const toggleDestination = (destId: string) => {
       const current = formData.assignedDestinations || [];
-      const updated = current.includes(destId)
-        ? current.filter(d => d !== destId)
-        : [...current, destId];
+      const updated = current.includes(destId) ? current.filter(d => d !== destId) : [...current, destId];
       setFormData({ ...formData, assignedDestinations: updated });
   };
 
   const toggleLinkedInventory = (id: string) => {
       const current = formData.linkedInventoryIds || [];
-      const updated = current.includes(id)
-        ? current.filter(i => i !== id)
-        : [...current, id];
+      const updated = current.includes(id) ? current.filter(i => i !== id) : [...current, id];
       setFormData({ ...formData, linkedInventoryIds: updated });
   };
 
-  // --- RENDER HELPERS ---
-
-  const filteredUsers = users.filter(u => {
-      const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
-      const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) || 
-                            u.email.toLowerCase().includes(search.toLowerCase()) ||
-                            u.companyName?.toLowerCase().includes(search.toLowerCase());
-      return matchesRole && matchesSearch;
-  });
-
+  // --- HELPERS ---
   const getRoleIcon = (role: UserRole) => {
       switch(role) {
           case UserRole.ADMIN: return <Shield size={16} className="text-red-600" />;
@@ -193,179 +176,213 @@ export const UserManagement: React.FC = () => {
       }
   };
 
-  const getInventoryNames = (ids: string[], type: 'HOTEL' | 'TRANSPORT' | undefined) => {
-      if (!ids || ids.length === 0) return 'None';
-      if (type === 'HOTEL') {
-          return allHotels.filter(h => ids.includes(h.id)).map(h => h.name).join(', ');
+  const getRoleColor = (role: UserRole) => {
+      switch(role) {
+          case UserRole.ADMIN: return 'bg-red-50 text-red-700 border-red-100';
+          case UserRole.STAFF: return 'bg-blue-50 text-blue-700 border-blue-100';
+          case UserRole.OPERATOR: return 'bg-amber-50 text-amber-700 border-amber-100';
+          case UserRole.SUPPLIER: return 'bg-purple-50 text-purple-700 border-purple-100';
+          default: return 'bg-emerald-50 text-emerald-700 border-emerald-100';
       }
-      return allTransfers.filter(t => ids.includes(t.id)).map(t => t.transferName).join(', ');
   };
+
+  const getRoleMetrics = (u: User) => {
+      if (u.role === UserRole.AGENT) {
+          const stats = agentService.getStats(u.id);
+          return (
+              <div className="flex gap-3 text-xs">
+                  <span className="flex items-center gap-1" title="Confirmed Bookings"><CheckCircle size={12} className="text-emerald-500"/> {stats.confirmedQuotes}</span>
+                  <span className="flex items-center gap-1" title="Credit Limit"><CreditCard size={12} className="text-slate-400"/> ${u.creditLimit?.toLocaleString()}</span>
+              </div>
+          );
+      }
+      if (u.role === UserRole.OPERATOR) {
+          const activeJobs = bookingService.getBookingsForOperator(u.id).filter(b => b.status === 'IN_PROGRESS').length;
+          return (
+              <div className="flex gap-3 text-xs">
+                  <span className="flex items-center gap-1" title="Active Jobs"><Activity size={12} className="text-blue-500"/> {activeJobs} Active</span>
+                  <span className="flex items-center gap-1" title="Assigned Regions"><MapPin size={12} className="text-slate-400"/> {u.assignedDestinations?.length || 0} Regions</span>
+              </div>
+          );
+      }
+      if (u.role === UserRole.SUPPLIER) {
+          return (
+              <div className="flex gap-3 text-xs">
+                  <span className="flex items-center gap-1" title="Linked Inventory"><Briefcase size={12} className="text-purple-500"/> {u.linkedInventoryIds?.length || 0} Items</span>
+                  <span className="bg-slate-100 px-1.5 rounded text-[10px] uppercase font-bold text-slate-500">{u.supplierType}</span>
+              </div>
+          );
+      }
+      return <span className="text-xs text-slate-400">-</span>;
+  };
+
+  const filteredUsers = users.filter(u => {
+      const matchesRole = activeTab === 'ALL' || u.role === activeTab;
+      const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) || 
+                            u.email.toLowerCase().includes(search.toLowerCase()) ||
+                            u.companyName?.toLowerCase().includes(search.toLowerCase());
+      return matchesRole && matchesSearch;
+  });
+
+  const TabButton = ({ role, label, icon: Icon }: any) => (
+      <button 
+        onClick={() => setActiveTab(role)}
+        className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === role 
+            ? 'border-brand-600 text-brand-600 bg-brand-50/50' 
+            : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+        }`}
+      >
+          <Icon size={16} />
+          {label}
+          <span className="ml-1.5 bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+              {users.filter(u => role === 'ALL' ? true : u.role === role).length}
+          </span>
+      </button>
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">User Management</h1>
-          <p className="text-slate-500">Create and manage accounts, roles, and access permissions.</p>
+          <p className="text-slate-500">Administrate accounts across all 4 tiers of the platform.</p>
         </div>
         <button 
-          onClick={() => handleOpenModal()}
+          onClick={() => handleOpenModal(undefined, activeTab === 'ALL' ? UserRole.AGENT : activeTab)}
           className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-brand-700 transition shadow-sm"
         >
-          <Plus size={18} /> Add User
+          <Plus size={18} /> Add {activeTab === 'ALL' ? 'User' : activeTab.toLowerCase().charAt(0).toUpperCase() + activeTab.slice(1).toLowerCase()}
         </button>
       </div>
 
-      {/* Filters & Search */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex gap-2 overflow-x-auto w-full md:w-auto">
-              {['ALL', UserRole.AGENT, UserRole.OPERATOR, UserRole.SUPPLIER, UserRole.STAFF, UserRole.ADMIN].map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setRoleFilter(r as any)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${roleFilter === r ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  >
-                      {r === 'ALL' ? 'All Users' : r.charAt(0) + r.slice(1).toLowerCase() + 's'}
-                  </button>
-              ))}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
+          {/* Tabs */}
+          <div className="flex border-b border-slate-200 overflow-x-auto">
+              <TabButton role="ALL" label="All Users" icon={Users} />
+              <TabButton role={UserRole.AGENT} label="Agents" icon={Users} />
+              <TabButton role={UserRole.OPERATOR} label="Operators" icon={Briefcase} />
+              <TabButton role={UserRole.SUPPLIER} label="Suppliers" icon={Store} />
+              <TabButton role={UserRole.STAFF} label="Staff" icon={UserIcon} />
+              <TabButton role={UserRole.ADMIN} label="Admins" icon={Shield} />
           </div>
-          
-          <div className="relative w-full md:w-64">
-              <Search size={18} className="absolute left-3 top-2.5 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Search name, email..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none text-sm"
-              />
-          </div>
-      </div>
 
-      {/* Users Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase text-xs tracking-wider">
-            <tr>
-              <th className="px-6 py-4 font-semibold">User Details</th>
-              <th className="px-6 py-4 font-semibold">Role</th>
-              <th className="px-6 py-4 font-semibold">Status</th>
-              <th className="px-6 py-4 font-semibold">Specifics</th>
-              <th className="px-6 py-4 font-semibold text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredUsers.map((u) => (
-              <tr key={u.id} className="hover:bg-slate-50 transition group">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                          u.role === UserRole.ADMIN ? 'bg-red-500' : 
-                          u.role === UserRole.STAFF ? 'bg-blue-500' :
-                          u.role === UserRole.OPERATOR ? 'bg-amber-500' :
-                          u.role === UserRole.SUPPLIER ? 'bg-purple-500' : 'bg-emerald-500'
-                      }`}>
-                          {u.name.charAt(0)}
-                      </div>
-                      <div>
-                          <div className="font-medium text-slate-900">{u.name} {u.id === currentUser?.id && '(You)'}</div>
-                          <div className="text-slate-500 text-xs">{u.email}</div>
-                          {u.companyName && <div className="text-xs text-slate-400 flex items-center gap-1"><Building size={10}/> {u.companyName}</div>}
-                      </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2 text-slate-700">
-                    {getRoleIcon(u.role)}
-                    <span className="capitalize text-xs font-medium">{u.role.toLowerCase()}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                    <button 
-                        onClick={() => handleToggleStatus(u)}
-                        disabled={u.id === currentUser?.id}
-                        className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
-                            u.status === 'ACTIVE' 
-                                ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' 
-                                : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                        {u.status || 'ACTIVE'}
-                    </button>
-                </td>
-                <td className="px-6 py-4 text-xs text-slate-600 max-w-xs truncate">
-                    {u.role === UserRole.AGENT && (
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-1" title="Credit Limit">
-                                <CreditCard size={12} className="text-slate-400" />
-                                ${u.creditLimit?.toLocaleString() || 0}
-                            </div>
-                            {u.customDomain && (
-                                <div className="flex items-center gap-1" title="White Label Domain">
-                                    <Globe size={12} className="text-purple-400" />
-                                    {u.customDomain}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    {u.role === UserRole.OPERATOR && (
-                        <div className="flex items-center gap-1" title="Assigned Regions">
-                            <MapPin size={12} className="text-slate-400" />
-                            {u.assignedDestinations?.join(', ') || 'None'}
-                        </div>
-                    )}
-                    {u.role === UserRole.STAFF && (
-                        <div className="flex items-center gap-1" title="Permissions Count">
-                            <Lock size={12} className="text-slate-400" />
-                            {u.permissions?.length || 0} Perms
-                        </div>
-                    )}
-                    {u.role === UserRole.SUPPLIER && (
-                        <div className="flex items-center gap-1" title={getInventoryNames(u.linkedInventoryIds || [], u.supplierType)}>
-                            <Store size={12} className="text-slate-400" />
-                            <span className="truncate">{getInventoryNames(u.linkedInventoryIds || [], u.supplierType)}</span>
-                        </div>
-                    )}
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                        onClick={() => handleOpenModal(u)} 
-                        className="p-2 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition"
-                        title="Edit User"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    {u.id !== currentUser?.id && (
-                        <button 
-                            onClick={() => handleDelete(u.id)} 
-                            className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Delete Permanently"
-                        >
-                        <Trash2 size={16} />
-                        </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filteredUsers.length === 0 && (
+          {/* Toolbar */}
+          <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center">
+              <div className="relative w-full md:w-96">
+                  <Search size={18} className="absolute left-3 top-2.5 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search by name, email, company..." 
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none text-sm bg-white"
+                  />
+              </div>
+              <div className="text-xs text-slate-500 italic">
+                  Showing {filteredUsers.length} active accounts
+              </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase text-xs tracking-wider">
                 <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500 italic">
-                        No users found matching criteria.
-                    </td>
+                  <th className="px-6 py-4 font-semibold">User Profile</th>
+                  <th className="px-6 py-4 font-semibold">Role & Access</th>
+                  <th className="px-6 py-4 font-semibold">Performance / Scope</th>
+                  <th className="px-6 py-4 font-semibold">Status</th>
+                  <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50 transition group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm ${
+                              u.role === UserRole.ADMIN ? 'bg-red-500' : 
+                              u.role === UserRole.STAFF ? 'bg-blue-500' :
+                              u.role === UserRole.OPERATOR ? 'bg-amber-500' :
+                              u.role === UserRole.SUPPLIER ? 'bg-purple-500' : 'bg-emerald-500'
+                          }`}>
+                              {u.name.charAt(0)}
+                          </div>
+                          <div>
+                              <div className="font-bold text-slate-900">{u.name} {u.id === currentUser?.id && <span className="text-xs font-normal text-slate-400">(You)</span>}</div>
+                              <div className="text-slate-500 text-xs">{u.email}</div>
+                              {u.companyName && <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><Building size={10}/> {u.companyName}</div>}
+                          </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-bold border ${getRoleColor(u.role)}`}>
+                        {getRoleIcon(u.role)}
+                        <span className="capitalize">{u.role.toLowerCase()}</span>
+                      </div>
+                      <div className="mt-1.5 text-xs text-slate-400">
+                          ID: <span className="font-mono">{u.uniqueId || u.id.substring(0,8)}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                        {getRoleMetrics(u)}
+                    </td>
+                    <td className="px-6 py-4">
+                        <button 
+                            onClick={() => handleToggleStatus(u)}
+                            disabled={u.id === currentUser?.id}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase border transition ${
+                                u.status === 'ACTIVE' 
+                                    ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' 
+                                    : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                            {u.status === 'ACTIVE' ? <CheckCircle size={12}/> : <XCircle size={12}/>}
+                            {u.status || 'ACTIVE'}
+                        </button>
+                        {!u.isVerified && <div className="text-[10px] text-amber-600 mt-1 font-bold">Pending Verification</div>}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                            onClick={() => handleOpenModal(u)} 
+                            className="p-2 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition"
+                            title="Edit User"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        {u.id !== currentUser?.id && (
+                            <button 
+                                onClick={() => handleDelete(u.id)} 
+                                className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                title="Delete User"
+                            >
+                            <Trash2 size={16} />
+                            </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredUsers.length === 0 && (
+                    <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic">
+                            No users found for this filter.
+                        </td>
+                    </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
       </div>
 
-      {/* CREATE / EDIT MODAL */}
+      {/* CREATE / EDIT MODAL - (Reused logic with enhanced styling) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl max-w-2xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-900">{editingUser ? 'Edit User' : 'Create New User'}</h2>
+              <h2 className="text-xl font-bold text-slate-900">{editingUser ? 'Edit User Profile' : 'Create New Account'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
             </div>
             
@@ -374,210 +391,113 @@ export const UserManagement: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                    <input 
-                      required
-                      type="text" 
-                      value={formData.name || ''} 
-                      onChange={e => setFormData({...formData, name: e.target.value})}
-                      className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
-                    />
+                    <input required type="text" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
-                    <input 
-                      required
-                      type="email" 
-                      value={formData.email || ''} 
-                      onChange={e => setFormData({...formData, email: e.target.value})}
-                      className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
-                    />
+                    <input required type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                    <select 
-                      value={formData.role} 
-                      onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
-                      className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none font-medium"
-                    >
-                        <option value={UserRole.AGENT}>Travel Agent</option>
-                        <option value={UserRole.OPERATOR}>Ground Operator (DMC)</option>
-                        <option value={UserRole.SUPPLIER}>Supplier (Hotel/Trans)</option>
-                        <option value={UserRole.STAFF}>Internal Staff</option>
-                        <option value={UserRole.ADMIN}>Administrator</option>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">System Role</label>
+                    <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none font-bold text-slate-800">
+                        {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Company / Brand</label>
-                    <input 
-                      type="text" 
-                      value={formData.companyName || ''} 
-                      onChange={e => setFormData({...formData, companyName: e.target.value})}
-                      className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
-                      placeholder={formData.role === UserRole.STAFF ? 'Department' : 'Company Name'}
-                    />
+                    <input type="text" value={formData.companyName || ''} onChange={e => setFormData({...formData, companyName: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Company Name" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone (Optional)</label>
-                    <input 
-                      type="text" 
-                      value={formData.phone || ''} 
-                      onChange={e => setFormData({...formData, phone: e.target.value})}
-                      className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
-                    />
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+                    <input type="text" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
                   </div>
                   <div className="flex items-end pb-2">
-                     <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            checked={formData.isVerified}
-                            onChange={e => setFormData({...formData, isVerified: e.target.checked})}
-                            className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500"
-                        />
-                        <span className="text-sm font-medium text-slate-700">Account Verified</span>
+                     <label className="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded-lg border border-slate-200 w-full">
+                        <input type="checkbox" checked={formData.isVerified} onChange={e => setFormData({...formData, isVerified: e.target.checked})} className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500"/>
+                        <span className="text-sm font-bold text-slate-700">Verified Account</span>
                      </label>
                   </div>
               </div>
 
               {!editingUser && (
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex gap-2 text-xs text-slate-600">
-                      <KeyRound size={16} />
-                      <p>A temporary password (<strong>password123</strong>) will be assigned. User can reset it via email.</p>
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 flex gap-2 text-xs text-blue-800">
+                      <KeyRound size={16} className="shrink-0" />
+                      <p>A temporary password (<strong>password123</strong>) will be set. The user can reset it via email link later.</p>
                   </div>
               )}
 
               <hr className="border-slate-100" />
 
               {/* DYNAMIC ROLE FIELDS */}
-              
-              {/* 1. AGENT FIELDS */}
               {formData.role === UserRole.AGENT && (
                   <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 animate-in fade-in space-y-4">
+                      <h3 className="font-bold text-emerald-800 text-sm mb-2 flex items-center gap-2"><CreditCard size={16}/> Agent Configuration</h3>
                       <div>
-                        <h3 className="font-bold text-emerald-800 text-sm mb-3 flex items-center gap-2"><CreditCard size={16}/> Financials</h3>
                         <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Credit Limit</label>
-                        <input 
-                            type="number" 
-                            value={formData.creditLimit || 0}
-                            onChange={e => setFormData({...formData, creditLimit: Number(e.target.value)})}
-                            className="w-full border border-emerald-200 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                        />
-                        <p className="text-xs text-emerald-600 mt-1">Maximum booking value allowed on credit.</p>
+                        <input type="number" value={formData.creditLimit || 0} onChange={e => setFormData({...formData, creditLimit: Number(e.target.value)})} className="w-full border border-emerald-200 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                       </div>
-
-                      <div className="border-t border-emerald-100 pt-4">
-                        <h3 className="font-bold text-emerald-800 text-sm mb-3 flex items-center gap-2"><Globe size={16}/> White Label Configuration</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Custom Domain (CNAME)</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="trips.besttravels.com"
-                                    value={formData.customDomain || ''}
-                                    onChange={e => setFormData({...formData, customDomain: e.target.value})}
-                                    className="w-full border border-emerald-200 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Logo URL</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="https://example.com/logo.png"
-                                    value={formData.logoUrl || ''}
-                                    onChange={e => setFormData({...formData, logoUrl: e.target.value})}
-                                    className="w-full border border-emerald-200 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
-                            </div>
-                        </div>
-                        <p className="text-xs text-emerald-600 mt-2">
-                            Use these settings to hide Idea Holiday branding on client links.
-                        </p>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Custom Domain</label>
+                              <input type="text" placeholder="trips.agency.com" value={formData.customDomain || ''} onChange={e => setFormData({...formData, customDomain: e.target.value})} className="w-full border border-emerald-200 p-2.5 rounded-lg text-sm" />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Logo URL</label>
+                              <input type="text" placeholder="https://..." value={formData.logoUrl || ''} onChange={e => setFormData({...formData, logoUrl: e.target.value})} className="w-full border border-emerald-200 p-2.5 rounded-lg text-sm" />
+                          </div>
                       </div>
                   </div>
               )}
 
-              {/* 2. OPERATOR FIELDS */}
               {formData.role === UserRole.OPERATOR && (
                   <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 animate-in fade-in">
                       <h3 className="font-bold text-amber-800 text-sm mb-3 flex items-center gap-2"><MapPin size={16}/> Assigned Regions</h3>
                       <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                           {destinations.map(d => (
                               <label key={d.id} className="flex items-center gap-2 p-2 bg-white rounded border border-amber-100 cursor-pointer hover:border-amber-300">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={formData.assignedDestinations?.includes(d.id)}
-                                    onChange={() => toggleDestination(d.id)}
-                                    className="text-amber-600 rounded focus:ring-amber-500"
-                                  />
+                                  <input type="checkbox" checked={formData.assignedDestinations?.includes(d.id)} onChange={() => toggleDestination(d.id)} className="text-amber-600 rounded focus:ring-amber-500"/>
                                   <span className="text-sm text-slate-700">{d.city}, {d.country}</span>
                               </label>
                           ))}
                       </div>
-                      <p className="text-xs text-amber-700 mt-2">Operator can only view and manage bookings for selected regions.</p>
                   </div>
               )}
 
-              {/* 3. SUPPLIER FIELDS */}
               {formData.role === UserRole.SUPPLIER && (
                   <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 animate-in fade-in">
-                      <h3 className="font-bold text-purple-800 text-sm mb-3 flex items-center gap-2"><Store size={16}/> Supplier Linkage</h3>
-                      
+                      <h3 className="font-bold text-purple-800 text-sm mb-3 flex items-center gap-2"><Store size={16}/> Supplier Configuration</h3>
                       <div className="mb-4">
                           <label className="block text-xs font-bold text-purple-700 uppercase mb-1">Supply Type</label>
-                          <select 
-                              value={formData.supplierType || 'HOTEL'} 
-                              onChange={e => setFormData({ ...formData, supplierType: e.target.value as any, linkedInventoryIds: [] })}
-                              className="w-full border border-purple-200 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500 outline-none"
-                          >
+                          <select value={formData.supplierType || 'HOTEL'} onChange={e => setFormData({ ...formData, supplierType: e.target.value as any, linkedInventoryIds: [] })} className="w-full border border-purple-200 p-2.5 rounded-lg text-sm bg-white">
                               <option value="HOTEL">Hotels</option>
                               <option value="TRANSPORT">Transportation</option>
                           </select>
                       </div>
-
-                      <label className="block text-xs font-bold text-purple-700 uppercase mb-1">Select Inventory Items to Link</label>
+                      <label className="block text-xs font-bold text-purple-700 uppercase mb-1">Link Inventory Items</label>
                       <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto border border-purple-200 bg-white rounded-lg p-2">
                           {formData.supplierType === 'HOTEL' && allHotels.map(h => (
                               <label key={h.id} className="flex items-center gap-2 p-1 hover:bg-purple-50 rounded cursor-pointer">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={formData.linkedInventoryIds?.includes(h.id)}
-                                    onChange={() => toggleLinkedInventory(h.id)}
-                                    className="text-purple-600 rounded focus:ring-purple-500"
-                                  />
-                                  <span className="text-sm text-slate-700 flex items-center gap-1"><HotelIcon size={12}/> {h.name} <span className="text-xs text-slate-400">({h.category})</span></span>
+                                  <input type="checkbox" checked={formData.linkedInventoryIds?.includes(h.id)} onChange={() => toggleLinkedInventory(h.id)} className="text-purple-600 rounded focus:ring-purple-500"/>
+                                  <span className="text-sm text-slate-700 flex items-center gap-1"><HotelIcon size={12}/> {h.name}</span>
                               </label>
                           ))}
                           {formData.supplierType === 'TRANSPORT' && allTransfers.map(t => (
                               <label key={t.id} className="flex items-center gap-2 p-1 hover:bg-purple-50 rounded cursor-pointer">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={formData.linkedInventoryIds?.includes(t.id)}
-                                    onChange={() => toggleLinkedInventory(t.id)}
-                                    className="text-purple-600 rounded focus:ring-purple-500"
-                                  />
-                                  <span className="text-sm text-slate-700 flex items-center gap-1"><Car size={12}/> {t.transferName} <span className="text-xs text-slate-400">({t.vehicleType})</span></span>
+                                  <input type="checkbox" checked={formData.linkedInventoryIds?.includes(t.id)} onChange={() => toggleLinkedInventory(t.id)} className="text-purple-600 rounded focus:ring-purple-500"/>
+                                  <span className="text-sm text-slate-700 flex items-center gap-1"><Car size={12}/> {t.transferName}</span>
                               </label>
                           ))}
-                          {(formData.supplierType === 'HOTEL' ? allHotels.length : allTransfers.length) === 0 && (
-                              <p className="text-xs text-slate-400 italic p-2">No inventory available to link.</p>
-                          )}
                       </div>
-                      <p className="text-xs text-purple-700 mt-2">Selected items will be editable by this user in the Extranet.</p>
                   </div>
               )}
 
-              {/* 4. STAFF FIELDS */}
               {formData.role === UserRole.STAFF && (
                   <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 animate-in fade-in">
                       <h3 className="font-bold text-blue-800 text-sm mb-3 flex items-center gap-2"><Lock size={16}/> Access Permissions</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
                           {ALL_PERMISSIONS.map(perm => (
                               <label key={perm.key} className="flex items-start gap-2 p-2 bg-white rounded border border-blue-100 cursor-pointer hover:border-blue-300">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={formData.permissions?.includes(perm.key)}
-                                    onChange={() => togglePermission(perm.key)}
-                                    className="mt-1 text-blue-600 rounded focus:ring-blue-500"
-                                  />
+                                  <input type="checkbox" checked={formData.permissions?.includes(perm.key)} onChange={() => togglePermission(perm.key)} className="mt-1 text-blue-600 rounded focus:ring-blue-500"/>
                                   <div>
                                       <span className="block text-sm font-medium text-slate-800">{perm.label}</span>
                                       <span className="block text-[10px] text-slate-500 leading-tight">{perm.description}</span>
