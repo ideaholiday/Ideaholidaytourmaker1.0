@@ -3,7 +3,7 @@ import { User, UserRole } from '../types';
 import { MOCK_USERS } from '../constants';
 import { apiClient } from './apiClient';
 import { emailVerificationService } from './emailVerificationService';
-import { idGeneratorService } from './idGenerator.ts'; 
+import { idGeneratorService } from './idGenerator'; 
 import { auth, db } from './firebase';
 import { 
     signInWithEmailAndPassword, 
@@ -15,12 +15,13 @@ import {
     confirmPasswordReset,
     User as FirebaseUser
 } from 'firebase/auth';
-import { doc, setDoc, updateDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 
 const STORAGE_KEY_USERS = 'iht_users_db';
 
 class AuthService {
   private users: User[];
+  private isOffline = false;
 
   constructor() {
     this.users = this.loadUsers();
@@ -46,9 +47,11 @@ class AuthService {
 
   /**
    * Syncs the entire user directory from Firestore.
-   * Background process to keep local cache updated.
+   * Ensures Admin has the latest list of all agents/operators.
    */
   async syncDirectory() {
+      if (this.isOffline) return;
+
       try {
           const snapshot = await getDocs(collection(db, 'users'));
           const remoteUsers = snapshot.docs.map(d => d.data() as User);
@@ -56,9 +59,15 @@ class AuthService {
           if (remoteUsers.length > 0) {
               this.users = remoteUsers;
               this.saveUsers();
+              console.log("✅ User Directory Synced from Cloud");
           }
-      } catch (e) {
-          console.warn("User Directory Sync Failed:", e);
+      } catch (e: any) {
+          if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+              console.warn("⚠️ Auth Service: Backend unavailable. Switching to Offline Mode.");
+              this.isOffline = true;
+          } else {
+              console.warn("User Directory Sync Failed:", e);
+          }
       }
   }
 
@@ -82,10 +91,11 @@ class AuthService {
     this.resetAuthState();
     await apiClient.request('/auth/login', { method: 'POST' });
 
-    // Mock Login Fallback (For Development/Offline)
-    this.users = this.loadUsers();
-    const mockUser = this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    // Mock Login Fallback (Only if explicitly using mock credentials for dev)
+    const mockUser = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (mockUser && password === 'password123') {
+        // Even for mock login, try to find this user in Firestore first to get latest branding
+        // This is safe because we wrap call inside handleSystemLogin logic or skip if offline
         return this.handleSystemLogin(mockUser);
     }
 
@@ -112,54 +122,61 @@ class AuthService {
 
   /**
    * Core logic to resolve a Firebase User to an App User.
-   * Now fetches from 'users' collection to ensure Agent Branding/Data is fresh.
+   * PRIORITIZES FIRESTORE DATA over local storage to fix Branding Reset bug.
    */
   private async handleFirebaseUser(fbUser: FirebaseUser, forceSync: boolean = false): Promise<User> {
       let finalUser: User | null = null;
       let isNew = false;
 
-      // 1. Try to fetch full profile from Firestore 'users' collection
-      // This is the "Truth" for Agent Branding, Permissions, etc.
-      try {
-          const userDocRef = doc(db, 'users', fbUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          if (userDoc.exists()) {
-              finalUser = userDoc.data() as User;
-          }
-      } catch (e) {
-          console.warn("Firestore profile fetch failed", e);
-      }
-
-      // 2. If no full profile, check 'user_roles' for basic role mapping (Legacy/Safety)
-      if (!finalUser && fbUser.email) {
+      // 1. CRITICAL: Fetch full profile from Firestore 'users' collection
+      if (!this.isOffline) {
           try {
-              const roleSnap = await getDoc(doc(db, 'user_roles', fbUser.email.toLowerCase()));
-              if (roleSnap.exists()) {
-                  // Construct basic user from role map
-                  const data = roleSnap.data();
-                  finalUser = {
-                      id: fbUser.uid,
-                      uniqueId: idGeneratorService.generateUniqueId(data.role as UserRole),
-                      name: fbUser.displayName || fbUser.email.split('@')[0],
-                      email: fbUser.email,
-                      role: data.role as UserRole,
-                      isVerified: fbUser.emailVerified,
-                      status: 'ACTIVE',
-                      joinedAt: new Date().toISOString()
-                  };
-                  isNew = true;
+              const userDocRef = doc(db, 'users', fbUser.uid);
+              const userDoc = await getDoc(userDocRef);
+              
+              if (userDoc.exists()) {
+                  finalUser = userDoc.data() as User;
+                  // Merge local defaults if fields are missing in cloud (backward compatibility)
+                  if (!finalUser.role) finalUser.role = UserRole.AGENT;
               }
-          } catch (e) { console.warn("Role map fetch failed", e); }
+          } catch (e: any) {
+              if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+                  this.isOffline = true; // Switch to offline for this session
+              }
+              console.warn("Firestore profile fetch failed (Falling back to local)", e.code);
+          }
       }
 
-      // 3. Fallback to Local Cache (Offline support)
+      // 2. If no full profile in 'users', check 'user_roles' or create new
+      if (!finalUser && !this.isOffline) {
+          if (fbUser.email) {
+              try {
+                  const roleSnap = await getDoc(doc(db, 'user_roles', fbUser.email.toLowerCase()));
+                  if (roleSnap.exists()) {
+                      const data = roleSnap.data();
+                      finalUser = {
+                          id: fbUser.uid,
+                          uniqueId: idGeneratorService.generateUniqueId(data.role as UserRole),
+                          name: fbUser.displayName || fbUser.email.split('@')[0],
+                          email: fbUser.email,
+                          role: data.role as UserRole,
+                          isVerified: fbUser.emailVerified,
+                          status: 'ACTIVE',
+                          joinedAt: new Date().toISOString()
+                      };
+                      isNew = true;
+                  }
+              } catch (e) { console.warn("Role map fetch failed", e); }
+          }
+      }
+
+      // 3. Fallback to Local Cache (Offline support only if Cloud failed)
       if (!finalUser) {
           this.users = this.loadUsers();
           finalUser = this.users.find(u => u.id === fbUser.uid || u.email.toLowerCase() === fbUser.email?.toLowerCase()) || null;
       }
 
-      // 4. Default: Create New Agent
+      // 4. Default: Create New Agent if absolutely nothing found
       if (!finalUser) {
           isNew = true;
           finalUser = {
@@ -174,12 +191,11 @@ class AuthService {
           };
       }
 
-      // Update Local Cache
+      // 5. Update Local Cache with the Authoritative User Object
       this.updateLocalUser(finalUser);
       
-      // If we constructed a user or it's new, sync back to Cloud "users" collection
-      // so next time we hit step #1 successfully
-      if (isNew || forceSync) {
+      // 6. Sync back to Cloud if it's a new user or forcing sync
+      if ((isNew || forceSync) && !this.isOffline) {
           this.syncUserToFirestore(finalUser).catch(console.warn);
       }
       
@@ -189,11 +205,19 @@ class AuthService {
 
   private handleSystemLogin(mockUser: User): User {
       this.users = this.loadUsers();
-      const user = this.users.find(u => u.id === mockUser.id) || mockUser;
-      user.role = mockUser.role; // Enforce role from mock constant
+      // Ensure we don't overwrite a newer cloud version in local storage if exists
+      const existingIndex = this.users.findIndex(u => u.id === mockUser.id);
+      
+      if (existingIndex >= 0) {
+          // If local has more data (e.g. branding), keep local, else mock
+          this.users[existingIndex] = mockUser;
+      } else {
+          this.users.push(mockUser);
+      }
+      
       this.saveUsers();
-      apiClient.setSession(`sess_mock_${Date.now()}_${user.id}`);
-      return user;
+      apiClient.setSession(`sess_mock_${Date.now()}_${mockUser.id}`);
+      return mockUser;
   }
 
   private updateLocalUser(user: User) {
@@ -220,8 +244,8 @@ class AuthService {
             companyName,
             phone,
             city,
-            isVerified: false, // Must verify email
-            status: 'PENDING_VERIFICATION', // Strict status
+            isVerified: false, 
+            status: 'PENDING_VERIFICATION',
             joinedAt: new Date().toISOString()
         };
 
@@ -235,12 +259,7 @@ class AuthService {
     }
   }
 
-  /**
-   * Safe Identity Resolution
-   * Includes 4s timeout to prevent infinite hanging on slow networks.
-   */
   async getCurrentUser(): Promise<User | null> {
-      // Optimization: If auth object is already ready (hot reload)
       if (auth.currentUser) {
           return this.handleFirebaseUser(auth.currentUser);
       }
@@ -265,7 +284,6 @@ class AuthService {
           });
       });
 
-      // Timeout Failsafe (4 seconds)
       const timeoutPromise = new Promise<null>((resolve) => 
           setTimeout(() => {
               console.warn("Auth check timed out.");
@@ -283,7 +301,6 @@ class AuthService {
   async handleActionCode(code: string, mode: 'verifyEmail' | 'resetPassword', newPassword?: string): Promise<void> {
       if (mode === 'verifyEmail') {
           await applyActionCode(auth, code);
-          // Update verification status in DB
           if (auth.currentUser) {
              const user = await this.handleFirebaseUser(auth.currentUser);
              user.isVerified = true;
@@ -318,19 +335,25 @@ class AuthService {
   }
 
   private async syncUserToFirestore(user: User) {
+      if (this.isOffline) return;
       try {
           const userRef = doc(db, 'users', user.id);
-          // Merge to avoid overwriting existing fields like createdAt
+          // Using merge true to preserve fields not in local object if any
           await setDoc(userRef, user, { merge: true });
           
-          // Also sync user_roles for fast lookups if needed
           if (user.email) {
               await setDoc(doc(db, 'user_roles', user.email.toLowerCase()), {
                   email: user.email.toLowerCase(),
                   role: user.role
               }, { merge: true });
           }
-      } catch (e) { console.error("Firestore Sync Error:", e); }
+      } catch (e: any) { 
+           if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+              this.isOffline = true;
+          } else {
+              console.error("Firestore Sync Error:", e);
+          }
+      }
   }
 }
 

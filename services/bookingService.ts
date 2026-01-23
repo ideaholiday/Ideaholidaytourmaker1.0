@@ -11,6 +11,7 @@ const STORAGE_KEY_BOOKINGS = 'iht_bookings_db';
 
 class BookingService {
   private bookings: Booking[];
+  private isOffline = false;
 
   constructor() {
     const stored = localStorage.getItem(STORAGE_KEY_BOOKINGS);
@@ -22,10 +23,15 @@ class BookingService {
   }
   
   private async syncToCloud(booking: Booking) {
+      if (this.isOffline) return;
       try {
           await setDoc(doc(db, 'bookings', booking.id), booking, { merge: true });
-      } catch (e) {
-          console.error("Cloud save failed for booking", booking.id, e);
+      } catch (e: any) {
+          if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+              this.isOffline = true;
+          } else {
+              console.error("Cloud save failed for booking", booking.id, e);
+          }
       }
   }
 
@@ -34,6 +40,7 @@ class BookingService {
    * Call this on dashboard load.
    */
   async syncAllBookings() {
+      if (this.isOffline) return;
       try {
           const snapshot = await getDocs(collection(db, 'bookings'));
           const remoteBookings = snapshot.docs.map(d => d.data() as Booking);
@@ -42,7 +49,14 @@ class BookingService {
              this.bookings = remoteBookings; // Replace local with authoritative cloud data
              this.saveLocal();
           }
-      } catch (e) { console.warn("Booking Sync Failed", e); }
+      } catch (e: any) { 
+           if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found' || e.message?.includes('permission-denied')) {
+             console.warn("⚠️ Booking Service: Backend unavailable. Switching to Offline Mode.");
+             this.isOffline = true;
+          } else {
+             console.warn("Booking Sync Failed", e); 
+          }
+      }
   }
 
   // --- CRUD ---

@@ -2,78 +2,112 @@
 import { OperatorInventoryItem, InventoryStatus, User, UserRole } from '../types';
 import { adminService } from './adminService';
 import { auditLogService } from './auditLogService';
+import { db } from './firebase';
+import { collection, getDocs, doc, setDoc, deleteDoc, query } from 'firebase/firestore';
 
 const STORAGE_KEY_OP_INVENTORY = 'iht_operator_inventory';
 
 class InventoryService {
   private items: OperatorInventoryItem[];
+  private isOffline = false;
 
   constructor() {
     const stored = localStorage.getItem(STORAGE_KEY_OP_INVENTORY);
     this.items = stored ? JSON.parse(stored) : [];
     
-    // Migration: If items are missing productId or version, patch them
+    // Migration logic
     let migrated = false;
     this.items.forEach(item => {
         if (!item.productId) {
-            item.productId = item.id; // Self-reference for v1
+            item.productId = item.id; 
             item.version = 1;
-            // Legacy approved items are current
             item.isCurrent = item.status === 'APPROVED';
             migrated = true;
         }
     });
-    if (migrated) this.save();
+    if (migrated) this.saveLocal();
+    
+    // Kick off Cloud Sync
+    this.syncFromCloud();
   }
 
-  private save() {
+  private saveLocal() {
     localStorage.setItem(STORAGE_KEY_OP_INVENTORY, JSON.stringify(this.items));
+  }
+
+  async syncFromCloud() {
+      if (this.isOffline) return;
+
+      try {
+          const q = query(collection(db, 'products'));
+          const snapshot = await getDocs(q);
+          const remoteItems = snapshot.docs.map(doc => doc.data() as OperatorInventoryItem);
+          
+          if (remoteItems.length > 0) {
+              this.items = remoteItems;
+              this.saveLocal();
+          }
+      } catch (e: any) {
+          if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found' || e.message?.includes('permission-denied')) {
+             console.warn("⚠️ Inventory Service: Backend unavailable. Switching to Offline Mode.");
+             this.isOffline = true;
+          } else {
+             console.warn("Inventory Cloud Sync Failed", e);
+          }
+      }
+  }
+
+  private async persist(item: OperatorInventoryItem) {
+      // 1. Local
+      const index = this.items.findIndex(i => i.id === item.id);
+      if (index >= 0) this.items[index] = item;
+      else this.items.unshift(item);
+      this.saveLocal();
+
+      // 2. Cloud
+      if (!this.isOffline) {
+          try {
+              await setDoc(doc(db, 'products', item.id), item, { merge: true });
+          } catch (e: any) {
+              if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+                  this.isOffline = true;
+              } else {
+                  console.error("Cloud inventory save failed", e);
+              }
+          }
+      }
   }
 
   getAllItems(): OperatorInventoryItem[] {
     return this.items;
   }
 
-  /**
-   * For Operators/Partners: Returns the "Working Copy".
-   * This is either the latest Draft/Pending version OR the Current Approved version if no draft exists.
-   * Group by productId and pick highest version.
-   */
   getItemsByOperator(operatorId: string): OperatorInventoryItem[] {
     const userItems = this.items.filter(i => i.operatorId === operatorId);
     
-    // Group by Product ID
+    // Group by Product ID to find latest version
     const grouped = new Map<string, OperatorInventoryItem[]>();
     userItems.forEach(item => {
-        if (!grouped.has(item.productId)) grouped.set(item.productId, []);
-        grouped.get(item.productId)?.push(item);
+        const pid = item.productId || item.id;
+        if (!grouped.has(pid)) grouped.set(pid, []);
+        grouped.get(pid)?.push(item);
     });
 
     const result: OperatorInventoryItem[] = [];
     grouped.forEach(versions => {
-        // Sort descending by version number
         versions.sort((a, b) => b.version - a.version);
-        // Push the latest one (Head)
         result.push(versions[0]);
     });
 
     return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  /**
-   * For the Builder/Agents: Returns ONLY Approved and Current items.
-   * "Current" ensures we don't show old versions or pending drafts.
-   */
   getApprovedItems(destinationId?: string): OperatorInventoryItem[] {
     return this.items.filter(i => 
       i.status === 'APPROVED' && 
       i.isCurrent &&
       (!destinationId || i.destinationId === destinationId)
     );
-  }
-
-  getPendingItems(): OperatorInventoryItem[] {
-    return this.items.filter(i => i.status === 'PENDING_APPROVAL');
   }
 
   // --- CRUD ---
@@ -87,10 +121,9 @@ class InventoryService {
     
     const newItem: OperatorInventoryItem = {
       id: uniqueId,
-      productId: uniqueId, // New product starts its own lineage
+      productId: uniqueId,
       version: 1,
-      isCurrent: false, // Not live until approved
-      
+      isCurrent: false, 
       operatorId: user.id, 
       operatorName: user.name, 
       type: item.type,
@@ -101,42 +134,33 @@ class InventoryService {
       costPrice: Number(item.costPrice),
       status: 'PENDING_APPROVAL', 
       createdAt: new Date().toISOString(),
-      
-      // Merge type specific fields
       ...item
     } as OperatorInventoryItem;
 
-    this.items.unshift(newItem);
-    this.save();
+    this.persist(newItem);
     return newItem;
   }
 
-  /**
-   * VERSIONED UPDATE
-   * If item is APPROVED -> Create New Version (Draft)
-   * If item is DRAFT/PENDING -> Update In Place
-   */
   updateItem(id: string, updates: Partial<OperatorInventoryItem>, user: User): void {
     const index = this.items.findIndex(i => i.id === id);
     if (index === -1) throw new Error("Item not found");
 
     const existing = this.items[index];
     
-    // Authorization Check
     if (existing.operatorId !== user.id && user.role !== UserRole.ADMIN) {
-        throw new Error("Unauthorized: You can only edit your own inventory.");
+        throw new Error("Unauthorized");
     }
 
     if (existing.status === 'APPROVED') {
-        // --- CREATE NEW VERSION ---
+        // Create New Version
         const newVersionNum = existing.version + 1;
         const newId = `opi_${Date.now()}_v${newVersionNum}`;
         
         const newVersion: OperatorInventoryItem = {
-            ...existing, // Copy all fields
-            ...updates,  // Apply updates
+            ...existing,
+            ...updates,
             id: newId,
-            productId: existing.productId, // Link to same product lineage
+            productId: existing.productId,
             version: newVersionNum,
             status: 'PENDING_APPROVAL',
             isCurrent: false,
@@ -144,23 +168,17 @@ class InventoryService {
             createdAt: new Date().toISOString()
         };
         
-        this.items.unshift(newVersion);
-        // Note: The old APPROVED version remains untouched and isCurrent=true until the new one is approved.
+        this.persist(newVersion);
         
     } else {
-        // --- UPDATE IN PLACE (Draft/Pending/Rejected) ---
-        // Admin can update approved directly? Let's say no, admin follows versioning too for audit.
-        // But for rejected/draft, just update.
-        
-        this.items[index] = {
+        // Update Draft
+        const updated = {
             ...existing,
             ...updates,
-            // If it was Rejected, resetting it to Pending Approval on edit is standard workflow
             status: existing.status === 'REJECTED' ? 'PENDING_APPROVAL' : existing.status
         };
+        this.persist(updated);
     }
-    
-    this.save();
   }
 
   deleteItem(id: string, user: User): void {
@@ -170,13 +188,15 @@ class InventoryService {
     if (item.operatorId !== user.id && user.role !== UserRole.ADMIN) {
         throw new Error("Unauthorized");
     }
-
-    // Logic: If deleting a DRAFT version, just remove it.
-    // If deleting an APPROVED version, maybe mark as inactive?
-    // For now, strict delete for simplicity, but in real app soft delete.
     
+    // Local Delete
     this.items = this.items.filter(i => i.id !== id);
-    this.save();
+    this.saveLocal();
+
+    // Cloud Delete
+    if (!this.isOffline) {
+        deleteDoc(doc(db, 'products', id)).catch(console.error);
+    }
   }
 
   // --- APPROVAL WORKFLOW ---
@@ -187,25 +207,25 @@ class InventoryService {
     
     const approvedItem = this.items[index];
 
-    // 1. Archive previous active version
-    // Find any other item with same productId that is currently true
+    // Archive previous
     this.items.forEach(i => {
         if (i.productId === approvedItem.productId && i.isCurrent) {
-            i.isCurrent = false; // Archive it
+            i.isCurrent = false;
+            this.persist(i); // Save archive state
         }
     });
 
-    // 2. Activate new version
-    this.items[index] = {
+    // Activate new
+    const newItem = {
       ...approvedItem,
-      status: 'APPROVED',
+      status: 'APPROVED' as const,
       isCurrent: true,
       approvedBy: adminUser.id,
       approvedAt: new Date().toISOString(),
       rejectionReason: undefined
     };
     
-    this.save();
+    this.persist(newItem);
 
     auditLogService.logAction({
       entityType: 'INVENTORY_APPROVAL',
@@ -221,18 +241,19 @@ class InventoryService {
     const index = this.items.findIndex(i => i.id === id);
     if (index === -1) return;
 
-    this.items[index] = {
+    const rejected = {
       ...this.items[index],
-      status: 'REJECTED',
+      status: 'REJECTED' as const,
       rejectionReason: reason
     };
-    this.save();
+    
+    this.persist(rejected);
 
     auditLogService.logAction({
       entityType: 'INVENTORY_APPROVAL',
       entityId: id,
       action: 'ITEM_REJECTED',
-      description: `Rejected inventory item: ${this.items[index].name} v${this.items[index].version}. Reason: ${reason}`,
+      description: `Rejected inventory item: ${rejected.name}. Reason: ${reason}`,
       user: adminUser,
       newValue: { status: 'REJECTED', reason }
     });

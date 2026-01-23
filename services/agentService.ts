@@ -10,6 +10,7 @@ const STORAGE_KEY_QUOTES = 'iht_agent_quotes';
 
 class AgentService {
   private quotes: Quote[];
+  private isOffline = false;
 
   constructor() {
     const stored = localStorage.getItem(STORAGE_KEY_QUOTES);
@@ -24,6 +25,8 @@ class AgentService {
    * Syncs quotes from Cloud for the specific Agent.
    */
   async fetchQuotes(agentId: string): Promise<Quote[]> {
+      if (this.isOffline) return this.quotes.filter(q => q.agentId === agentId);
+
       try {
         const q = query(collection(db, 'quotes'), where('agentId', '==', agentId));
         const snapshot = await getDocs(q);
@@ -37,8 +40,12 @@ class AgentService {
             this.saveLocal();
         }
         return this.quotes.filter(q => q.agentId === agentId);
-      } catch (e) {
-          console.warn("Cloud Sync Error (Quotes):", e);
+      } catch (e: any) {
+          if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+              this.isOffline = true;
+          } else {
+              console.warn("Cloud Sync Error (Quotes):", e);
+          }
           return this.quotes.filter(q => q.agentId === agentId);
       }
   }
@@ -90,9 +97,11 @@ class AgentService {
         this.quotes.splice(index, 1);
         this.saveLocal();
         
-        try {
-            await deleteDoc(doc(db, 'quotes', quoteId));
-        } catch (e) { console.error("Cloud delete failed", e); }
+        if (!this.isOffline) {
+            try {
+                await deleteDoc(doc(db, 'quotes', quoteId));
+            } catch (e: any) { console.error("Cloud delete failed", e); }
+        }
     }
   }
 
@@ -118,15 +127,24 @@ class AgentService {
   // --- HELPERS ---
 
   private async syncToCloud(quote: Quote) {
+      if (this.isOffline) return;
       try {
           await setDoc(doc(db, 'quotes', quote.id), quote, { merge: true });
-      } catch (e) {
-          console.error("Cloud save failed for quote", quote.id, e);
+      } catch (e: any) {
+          if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+              this.isOffline = true;
+          } else {
+              console.error("Cloud save failed for quote", quote.id, e);
+          }
       }
   }
 
   // Fetch all quotes assigned to an operator (Cross-User)
   async getOperatorAssignments(operatorId: string): Promise<Quote[]> {
+      if (this.isOffline) {
+          return this.quotes.filter(q => q.operatorId === operatorId);
+      }
+
       try {
         const q = query(collection(db, 'quotes'), where('operatorId', '==', operatorId));
         const snapshot = await getDocs(q);

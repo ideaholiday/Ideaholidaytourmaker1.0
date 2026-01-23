@@ -64,24 +64,40 @@ const KEYS = {
 };
 
 class AdminService {
+  private isOffline = false;
   
   /**
    * Syncs all admin data from Firestore to LocalStorage.
-   * Call this on app start to ensure data is not blank on new devices.
+   * Ensures app has data on load.
    */
   async syncAllFromCloud() {
+      if (this.isOffline) return; // Circuit breaker
+
       console.log("🔄 Starting Cloud Sync...");
-      await Promise.all([
-          this.syncCollection('destinations', KEYS.DESTINATIONS),
-          this.syncCollection('hotels', KEYS.HOTELS),
-          this.syncCollection('activities', KEYS.ACTIVITIES),
-          this.syncCollection('transfers', KEYS.TRANSFERS),
-          this.syncCollection('visas', KEYS.VISAS),
-          this.syncCollection('packages', KEYS.PACKAGES),
-          this.syncCollection('users', KEYS.USERS),
-          this.syncCollection('templates', KEYS.TEMPLATES)
-      ]);
-      console.log("✅ Cloud Sync Complete.");
+      try {
+          await Promise.all([
+              this.syncCollection('destinations', KEYS.DESTINATIONS),
+              this.syncCollection('hotels', KEYS.HOTELS),
+              this.syncCollection('activities', KEYS.ACTIVITIES),
+              this.syncCollection('transfers', KEYS.TRANSFERS),
+              this.syncCollection('visas', KEYS.VISAS),
+              this.syncCollection('packages', KEYS.PACKAGES),
+              this.syncCollection('users', KEYS.USERS),
+              this.syncCollection('templates', KEYS.TEMPLATES)
+          ]);
+          console.log("✅ Cloud Sync Complete.");
+      } catch (e: any) {
+          this.handleSyncError(e);
+      }
+  }
+
+  private handleSyncError(e: any) {
+      if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found' || e.message?.includes('permission-denied') || e.message?.includes('not-found')) {
+          console.warn("⚠️ Backend unavailable (Offline Mode). Using local data.", e.message);
+          this.isOffline = true;
+      } else {
+          console.warn("Sync Warning:", e);
+      }
   }
 
   private async syncCollection(firestoreCol: string, localKey: string) {
@@ -91,28 +107,32 @@ class AdminService {
           const remoteData = snapshot.docs.map(doc => doc.data());
           
           if (remoteData.length > 0) {
-              // Merge: Remote takes precedence, but if remote is empty, keep local (for initial seed)
+              // Remote wins. Overwrite local to ensure consistency across devices.
               localStorage.setItem(localKey, JSON.stringify(remoteData));
           }
       } catch (e) {
-          console.warn(`Failed to sync ${firestoreCol}`, e);
+          // Re-throw to trigger circuit breaker in parent
+          throw e; 
       }
   }
 
   // Helper to save to BOTH Local and Cloud
   private async persist<T extends { id: string }>(key: string, collectionName: string, item: T) {
-      // 1. Local Save
+      // 1. Local Save (Immediate UI Update)
       const list = this.getData<T>(key, []);
       const index = list.findIndex(i => i.id === item.id);
       if (index >= 0) list[index] = item;
       else list.push(item);
       localStorage.setItem(key, JSON.stringify(list));
 
-      // 2. Cloud Save
-      try {
-          await setDoc(doc(db, collectionName, item.id), item, { merge: true });
-      } catch (e) {
-          console.error(`Cloud save failed for ${collectionName}`, e);
+      // 2. Cloud Save (Persistence)
+      if (!this.isOffline) {
+          try {
+              // Use Merge to protect against partial updates if schema evolves
+              await setDoc(doc(db, collectionName, item.id), item, { merge: true });
+          } catch (e: any) {
+              this.handleSyncError(e);
+          }
       }
   }
 
@@ -122,10 +142,12 @@ class AdminService {
       localStorage.setItem(key, JSON.stringify(list));
 
       // 2. Cloud Delete
-      try {
-          await deleteDoc(doc(db, collectionName, id));
-      } catch (e) {
-          console.error(`Cloud delete failed for ${collectionName}`, e);
+      if (!this.isOffline) {
+          try {
+              await deleteDoc(doc(db, collectionName, id));
+          } catch (e: any) {
+              this.handleSyncError(e);
+          }
       }
   }
 
@@ -134,7 +156,8 @@ class AdminService {
     if (!stored) return defaults;
     try {
         const storedData = JSON.parse(stored) as T[];
-        return storedData.length > 0 ? storedData : defaults;
+        // Only return defaults if local is explicitly empty AND defaults exist (bootstrap)
+        return (storedData.length === 0 && defaults.length > 0) ? defaults : storedData;
     } catch (e) {
         return defaults;
     }
@@ -203,7 +226,10 @@ class AdminService {
   }
   savePricingRule(rule: PricingRule) {
     localStorage.setItem(KEYS.PRICING, JSON.stringify(rule));
-    // Also save specific rule doc to firestore if needed, usually singleton
+    // Persist pricing rule singleton to Cloud
+    if (!this.isOffline) {
+        setDoc(doc(db, 'settings', 'pricing_rule'), rule, { merge: true }).catch(e => this.handleSyncError(e));
+    }
   }
 
   // --- USERS ---
@@ -211,7 +237,8 @@ class AdminService {
   
   saveUser(user: Partial<User>) {
     const list = this.getUsers();
-    // Logic to merge/add user locally
+    
+    // Merge logic for Local
     const index = list.findIndex(u => u.id === user.id);
     let userToSave: User;
     
@@ -235,13 +262,16 @@ class AdminService {
     
     localStorage.setItem(KEYS.USERS, JSON.stringify(list));
     
-    // Cloud Sync
-    setDoc(doc(db, 'users', userToSave.id), userToSave, { merge: true }).catch(console.error);
-    if(userToSave.email) {
-         setDoc(doc(db, 'user_roles', userToSave.email.toLowerCase()), {
-             email: userToSave.email.toLowerCase(),
-             role: userToSave.role
-         }, { merge: true });
+    if (!this.isOffline) {
+        setDoc(doc(db, 'users', userToSave.id), userToSave, { merge: true })
+            .catch(e => this.handleSyncError(e));
+            
+        if(userToSave.email) {
+            setDoc(doc(db, 'user_roles', userToSave.email.toLowerCase()), {
+                email: userToSave.email.toLowerCase(),
+                role: userToSave.role
+            }, { merge: true }).catch(e => console.warn("Role sync failed (likely offline)", e));
+        }
     }
   }
 
