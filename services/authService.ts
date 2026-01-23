@@ -31,8 +31,6 @@ class AuthService {
     if (stored) {
         return JSON.parse(stored);
     }
-    // Initialize with default mocks ONLY if storage is empty
-    localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(MOCK_USERS));
     return MOCK_USERS;
   }
 
@@ -40,31 +38,20 @@ class AuthService {
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(this.users));
   }
 
-  /**
-   * Syncs the entire user directory from Firestore.
-   * Call this on admin login to ensure the user list is up to date.
-   */
   async syncDirectory() {
       try {
           const snapshot = await getDocs(collection(db, 'users'));
           const remoteUsers = snapshot.docs.map(d => d.data() as User);
-          
           if (remoteUsers.length > 0) {
-              // Merge Logic: Overwrite local with remote
               this.users = remoteUsers;
               this.saveUsers();
           }
-      } catch (e) {
-          console.warn("User Directory Sync Failed:", e);
-      }
+      } catch (e) { console.warn("User Dir Sync Failed", e); }
   }
 
   resolveDashboardPath(role: UserRole): string {
       const knownRoles = Object.values(UserRole);
-      if (!knownRoles.includes(role)) {
-          return '/unauthorized';
-      }
-
+      if (!knownRoles.includes(role)) return '/unauthorized';
       switch(role) {
           case UserRole.ADMIN: return '/admin/dashboard';
           case UserRole.STAFF: return '/admin/dashboard';
@@ -77,9 +64,8 @@ class AuthService {
 
   async login(email: string, password: string): Promise<User> {
     this.resetAuthState();
-    await apiClient.request('/auth/login', { method: 'POST' });
-
-    // Mock Login Fallback
+    
+    // Check Mock / System accounts (Offline fallback)
     this.users = this.loadUsers();
     const mockUser = this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (mockUser && password === 'password123') {
@@ -103,74 +89,116 @@ class AuthService {
   private resetAuthState() {
     apiClient.clearSession();
     sessionStorage.clear();
-    // Do NOT clear IHT keys to preserve offline data, but refresh memory
+    // Refresh memory
     this.users = this.loadUsers();
   }
 
-  private async handleFirebaseUser(fbUser: FirebaseUser, forceSync: boolean = false): Promise<User> {
-      this.users = this.loadUsers();
-      
-      let authoritativeRole: UserRole | null = null;
-      let remoteData: any = {};
+  /**
+   * Core Identity Resolution
+   * Timeout set to 3.5s to unblock UI quickly if Firebase hangs.
+   */
+  async getCurrentUser(): Promise<User | null> {
+      // Direct synchronous check if already loaded (Optimization)
+      if (auth.currentUser) {
+          return this.handleFirebaseUser(auth.currentUser);
+      }
 
-      // Priority: Firestore Role
-      if (fbUser.email) {
-          try {
-              const roleRef = doc(db, 'user_roles', fbUser.email.toLowerCase());
-              const roleSnap = await getDoc(roleRef);
-              if (roleSnap.exists()) {
-                  const data = roleSnap.data();
-                  authoritativeRole = data.role as UserRole;
-                  remoteData = data;
+      const authPromise = new Promise<User | null>((resolve) => {
+          const unsubscribe = auth.onAuthStateChanged(async (fbUser) => {
+              unsubscribe();
+              if (fbUser) {
+                  try {
+                      const user = await this.handleFirebaseUser(fbUser, true);
+                      resolve(user);
+                  } catch (e) {
+                      console.warn("User profile resolution failed", e);
+                      resolve(null);
+                  }
+              } else {
+                  resolve(null);
               }
-          } catch (e) { console.warn("Firestore role fetch failed", e); }
+          }, (error) => {
+              console.error("Auth State Observer Error:", error);
+              resolve(null); // Fail safe
+          });
+      });
+
+      // 3.5-second timeout failsafe
+      const timeoutPromise = new Promise<null>((resolve) => 
+          setTimeout(() => {
+              console.warn("Auth check timed out - assuming logged out.");
+              resolve(null);
+          }, 3500)
+      );
+
+      return Promise.race([authPromise, timeoutPromise]);
+  }
+
+  private async handleFirebaseUser(fbUser: FirebaseUser, forceSync: boolean = false): Promise<User> {
+      let finalUser: User | null = null;
+
+      // 1. Try Firestore Profile
+      try {
+          const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+          if (userDoc.exists()) {
+              finalUser = userDoc.data() as User;
+          }
+      } catch (e) { console.warn("Firestore profile fetch error", e); }
+
+      // 2. Fallback to Local Directory
+      if (!finalUser) {
+          this.users = this.loadUsers();
+          finalUser = this.users.find(u => u.id === fbUser.uid || u.email.toLowerCase() === fbUser.email?.toLowerCase()) || null;
       }
 
-      let user = this.users.find(u => u.id === fbUser.uid);
-      if (!user && fbUser.email) {
-          user = this.users.find(u => u.email.toLowerCase() === fbUser.email!.toLowerCase());
-          if (user) user.id = fbUser.uid; 
-      }
+      // 3. New User Registration Logic (If absolutely no record found)
+      if (!finalUser) {
+          // Check role authority
+          let role = UserRole.AGENT;
+          if (fbUser.email) {
+             // Try catch for role fetch to prevent hanging
+             try {
+                const roleSnap = await getDoc(doc(db, 'user_roles', fbUser.email.toLowerCase()));
+                if (roleSnap.exists()) role = roleSnap.data().role;
+             } catch(e) { console.warn("Role fetch failed, defaulting to Agent"); }
+          }
 
-      if (user) {
-          if (authoritativeRole) user.role = authoritativeRole;
-          if (remoteData.assignedDestinations) user.assignedDestinations = remoteData.assignedDestinations;
-          user.isVerified = fbUser.emailVerified;
-          this.saveUsers();
-          this.syncUserToFirestore(user).catch(console.warn);
-      } else {
-          const role = authoritativeRole || UserRole.AGENT; 
-          const uniqueId = idGeneratorService.generateUniqueId(role);
-          
-          user = {
+          finalUser = {
               id: fbUser.uid,
-              uniqueId,
+              uniqueId: idGeneratorService.generateUniqueId(role),
               name: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
               email: fbUser.email || '',
               role: role,
               isVerified: fbUser.emailVerified,
               status: 'ACTIVE',
-              joinedAt: new Date().toISOString(),
-              companyName: remoteData.companyName || 'New Account'
+              joinedAt: new Date().toISOString()
           };
-          this.users.push(user);
-          this.saveUsers();
-          this.syncUserToFirestore(user).catch(console.warn);
+          // Create in DB - Fire and Forget to avoid blocking
+          this.syncUserToFirestore(finalUser);
       }
 
-      apiClient.setSession(`sess_${Date.now()}_${user.id}`);
-      return user;
+      // 4. Update Local Cache
+      this.updateLocalUser(finalUser);
+      
+      apiClient.setSession(`sess_${Date.now()}_${finalUser.id}`);
+      return finalUser;
   }
 
   private handleSystemLogin(mockUser: User): User {
       this.users = this.loadUsers();
       const user = this.users.find(u => u.id === mockUser.id) || mockUser;
-      user.role = mockUser.role;
-      this.saveUsers();
       apiClient.setSession(`sess_mock_${Date.now()}_${user.id}`);
       return user;
   }
 
+  private updateLocalUser(user: User) {
+      this.users = this.loadUsers();
+      const idx = this.users.findIndex(u => u.id === user.id);
+      if (idx >= 0) this.users[idx] = user;
+      else this.users.push(user);
+      this.saveUsers();
+  }
+  
   async register(email: string, password: string, name: string, role: UserRole, companyName: string, phone: string, city: string): Promise<User> {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -192,80 +220,42 @@ class AuthService {
             joinedAt: new Date().toISOString()
         };
 
-        this.users.push(newUser);
-        this.saveUsers();
-        this.syncUserToFirestore(newUser).catch(console.warn);
+        this.syncUserToFirestore(newUser);
+        this.updateLocalUser(newUser);
         return newUser;
     } catch (error: any) {
         throw new Error(error.message);
     }
   }
-
-  async getCurrentUser(): Promise<User | null> {
-      return new Promise((resolve) => {
-          const unsubscribe = auth.onAuthStateChanged(async (fbUser) => {
-              unsubscribe();
-              if (fbUser) {
-                  const user = await this.handleFirebaseUser(fbUser, true);
-                  resolve(user);
-              } else {
-                  resolve(null);
-              }
-          });
-      });
-  }
-
-  async requestPasswordReset(email: string): Promise<void> {
-      await sendPasswordResetEmail(auth, email);
-  }
-
-  async handleActionCode(code: string, mode: 'verifyEmail' | 'resetPassword', newPassword?: string): Promise<void> {
+  
+  // Helpers
+  async requestPasswordReset(email: string) { await sendPasswordResetEmail(auth, email); }
+  async handleActionCode(code: string, mode: 'verifyEmail' | 'resetPassword', newPwd?: string) {
       if (mode === 'verifyEmail') {
           await applyActionCode(auth, code);
-          if (auth.currentUser) await updateDoc(doc(db, 'users', auth.currentUser.uid), { emailVerified: true });
-      } else if (mode === 'resetPassword') {
-          if (!newPassword) throw new Error("New password required.");
-          await confirmPasswordReset(auth, code, newPassword);
+          if (auth.currentUser) this.syncUserToFirestore({ ...await this.getCurrentUser()!, isVerified: true });
+      } else {
+          if(newPwd) await confirmPasswordReset(auth, code, newPwd);
       }
   }
-
-  async verifyUser(token: string): Promise<boolean> {
-      try {
-          const email = emailVerificationService.validateToken(token);
-          const user = this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-          if (user) {
-              user.isVerified = true;
-              user.status = 'ACTIVE';
-              this.saveUsers();
-              this.syncUserToFirestore(user).catch(console.warn);
-              emailVerificationService.invalidateToken(token);
-              return true;
-          }
-          return false;
-      } catch (e) { return false; }
-  }
   
-  async resendVerification(email: string): Promise<void> {
-      if (auth.currentUser) await sendEmailVerification(auth.currentUser);
+  async verifyUser(token: string): Promise<boolean> { 
+      const email = emailVerificationService.validateToken(token);
+      const user = this.users.find(u => u.email === email);
+      if(user) {
+          user.isVerified = true;
+          this.syncUserToFirestore(user);
+          this.updateLocalUser(user);
+          return true;
+      }
+      return false;
   }
+
+  async resendVerification(email: string) { if(auth.currentUser) await sendEmailVerification(auth.currentUser); }
 
   private async syncUserToFirestore(user: User) {
       try {
-          const userRef = doc(db, 'users', user.id);
-          await setDoc(userRef, {
-              uid: user.id,
-              uniqueId: user.uniqueId,
-              email: user.email,
-              displayName: user.name,
-              role: user.role,
-              emailVerified: user.isVerified,
-              companyName: user.companyName || '',
-              permissions: user.permissions || [],
-              assignedDestinations: user.assignedDestinations || [],
-              linkedInventoryIds: user.linkedInventoryIds || [],
-              partnerType: user.partnerType || null,
-              updatedAt: new Date().toISOString()
-          }, { merge: true });
+          await setDoc(doc(db, 'users', user.id), user, { merge: true });
       } catch (e) { console.error("Firestore Sync Error:", e); }
   }
 }
