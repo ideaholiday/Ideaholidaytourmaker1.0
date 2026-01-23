@@ -23,11 +23,11 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'idea-holiday-platform'
+      - 'idea-tour-maker-1-0'
       - '--image'
       - 'gcr.io/$PROJECT_ID/idea-holiday-tour-maker:$COMMIT_SHA'
       - '--region'
-      - 'asia-south1' # Low latency for Lucknow/India
+      - 'us-west1'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated' # Public frontend access

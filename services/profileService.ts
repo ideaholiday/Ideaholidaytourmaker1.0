@@ -1,11 +1,8 @@
-
 import { User, UserRole, UserStatus } from '../types';
 import { adminService } from './adminService'; // To reuse User CRUD
 import { agentService } from './agentService';
 import { bookingService } from './bookingService';
 import { auditLogService } from './auditLogService';
-import { db } from './firebase';
-import { doc, getDoc } from 'firebase/firestore';
 
 class ProfileService {
   
@@ -26,31 +23,6 @@ class ProfileService {
     return adminService.getUsers().find(u => u.id === userId);
   }
 
-  /**
-   * Async fetch for Public/Clean sessions.
-   * Checks local cache first, then Firestore.
-   */
-  async fetchUser(userId: string): Promise<User | undefined> {
-      // 1. Try Local
-      const local = this.getUser(userId);
-      if (local) return local;
-
-      // 2. Try Firestore
-      try {
-          const docRef = doc(db, 'users', userId);
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-              const userData = snap.data() as User;
-              // Optional: Cache this user back to local adminService to avoid refetch
-              adminService.saveUser(userData);
-              return userData;
-          }
-      } catch (e) {
-          console.error("Profile Fetch Error:", e);
-      }
-      return undefined;
-  }
-
   // --- UPDATES ---
   updateUserStatus(userId: string, status: UserStatus) {
     const user = this.getUser(userId);
@@ -59,6 +31,7 @@ class ProfileService {
       adminService.saveUser({ ...user, status });
 
       // AUDIT LOG
+      // Note: In real app, pass the admin performing this action. Here we assume System/Admin context.
       const adminUser: User = { id: 'admin_sys', name: 'Admin', role: UserRole.ADMIN, email: '', isVerified: true };
       
       auditLogService.logAction({

@@ -28,6 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const performGlobalSync = async () => {
      // Trigger background sync for all critical data
+     // This ensures new devices get the latest data immediately
      try {
          await Promise.all([
              adminService.syncAllFromCloud(),
@@ -46,9 +47,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (currentUser) {
           setUser(currentUser);
           setSessionStart(Date.now()); 
-          // CRITICAL: Await sync here to prevent UI rendering before local DB is populated
-          // This fixes blank screens on fresh cloud instances.
-          await performGlobalSync();
+          // Sync on load
+          performGlobalSync();
         } else {
           setUser(null);
           setSessionStart(null);

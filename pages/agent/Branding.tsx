@@ -14,7 +14,7 @@ const DEFAULT_BRANDING: AgentBranding = {
 };
 
 export const Branding: React.FC = () => {
-  const { user, reloadUser } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<AgentBranding>(DEFAULT_BRANDING);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,11 +47,8 @@ export const Branding: React.FC = () => {
           agentBranding: formData
       };
       
-      // Persist to Cloud & Local
+      // Persist
       profileService.updateProfileDetails(user.id, updatedUser);
-      
-      // CRITICAL: Refresh Auth Context to reflect changes immediately
-      await reloadUser();
       
       // Simulate delay for feedback
       setTimeout(() => {

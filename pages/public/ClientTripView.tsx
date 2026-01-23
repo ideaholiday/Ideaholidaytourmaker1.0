@@ -278,62 +278,64 @@ const TripContent: React.FC<{
 
 export const ClientTripView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   
   const [data, setData] = useState<Booking | Quote | null>(null);
   const [agent, setAgent] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   
+  // Modal State
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
-  const navigate = useNavigate(); // Added missing hook
 
   useEffect(() => {
     if (!id) return;
 
-    const load = async () => {
-        // 1. Booking Check
-        const booking = bookingService.getBooking(id);
-        if (booking) {
-            setData(booking);
-            await fetchAgent(booking.agentId);
-            return;
-        }
+    // 1. Try finding a Booking first
+    const booking = bookingService.getBooking(id);
+    if (booking) {
+        setData(booking);
+        fetchAgent(booking.agentId);
+        return;
+    }
 
-        // 2. Quote Check
-        const allQuotesStr = localStorage.getItem('iht_agent_quotes'); 
-        if (allQuotesStr) {
-            const allQuotes: Quote[] = JSON.parse(allQuotesStr);
-            const quote = allQuotes.find(q => q.id === id);
-            if (quote) {
-                setData(quote);
-                await fetchAgent(quote.agentId);
-                return;
-            }
-        }
-
-        // 3. Fallback
-        const quote = INITIAL_QUOTES.find((q: Quote) => q.id === id);
+    // 2. Try finding a Quote in simulated storage
+    const allQuotesStr = localStorage.getItem('iht_agent_quotes'); 
+    if (allQuotesStr) {
+        const allQuotes: Quote[] = JSON.parse(allQuotesStr);
+        const quote = allQuotes.find(q => q.id === id);
         if (quote) {
             setData(quote);
-            await fetchAgent(quote.agentId);
-        } else {
-            setLoading(false);
+            fetchAgent(quote.agentId);
+            return;
         }
-    };
-    load();
+    }
+
+    // Fallback constants
+    const quote = INITIAL_QUOTES.find((q: Quote) => q.id === id);
+    if (quote) {
+        setData(quote);
+        fetchAgent(quote.agentId);
+    } else {
+        setLoading(false);
+    }
+
   }, [id]);
 
-  // Updated: Async fetch directly from Firestore if missing locally
-  const fetchAgent = async (agentId: string) => {
-      const user = await profileService.fetchUser(agentId);
+  const fetchAgent = (agentId: string) => {
+      const user = profileService.getUser(agentId);
       setAgent(user || null);
       setLoading(false);
   };
 
   const handleBookingSubmit = (travelers: Traveler[]) => {
       if (!data) return;
+      // Convert Quote to Booking
       const newBooking = bookingService.requestPublicBooking(data as Quote, travelers);
+      
       setIsBookModalOpen(false);
+      // Redirect to new booking view
       navigate(`/view/${newBooking.id}`);
+      // Force reload data state
       setData(newBooking);
   };
 
