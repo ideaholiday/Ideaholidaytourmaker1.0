@@ -8,8 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Plus, Trash2, Save, Hotel as HotelIcon, Camera, Car, X, 
   Search, GripVertical, MapPin, 
-  Loader2, Calendar, FileText, AlertCircle, Moon, Info, Percent,
-  ChevronDown, ChevronUp, ArrowRight
+  Loader2, Calendar, FileText, Moon, Percent,
+  ChevronDown, ChevronUp, Image as ImageIcon, Star, Clock, Users, Briefcase, Check
 } from 'lucide-react';
 
 interface Props {
@@ -25,12 +25,11 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   
   // -- STATE --
   const [items, setItems] = useState<ItineraryItem[]>([]);
-  const [availableDestinations, setAvailableDestinations] = useState<Destination[]>([]);
+  const [groupedDestinations, setGroupedDestinations] = useState<Record<string, Destination[]>>({});
   
   // Pricing
   const [totalNetPayable, setTotalNetPayable] = useState<number>(0); 
   const [totalSellingPrice, setTotalSellingPrice] = useState<number>(0);
-  const [supplierCost, setSupplierCost] = useState<number>(0); 
   const [agentMarkupPercent, setAgentMarkupPercent] = useState<number>(15); // Default 15%
 
   const [isCalculating, setIsCalculating] = useState(false);
@@ -47,6 +46,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   const [activeTab, setActiveTab] = useState<'HOTEL' | 'ACTIVITY' | 'TRANSFER' | 'MANUAL'>('HOTEL');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedDays, setExpandedDays] = useState<number[]>([]); // Track open/closed days
+  const [justAdded, setJustAdded] = useState<string | null>(null); // Feedback state
   
   // Custom/Manual Service Form
   const [customService, setCustomService] = useState({ 
@@ -66,7 +66,14 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   // -- INITIALIZATION --
   useEffect(() => {
     const dests = adminService.getDestinations().filter(d => d.isActive);
-    setAvailableDestinations(dests);
+    
+    // Group By Country for Better UI
+    const grouped: Record<string, Destination[]> = {};
+    dests.forEach(d => {
+        if (!grouped[d.country]) grouped[d.country] = [];
+        grouped[d.country].push(d);
+    });
+    setGroupedDestinations(grouped);
 
     if (!initialItinerary || initialItinerary.length === 0) {
       setItems([{ day: 1, title: 'Arrival', description: '', inclusions: [], services: [], cityId: '' }]);
@@ -123,7 +130,6 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
             if (response && typeof response.selling_price !== 'undefined') {
                 setTotalNetPayable(Number(response.net_cost) || 0); 
                 setTotalSellingPrice(Number(response.selling_price) || 0); 
-                setSupplierCost(Number(response.supplier_cost) || 0);
                 
                 if (response.currency) setDisplayCurrency(response.currency);
             }
@@ -155,7 +161,6 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   const onDragStartDay = (e: React.DragEvent, index: number) => {
       e.stopPropagation();
       setDraggedDayIdx(index);
-      // Ghost image fix
       const img = new Image();
       img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
       e.dataTransfer.setDragImage(img, 0, 0);
@@ -181,7 +186,6 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
       const [draggedItem] = newItems.splice(draggedDayIdx, 1);
       newItems.splice(dropIndex, 0, draggedItem);
       
-      // Re-index days
       const reindexed = newItems.map((item, i) => ({ ...item, day: i + 1 }));
       setItems(reindexed);
       setDraggedDayIdx(null);
@@ -192,7 +196,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
       e.stopPropagation();
       setDraggedService({ dayIdx, svcIdx });
       e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", JSON.stringify({ dayIdx, svcIdx })); // Fallback
+      e.dataTransfer.setData("text/plain", JSON.stringify({ dayIdx, svcIdx }));
   };
 
   const onDragOverService = (e: React.DragEvent, dayIdx: number, svcIdx: number) => {
@@ -212,33 +216,20 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
 
       const { dayIdx: srcDayIdx, svcIdx: srcSvcIdx } = draggedService;
       
-      // Copy items
       const newItems = [...items];
-      
-      // Extract service
       const srcServices = [...(newItems[srcDayIdx].services || [])];
       const [movedService] = srcServices.splice(srcSvcIdx, 1);
       newItems[srcDayIdx].services = srcServices;
 
-      // Insert service
-      // Be careful if moving within same list, referencing newItems is safe as we updated srcServices above
-      // But we need to check if targetDayIdx is same as srcDayIdx, if so, use the modified array
       let targetServices = srcDayIdx === targetDayIdx ? srcServices : [...(newItems[targetDayIdx].services || [])];
       
-      // If dropping at end (-1)
       if (targetSvcIdx === -1) {
           targetServices.push(movedService);
       } else {
-          // Adjust index if we removed an item before the target in the same list
-          // Actually, standard splice insertion logic works if we just insert at target index.
-          // Because we already removed the item, the indices shifted.
-          // If we removed from index 0, index 1 becomes 0.
-          // If we drop at index 1 (which was old index 2), it inserts at 1.
           targetServices.splice(targetSvcIdx, 0, movedService);
       }
       
       newItems[targetDayIdx].services = targetServices;
-
       setItems(newItems);
       setDraggedService(null);
   };
@@ -249,6 +240,10 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
       const currentServices = newItems[dayIndex].services || [];
       newItems[dayIndex].services = [...currentServices, service];
       setItems(newItems);
+      
+      // Visual Feedback
+      setJustAdded(service.inventory_id || service.id);
+      setTimeout(() => setJustAdded(null), 1500);
   };
 
   const removeService = (dayIndex: number, serviceIndex: number) => {
@@ -258,7 +253,10 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   };
 
   const addSystemItem = (index: number, item: any, type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER') => {
-      let meta: any = {};
+      let meta: any = {
+          description: item.description || item.notes || '',
+          imageUrl: item.imageUrl || ''
+      };
       let name = '';
       let cost = 0;
       let duration = 1;
@@ -269,7 +267,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
       if (type === 'HOTEL') {
           name = item.name;
           cost = item.cost;
-          meta = { roomType: item.roomType, mealPlan: item.mealPlan };
+          meta = { ...meta, roomType: item.roomType, mealPlan: item.mealPlan, category: item.category };
           if (item.costType === 'Per Room') quantity = Math.ceil(pax / 2);
           else quantity = pax;
           
@@ -278,14 +276,14 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
           name = item.activityName;
           cost = item.costAdult;
           quantity = pax; 
-          meta = { type: item.activityType };
+          meta = { ...meta, type: item.activityType, duration: item.duration, startTime: item.startTime };
       } else {
           name = item.transferName;
           cost = item.cost;
           quantity = 1;
           if (item.costBasis === 'Per Person') quantity = pax;
           if (item.costBasis === 'Per Vehicle' && item.maxPassengers) quantity = Math.ceil(pax / item.maxPassengers);
-          meta = { vehicle: item.vehicleType };
+          meta = { ...meta, vehicle: item.vehicleType, transferType: item.transferType };
       }
 
       addServiceToDay(index, {
@@ -301,7 +299,11 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
           quantity: quantity,
           isOperatorInventory: false 
       });
-      setActiveServiceDay(null);
+      
+      // UX Logic: Close panel for hotels (usually 1 per day), keep open for activities/transfers
+      if (type === 'HOTEL') {
+          setActiveServiceDay(null);
+      }
   };
 
   const addManualItem = (index: number) => {
@@ -332,7 +334,8 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
           quantity: quantity
       });
       setCustomService({ name: '', cost: 0, type: 'HOTEL', notes: '', roomType: '', mealPlan: 'BB' });
-      setActiveServiceDay(null);
+      // Keep open for manual entry to allow rapid addition
+      // setActiveServiceDay(null); 
   };
 
   const getFilteredInventory = (dayIndex: number) => {
@@ -358,9 +361,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   };
 
   return (
-    <div className="flex flex-col gap-6 select-none">
+    <div className="flex flex-col gap-6 select-none pb-20">
       
-      {/* 1. STICKY HEADER - Pricing & Markup Control */}
+      {/* 1. STICKY HEADER */}
       <div className="sticky top-16 z-30 bg-white border border-slate-200 rounded-xl shadow-lg p-3 md:p-4 flex flex-col md:flex-row justify-between items-center gap-4 animate-in slide-in-from-top-2">
           <div className="flex items-center gap-3 w-full md:w-auto">
               <div className="p-2 bg-brand-50 rounded-lg text-brand-600">
@@ -373,7 +376,6 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
           </div>
 
           <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-              {/* MARKUP CONTROLLER */}
               <div className="flex items-center justify-between w-full md:w-auto bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <span className="text-[10px] font-bold text-slate-500 uppercase mr-2">Markup</span>
                   <div className="flex items-center gap-2">
@@ -386,7 +388,6 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                   </div>
               </div>
 
-              {/* PRICE DISPLAY */}
               <div className="flex items-center gap-4 w-full md:w-auto justify-end">
                   <div className="text-right hidden md:block">
                       <p className="text-[10px] text-slate-400 font-bold uppercase">Net Cost</p>
@@ -419,13 +420,12 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
           {items.map((item, index) => {
               const { hotels: dayHotels, activities: dayActivities, transfers: dayTransfers } = getFilteredInventory(index);
               const hasCity = !!item.cityId;
-              const currentDuration = hasCity ? calculateCityDuration(index, item.cityId!) : 1;
               const isExpanded = expandedDays.includes(item.day);
 
               return (
               <div 
                 key={item.day}
-                className={`bg-white border rounded-xl shadow-sm transition-all duration-200 ${
+                className={`bg-white border rounded-xl shadow-sm transition-all duration-200 group/day ${
                     draggedDayIdx === index ? 'opacity-40 border-dashed border-slate-400 scale-[0.98]' : 'border-slate-200'
                 } ${dragOverTarget?.type === 'DAY' && dragOverTarget.dayIdx === index ? 'ring-2 ring-brand-500 shadow-lg scale-[1.01]' : ''}`}
                 draggable
@@ -435,7 +435,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
               >
                   {/* Day Header */}
                   <div 
-                    className="p-4 flex items-center gap-3 cursor-pointer hover:bg-slate-50 border-b border-slate-100 rounded-t-xl"
+                    className="p-4 flex items-center gap-3 cursor-pointer hover:bg-slate-50 border-b border-slate-100 rounded-t-xl select-none"
                     onClick={() => toggleDay(item.day)}
                   >
                       <div 
@@ -447,7 +447,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                       
                       <div className="flex-1 flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                           <div className="flex items-center gap-3">
-                              <span className="bg-slate-100 text-slate-600 font-bold px-2 py-1 rounded text-xs border border-slate-200 whitespace-nowrap">
+                              <span className="bg-slate-800 text-white font-bold px-3 py-1 rounded-lg text-sm border border-slate-700 whitespace-nowrap shadow-sm">
                                   Day {item.day}
                               </span>
                               <input 
@@ -474,11 +474,15 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                       setSearchTerm('');
                                       setItems(newItems);
                                   }}
-                                  className={`w-full pl-8 pr-2 py-1.5 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-brand-500 ${!item.cityId ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-300 bg-white'}`}
+                                  className={`w-full pl-8 pr-2 py-1.5 text-xs border rounded-lg outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer ${!item.cityId ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-300 bg-white'}`}
                               >
-                                  <option value="">Select City (Required)</option>
-                                  {availableDestinations.map(d => (
-                                      <option key={d.id} value={d.id}>{d.city}</option>
+                                  <option value="">Select Location</option>
+                                  {Object.keys(groupedDestinations).map(country => (
+                                      <optgroup key={country} label={country}>
+                                          {groupedDestinations[country].map(d => (
+                                              <option key={d.id} value={d.id}>{d.city}</option>
+                                          ))}
+                                      </optgroup>
                                   ))}
                               </select>
                           </div>
@@ -498,15 +502,17 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                   {/* Day Content */}
                   {isExpanded && (
                       <div className="p-4 bg-slate-50/30">
-                          {/* Services List with Drop Zone */}
-                          <div className="space-y-2 mb-4 relative">
+                          
+                          {/* Drop Zone: Top */}
+                          <div className="space-y-2 mb-4 relative min-h-[60px]"
+                             onDragOver={(e) => onDragOverService(e, index, -1)}
+                             onDrop={(e) => onDropService(e, index, -1)}
+                          >
                               {item.services?.length === 0 && (
                                   <div 
                                     className={`flex items-center justify-center border-2 border-dashed rounded-lg text-slate-400 text-xs p-6 transition-colors ${
                                         dragOverTarget?.type === 'SERVICE' && dragOverTarget.dayIdx === index ? 'border-brand-500 bg-brand-50' : 'border-slate-200'
                                     }`}
-                                    onDragOver={(e) => onDragOverService(e, index, -1)}
-                                    onDrop={(e) => onDropService(e, index, -1)}
                                   >
                                       Drag services here or add new below
                                   </div>
@@ -529,7 +535,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                   >
                                       {/* Visual Drop Line */}
                                       {isDragOver && (
-                                          <div className="absolute -top-1 left-0 right-0 h-1 bg-brand-500 rounded-full z-20 pointer-events-none"></div>
+                                          <div className="absolute -top-1 left-0 right-0 h-1 bg-brand-500 rounded-full z-20 pointer-events-none shadow-sm"></div>
                                       )}
 
                                       {/* Connector Line Logic */}
@@ -542,32 +548,51 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                               <GripVertical size={16} />
                                           </div>
                                           
-                                          <div className={`p-2 rounded-lg shrink-0 ${
-                                              svc.type === 'HOTEL' ? 'bg-indigo-50 text-indigo-600' : 
-                                              svc.type === 'ACTIVITY' ? 'bg-pink-50 text-pink-600' : 
-                                              svc.type === 'TRANSFER' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600'
-                                          }`}>
-                                              {svc.type === 'HOTEL' && <HotelIcon size={18} />}
-                                              {svc.type === 'ACTIVITY' && <Camera size={18} />}
-                                              {svc.type === 'TRANSFER' && <Car size={18} />}
-                                              {svc.type === 'OTHER' && <FileText size={18} />}
+                                          {/* Rich Service Thumbnail */}
+                                          <div className="h-12 w-12 rounded-lg bg-slate-100 shrink-0 border border-slate-200 overflow-hidden flex items-center justify-center">
+                                              {svc.meta?.imageUrl ? (
+                                                  <img src={svc.meta.imageUrl} alt={svc.name} className="w-full h-full object-cover" />
+                                              ) : (
+                                                <div className={`p-2 ${
+                                                    svc.type === 'HOTEL' ? 'text-indigo-500' : 
+                                                    svc.type === 'ACTIVITY' ? 'text-pink-500' : 
+                                                    svc.type === 'TRANSFER' ? 'text-blue-500' : 'text-slate-500'
+                                                }`}>
+                                                    {svc.type === 'HOTEL' && <HotelIcon size={20} />}
+                                                    {svc.type === 'ACTIVITY' && <Camera size={20} />}
+                                                    {svc.type === 'TRANSFER' && <Car size={20} />}
+                                                    {svc.type === 'OTHER' && <FileText size={20} />}
+                                                </div>
+                                              )}
                                           </div>
                                           
                                           <div className="flex-1 min-w-0">
-                                              <p className="text-sm font-bold text-slate-800 truncate">{svc.name}</p>
-                                              <div className="text-xs text-slate-500 flex flex-wrap gap-2 items-center mt-0.5">
-                                                  {svc.meta?.roomType && <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{svc.meta.roomType}</span>}
-                                                  {svc.meta?.mealPlan && <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{svc.meta.mealPlan}</span>}
-                                                  {svc.meta?.vehicle && <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{svc.meta.vehicle}</span>}
-                                                  
+                                              <div className="flex items-center gap-2">
+                                                  <p className="text-sm font-bold text-slate-800 truncate">{svc.name}</p>
                                                   {svc.type === 'HOTEL' && svc.duration_nights && (
-                                                      <span className="flex items-center gap-1 text-indigo-600 font-semibold bg-indigo-50 px-1.5 py-0.5 rounded">
-                                                          <Moon size={10} /> {svc.duration_nights}N
+                                                      <span className="flex items-center gap-1 text-indigo-600 text-[10px] font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                                          <Moon size={8} /> {svc.duration_nights}N
                                                       </span>
                                                   )}
                                                   {svc.quantity && svc.quantity > 1 && (
-                                                      <span className="text-slate-400 font-medium">x{svc.quantity}</span>
+                                                      <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">
+                                                          x{svc.quantity}
+                                                      </span>
                                                   )}
+                                              </div>
+                                              
+                                              {/* Description Snippet */}
+                                              {svc.meta?.description && (
+                                                  <p className="text-xs text-slate-500 truncate mt-0.5 max-w-md">{svc.meta.description}</p>
+                                              )}
+
+                                              {/* Meta Pills */}
+                                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                                  {svc.meta?.roomType && <span className="text-[9px] bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-slate-500">{svc.meta.roomType}</span>}
+                                                  {svc.meta?.mealPlan && <span className="text-[9px] bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-slate-500">{svc.meta.mealPlan}</span>}
+                                                  {svc.meta?.category && <span className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 flex items-center gap-0.5"><Star size={8} fill="currentColor"/> {svc.meta.category}</span>}
+                                                  {svc.meta?.vehicle && <span className="text-[9px] bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-slate-500">{svc.meta.vehicle}</span>}
+                                                  {svc.meta?.type && svc.type === 'ACTIVITY' && <span className="text-[9px] bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-slate-500">{svc.meta.type}</span>}
                                               </div>
                                           </div>
 
@@ -587,14 +612,18 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                               {/* Bottom Drop Zone for appending */}
                               {item.services?.length > 0 && draggedService && (
                                   <div 
-                                      className={`h-2 transition-all rounded-full ${
+                                      className={`h-4 transition-all rounded-lg flex items-center justify-center border-2 border-dashed ${
                                           dragOverTarget?.type === 'SERVICE' && dragOverTarget.dayIdx === index && dragOverTarget.svcIdx === -1 
-                                          ? 'bg-brand-400 h-4 scale-y-100' 
-                                          : 'bg-transparent'
+                                          ? 'border-brand-500 bg-brand-50 opacity-100' 
+                                          : 'border-transparent opacity-0'
                                       }`}
                                       onDragOver={(e) => onDragOverService(e, index, -1)}
                                       onDrop={(e) => onDropService(e, index, -1)}
-                                  />
+                                  >
+                                      {dragOverTarget?.type === 'SERVICE' && dragOverTarget.dayIdx === index && dragOverTarget.svcIdx === -1 && 
+                                        <span className="text-[10px] text-brand-600 font-bold">Drop at end of Day {item.day}</span>
+                                      }
+                                  </div>
                               )}
                           </div>
                           
@@ -622,41 +651,103 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                                         autoFocus
                                                     />
                                                 </div>
-                                                <div className="max-h-48 overflow-y-auto space-y-1">
+                                                <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                                                     {activeTab === 'HOTEL' && dayHotels.map(h => (
-                                                        <button key={h.id} onClick={() => addSystemItem(index, h, 'HOTEL')} className="w-full text-left p-2 hover:bg-indigo-50 rounded-lg flex justify-between items-center text-sm group transition-colors">
-                                                            <div>
-                                                                <span className="font-medium text-slate-800">{h.name}</span>
-                                                                <div className="flex gap-2 text-[10px] text-slate-500">
-                                                                    <span>{h.category}</span>
-                                                                    <span>{h.mealPlan}</span>
+                                                        <button 
+                                                            key={h.id} 
+                                                            onClick={() => addSystemItem(index, h, 'HOTEL')} 
+                                                            className={`w-full text-left p-3 hover:bg-indigo-50 rounded-xl flex items-start gap-3 group transition-all border border-transparent hover:border-indigo-100 mb-1 ${justAdded === h.id ? 'bg-green-50 border-green-200' : ''}`}
+                                                        >
+                                                            <div className="h-12 w-12 bg-slate-100 rounded-lg shrink-0 overflow-hidden border border-slate-100">
+                                                                {h.imageUrl ? <img src={h.imageUrl} className="w-full h-full object-cover" alt="" /> : <HotelIcon className="m-3 text-slate-300" size={24} />}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start">
+                                                                    <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{h.name}</h4>
+                                                                    <span className="font-mono font-bold text-xs text-indigo-700 whitespace-nowrap">₹{h.cost.toLocaleString()}</span>
+                                                                </div>
+                                                                
+                                                                <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed mt-0.5 mb-1.5">{h.description || 'No description available.'}</p>
+                                                                
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex gap-1.5 flex-wrap">
+                                                                        <span className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-100"><Star size={8} fill="currentColor"/> {h.category}</span>
+                                                                        <span className="text-[9px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{h.mealPlan}</span>
+                                                                    </div>
+                                                                    <div className={`transition-opacity text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${justAdded === h.id ? 'opacity-100 bg-green-500 text-white border-green-500' : 'opacity-0 group-hover:opacity-100 text-indigo-600 bg-white border-indigo-200'}`}>
+                                                                        {justAdded === h.id ? <span className="flex items-center gap-1"><Check size={8}/> Added</span> : '+ Add'}
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                            <div className="text-right">
-                                                                <span className="block font-mono font-bold text-xs">₹{h.cost.toLocaleString()}</span>
-                                                                <span className="text-[10px] text-indigo-600">+ Add</span>
-                                                            </div>
                                                         </button>
                                                     ))}
+
                                                     {activeTab === 'ACTIVITY' && dayActivities.map(a => (
-                                                        <button key={a.id} onClick={() => addSystemItem(index, a, 'ACTIVITY')} className="w-full text-left p-2 hover:bg-pink-50 rounded-lg flex justify-between items-center text-sm group transition-colors">
-                                                            <span className="font-medium text-slate-800">{a.activityName}</span>
-                                                            <div className="text-right">
-                                                                <span className="block font-mono font-bold text-xs">₹{a.costAdult.toLocaleString()}</span>
+                                                        <button 
+                                                            key={a.id} 
+                                                            onClick={() => addSystemItem(index, a, 'ACTIVITY')} 
+                                                            className={`w-full text-left p-3 hover:bg-pink-50 rounded-xl flex items-start gap-3 group transition-all border border-transparent hover:border-pink-100 mb-1 ${justAdded === a.id ? 'bg-green-50 border-green-200' : ''}`}
+                                                        >
+                                                            <div className="h-12 w-12 bg-slate-100 rounded-lg shrink-0 overflow-hidden border border-slate-100">
+                                                                {a.imageUrl ? <img src={a.imageUrl} className="w-full h-full object-cover" alt="" /> : <Camera className="m-3 text-slate-300" size={24} />}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start">
+                                                                    <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{a.activityName}</h4>
+                                                                    <span className="font-mono font-bold text-xs text-pink-700 whitespace-nowrap">₹{a.costAdult.toLocaleString()}</span>
+                                                                </div>
+                                                                
+                                                                <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed mt-0.5 mb-1.5">{a.description || 'No description available.'}</p>
+
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex gap-1.5 flex-wrap">
+                                                                        <span className="text-[9px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{a.activityType}</span>
+                                                                        <span className="flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded"><Clock size={8}/> {a.duration}</span>
+                                                                    </div>
+                                                                    <div className={`transition-opacity text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${justAdded === a.id ? 'opacity-100 bg-green-500 text-white border-green-500' : 'opacity-0 group-hover:opacity-100 text-pink-600 bg-white border-pink-200'}`}>
+                                                                        {justAdded === a.id ? <span className="flex items-center gap-1"><Check size={8}/> Added</span> : '+ Add'}
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </button>
                                                     ))}
+
                                                     {activeTab === 'TRANSFER' && dayTransfers.map(t => (
-                                                        <button key={t.id} onClick={() => addSystemItem(index, t, 'TRANSFER')} className="w-full text-left p-2 hover:bg-blue-50 rounded-lg flex justify-between items-center text-sm group transition-colors">
-                                                            <div>
-                                                                <span className="font-medium text-slate-800">{t.transferName}</span>
-                                                                <div className="text-[10px] text-slate-500">{t.vehicleType}</div>
+                                                        <button 
+                                                            key={t.id} 
+                                                            onClick={() => addSystemItem(index, t, 'TRANSFER')} 
+                                                            className={`w-full text-left p-3 hover:bg-blue-50 rounded-xl flex items-start gap-3 group transition-all border border-transparent hover:border-blue-100 mb-1 ${justAdded === t.id ? 'bg-green-50 border-green-200' : ''}`}
+                                                        >
+                                                            <div className="h-12 w-12 bg-slate-100 rounded-lg shrink-0 overflow-hidden border border-slate-100 flex items-center justify-center">
+                                                                {t.imageUrl ? <img src={t.imageUrl} className="w-full h-full object-cover" alt="" /> : <Car className="text-slate-300" size={24} />}
                                                             </div>
-                                                            <div className="text-right">
-                                                                <span className="block font-mono font-bold text-xs">₹{t.cost.toLocaleString()}</span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start">
+                                                                    <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{t.transferName}</h4>
+                                                                    <span className="font-mono font-bold text-xs text-blue-700 whitespace-nowrap">₹{t.cost.toLocaleString()}</span>
+                                                                </div>
+                                                                
+                                                                <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed mt-0.5 mb-1.5">{t.description || 'No description available.'}</p>
+                                                                
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex gap-1.5 flex-wrap">
+                                                                        <span className="text-[9px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{t.vehicleType}</span>
+                                                                        <span className="flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded"><Users size={8}/> {t.maxPassengers}</span>
+                                                                        <span className="flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded"><Briefcase size={8}/> {t.luggageCapacity || 2}</span>
+                                                                    </div>
+                                                                    <div className={`transition-opacity text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${justAdded === t.id ? 'opacity-100 bg-green-500 text-white border-green-500' : 'opacity-0 group-hover:opacity-100 text-blue-600 bg-white border-blue-200'}`}>
+                                                                        {justAdded === t.id ? <span className="flex items-center gap-1"><Check size={8}/> Added</span> : '+ Add'}
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </button>
                                                     ))}
+
+                                                    {((activeTab === 'HOTEL' && dayHotels.length === 0) || 
+                                                      (activeTab === 'ACTIVITY' && dayActivities.length === 0) ||
+                                                      (activeTab === 'TRANSFER' && dayTransfers.length === 0)) && (
+                                                        <div className="text-center text-slate-400 text-xs py-4">No inventory found for this location.</div>
+                                                    )}
                                                 </div>
                                             </>
                                         ) : (
@@ -689,7 +780,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                                 : 'bg-white text-brand-600 border-brand-200 hover:bg-brand-50 hover:border-brand-300 shadow-sm'
                                             }`}
                                         >
-                                            <Plus size={14} /> {!hasCity ? 'Select City First' : 'Add Service'}
+                                            <Plus size={14} /> {!hasCity ? 'Select Location First' : 'Add Service'}
                                         </button>
                                     </div>
                                 )}

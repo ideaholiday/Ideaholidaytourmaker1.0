@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Http\Controllers\Api\V1\Agent;
@@ -62,7 +63,7 @@ class BuilderController extends Controller
                         // CASE A: Locked/Approved -> Create NEXT Version
                         $itinerary = $existing->createNextVersion($agent);
                     } else {
-                        // CASE B: Draft -> Update Existing
+                        // CASE B: Draft/Approved(Editable) -> Update Existing
                         $itinerary = $existing;
                     }
                 }
@@ -75,10 +76,9 @@ class BuilderController extends Controller
                 $itinerary->reference_code = 'QT-' . strtoupper(Str::random(6)) . date('my'); // Unique Ref
                 $itinerary->agent_id = $agent->id;
                 $itinerary->version = 1;
-                $itinerary->status = ItineraryStatus::DRAFT;
                 $itinerary->is_locked = false;
             }
-
+            
             // 2. Calculate Final Pricing (Backend Authority)
             $pricing = $this->pricingService->calculate(
                 $agent, 
@@ -94,6 +94,11 @@ class BuilderController extends Controller
             $itinerary->pax_count = $validated['pax'];
             $itinerary->display_currency = $pricing['currency'];
             
+            // AUTO-APPROVE LOGIC: Itinerary is usable immediately
+            $itinerary->status = ItineraryStatus::APPROVED;
+            $itinerary->approved_at = now();
+            $itinerary->allowStatusUpdate = true; // Bypass model protection for this save
+
             // 3. Save Pricing Snapshot (Immutable Financial Record for THIS version)
             $itinerary->pricing_snapshot = [
                 'base_total' => $pricing['breakdown']['supplier_base'],
@@ -141,7 +146,7 @@ class BuilderController extends Controller
                 'id' => $itinerary->id, 
                 'version' => $itinerary->version,
                 'reference' => $itinerary->reference_code,
-                'message' => 'Itinerary saved successfully'
+                'message' => 'Itinerary saved and ready.'
             ]);
         });
     }

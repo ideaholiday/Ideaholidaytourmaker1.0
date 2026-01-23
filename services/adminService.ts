@@ -30,20 +30,20 @@ const INITIAL_DESTINATIONS: Destination[] = [
 
 const INITIAL_HOTELS: Hotel[] = [
   // India - Delhi
-  { id: 'h_del_taj', name: 'Taj Palace', destinationId: 'd11', category: 'Luxury', roomType: 'Superior Room', mealPlan: 'BB', cost: 12000, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR' },
+  { id: 'h_del_taj', name: 'Taj Palace', destinationId: 'd11', category: 'Luxury', roomType: 'Superior Room', mealPlan: 'BB', cost: 12000, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR', description: 'Experience the grandeur of the Taj with world-class amenities.', imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=400' },
   { 
     id: 'h_dxb_marina', name: 'Marina Byblos', destinationId: 'd1', category: '4 Star', roomType: 'Deluxe Room', mealPlan: 'BB', cost: 8500, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR',
-    description: 'Located in Dubai Marina with easy access to JBR Beach.',
-    imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=400'
+    description: 'Located in Dubai Marina with easy access to JBR Beach and the Yacht Club. Features a rooftop pool and English pub.',
+    imageUrl: 'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&q=80&w=400'
   },
-  { id: 'h_dxb_atlantis', name: 'Atlantis The Palm', destinationId: 'd1', category: 'Luxury', roomType: 'Ocean King', mealPlan: 'HB', cost: 45000, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR' },
-  { id: 'h_hkt_grace', name: 'Phuket Graceland', destinationId: 'd2', category: '4 Star', roomType: 'Superior', mealPlan: 'BB', cost: 6000, costType: 'Per Room', season: 'Off-Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR' }
+  { id: 'h_dxb_atlantis', name: 'Atlantis The Palm', destinationId: 'd1', category: 'Luxury', roomType: 'Ocean King', mealPlan: 'HB', cost: 45000, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR', description: 'Iconic resort on the Palm Jumeirah with Aquaventure Waterpark access included.', imageUrl: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&q=80&w=400' },
+  { id: 'h_hkt_grace', name: 'Phuket Graceland', destinationId: 'd2', category: '4 Star', roomType: 'Superior', mealPlan: 'BB', cost: 6000, costType: 'Per Room', season: 'Off-Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR', description: 'Beachfront resort in Patong with multiple pools and bowling alley.', imageUrl: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&q=80&w=400' }
 ];
 
 const INITIAL_ACTIVITIES: Activity[] = [
   { 
     id: 'a_dxb_safari', 
-    activityName: 'Desert Safari', 
+    activityName: 'Desert Safari with BBQ', 
     destinationId: 'd1', 
     activityType: 'Adventure', 
     costAdult: 3500, 
@@ -53,17 +53,17 @@ const INITIAL_ACTIVITIES: Activity[] = [
     isActive: true, 
     createdBy: 'u1', 
     currency: 'INR', 
-    description: 'Dune bashing, BBQ dinner', 
+    description: 'Thrilling dune bashing in 4x4 Land Cruisers followed by a traditional BBQ dinner, belly dancing, and tanoura show at the camp.', 
     duration: '6 Hours', 
     startTime: '3:00 PM',
-    imageUrl: 'https://images.unsplash.com/photo-1547234935-80c7142ee969?auto=format&fit=crop&q=80&w=400',
+    imageUrl: 'https://images.unsplash.com/photo-1451337516015-6b6e9a44a8a3?auto=format&fit=crop&q=80&w=400',
     season: 'All Year',
     validFrom: '2024-01-01',
     validTo: '2025-12-31'
   },
   { 
     id: 'a_dxb_burj', 
-    activityName: 'Burj Khalifa 124th Floor', 
+    activityName: 'Burj Khalifa At The Top', 
     destinationId: 'd1', 
     activityType: 'City Tour', 
     costAdult: 4500, 
@@ -73,10 +73,10 @@ const INITIAL_ACTIVITIES: Activity[] = [
     isActive: true, 
     createdBy: 'u1', 
     currency: 'INR', 
-    description: 'Non-prime hours ticket',
+    description: 'Access to levels 124 & 125 of the world\'s tallest building. Enjoy breathtaking panoramic views of the Dubai skyline.',
     duration: '2 Hours',
     startTime: 'Flexible',
-    imageUrl: 'https://images.unsplash.com/photo-1582672060674-bc2bd808a8b5?auto=format&fit=crop&q=80&w=400',
+    imageUrl: 'https://images.unsplash.com/photo-1528702748617-c64d49f918af?auto=format&fit=crop&q=80&w=400',
     season: 'All Year',
     validFrom: '2024-01-01',
     validTo: '2025-12-31'
@@ -93,7 +93,7 @@ const INITIAL_ACTIVITIES: Activity[] = [
     isActive: true, 
     createdBy: 'u1', 
     currency: 'INR', 
-    description: 'By Speedboat + Lunch',
+    description: 'Full day speedboat tour visiting Maya Bay, Pileh Lagoon, and Viking Cave. Includes buffet lunch and snorkeling gear.',
     duration: 'Full Day',
     startTime: '8:00 AM',
     imageUrl: 'https://images.unsplash.com/photo-1537956965359-3578dddd1292?auto=format&fit=crop&q=80&w=400',
@@ -106,7 +106,7 @@ const INITIAL_ACTIVITIES: Activity[] = [
 const INITIAL_TRANSFERS: Transfer[] = [
   { 
     id: 't_dxb_arr_pvt', 
-    transferName: 'DXB Airport Arrival', 
+    transferName: 'DXB Airport Arrival (Private)', 
     destinationId: 'd1', 
     transferType: 'PVT', 
     vehicleType: 'Sedan', 
@@ -119,14 +119,15 @@ const INITIAL_TRANSFERS: Transfer[] = [
     createdBy: 'u1',
     luggageCapacity: 2,
     meetingPoint: 'Arrival Hall, Pillar 5',
-    imageUrl: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=400',
+    imageUrl: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=400',
+    description: 'Private transfer from Dubai International Airport (DXB) to your hotel in Dubai city limits. Driver waits with name placard.',
     season: 'All Year',
     validFrom: '2024-01-01',
     validTo: '2025-12-31'
   },
   { 
     id: 't_hkt_arr_van', 
-    transferName: 'HKT Airport Arrival', 
+    transferName: 'HKT Airport Arrival (Van)', 
     destinationId: 'd2', 
     transferType: 'PVT', 
     vehicleType: 'Van', 
@@ -139,7 +140,8 @@ const INITIAL_TRANSFERS: Transfer[] = [
     createdBy: 'u1',
     luggageCapacity: 6,
     meetingPoint: 'Exit Gate 2',
-    imageUrl: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?auto=format&fit=crop&q=80&w=400',
+    imageUrl: 'https://images.unsplash.com/photo-1559416523-140ddc3d238c?auto=format&fit=crop&q=80&w=400',
+    description: 'Spacious van transfer suitable for families or groups. Direct from Phuket Airport to Patong/Karon/Kata area.',
     season: 'All Year',
     validFrom: '2024-01-01',
     validTo: '2025-12-31'

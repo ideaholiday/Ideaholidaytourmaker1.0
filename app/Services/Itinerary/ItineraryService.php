@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Services\Itinerary;
@@ -33,8 +34,9 @@ class ItineraryService
                 'unique_ref_no' => $reference,
                 'reference_code' => $reference, // redundancy based on schema evolution
                 'version' => 1,
-                'status' => ItineraryStatus::DRAFT,
+                'status' => ItineraryStatus::APPROVED, // Direct Approval
                 'is_locked' => false,
+                'approved_at' => now(),
                 'title' => $data['title'],
                 'destination_summary' => $data['destination_summary'] ?? 'TBD',
                 'travel_date' => $data['travel_date'] ?? null,
@@ -57,7 +59,7 @@ class ItineraryService
 
     /**
      * Update an existing itinerary (Header, Days, Services, and Price).
-     * Strictly enforces that the itinerary must be editable (Draft/Submitted).
+     * Strictly enforces that the itinerary must be editable.
      */
     public function update(Itinerary $itinerary, array $data): Itinerary
     {
@@ -66,12 +68,17 @@ class ItineraryService
         }
 
         return DB::transaction(function () use ($itinerary, $data) {
+            
+            $itinerary->allowStatusUpdate = true;
+            
             // 1. Update Header
             $itinerary->update([
                 'title' => $data['title'] ?? $itinerary->title,
                 'destination_summary' => $data['destination_summary'] ?? $itinerary->destination_summary,
                 'travel_date' => $data['travel_date'] ?? $itinerary->travel_date,
                 'pax_count' => $data['pax_count'] ?? $itinerary->pax_count,
+                'status' => ItineraryStatus::APPROVED, // Ensure it stays usable
+                'approved_at' => now()
             ]);
 
             // 2. Sync Structure (Days & Services) if provided
@@ -87,7 +94,7 @@ class ItineraryService
     }
 
     /**
-     * Create a new Version (Draft) from a Locked Itinerary.
+     * Create a new Version (Draft/Approved) from a Locked Itinerary.
      * Performs a deep clone of the itinerary, its days, and its services.
      */
     public function createNextVersion(Itinerary $sourceItinerary, User $user): Itinerary
@@ -106,7 +113,8 @@ class ItineraryService
             $newVersion->id = Str::uuid();
             $newVersion->agent_id = $user->id; // The user creating the version becomes the owner
             $newVersion->version = $sourceItinerary->version + 1;
-            $newVersion->status = ItineraryStatus::DRAFT;
+            $newVersion->status = ItineraryStatus::APPROVED; // Auto-approve
+            $newVersion->approved_at = now();
             $newVersion->is_locked = false;
             $newVersion->reference_code = $sourceItinerary->reference_code;
             
@@ -234,6 +242,8 @@ class ItineraryService
 
         // Calculate
         $pricing = $this->pricingEngine->calculateForItinerary($itinerary);
+        
+        $itinerary->allowStatusUpdate = true;
 
         // Save to JSON column
         $itinerary->update([
