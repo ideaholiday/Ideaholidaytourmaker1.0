@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { ItineraryItem, ItineraryService } from '../types';
 import { adminService } from '../services/adminService';
 import { currencyService } from '../services/currencyService';
 import { calculatePriceFromNet } from '../utils/pricingEngine';
 import { InventoryModal } from './builder/InventoryModal';
-import { Save, Plus, Trash2, MapPin, Hotel, Camera, Car, X } from 'lucide-react';
+import { Save, Plus, Trash2, MapPin, Hotel, Camera, Car, X, Info } from 'lucide-react';
 
 interface Props {
   initialItinerary: ItineraryItem[];
@@ -21,16 +22,19 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   const [modalType, setModalType] = useState<'HOTEL' | 'ACTIVITY' | 'TRANSFER'>('HOTEL');
   const [financials, setFinancials] = useState({ net: 0, selling: 0, currency: 'INR' });
 
+  // Recalculate price whenever itinerary changes
   useEffect(() => {
     let totalNet = 0;
     const rules = adminService.getPricingRule();
     
     itinerary.forEach(day => {
         day.services?.forEach(svc => {
-            const cost = svc.cost || 0;
+            const cost = Number(svc.cost) || 0;
             const currency = svc.currency || 'INR';
-            const qty = svc.quantity || 1;
-            const nights = svc.duration_nights || 1;
+            const qty = Number(svc.quantity) || 1;
+            const nights = Number(svc.duration_nights) || 1;
+            
+            // Standardize to INR for calculation
             totalNet += currencyService.convert(cost * qty * nights, currency, 'INR');
         });
     });
@@ -44,21 +48,28 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   }, [itinerary, pax]);
 
   const handleAddService = (item: any) => {
+      // Robust cost extraction
+      const rawCost = item.estimated_cost || item.cost || item.costPrice || item.price || 0;
+      
       const newService: ItineraryService = {
           id: item.id || `svc_${Date.now()}`,
-          inventory_id: item.inventory_id,
+          inventory_id: item.inventory_id || item.id, // Fallback if inventory_id missing
           type: item.type,
           name: item.name,
-          cost: item.estimated_cost,
-          price: item.estimated_cost,
-          currency: item.currency,
-          quantity: item.quantity || 1,
-          duration_nights: item.nights || 1,
-          meta: item.meta
+          cost: Number(rawCost),
+          price: Number(rawCost),
+          currency: item.currency || 'INR',
+          quantity: Number(item.quantity) || 1,
+          duration_nights: Number(item.nights) || 1,
+          meta: item.meta || {}
       };
 
       const updated = [...itinerary];
-      if(!updated[activeDayIndex].services) updated[activeDayIndex].services = [];
+      // Ensure the services array exists
+      if (!updated[activeDayIndex].services) {
+          updated[activeDayIndex].services = [];
+      }
+      
       updated[activeDayIndex].services!.push(newService);
       setItinerary(updated);
   };
@@ -75,6 +86,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   };
 
   const activeDay = itinerary[activeDayIndex];
+
+  // Derive the city ID for the active day to pass to the modal
+  const activeCityId = activeDay?.cityId || '';
 
   return (
     <div className="flex flex-col h-[calc(100vh-100px)] bg-slate-50 rounded-xl overflow-hidden border border-slate-200 shadow-xl fixed inset-0 z-50 m-4 md:m-8">
@@ -148,19 +162,27 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                             />
                         </div>
 
+                        {/* City Context Display */}
+                        {activeDay.cityId && (
+                           <div className="mb-4 flex items-center gap-2 text-xs text-slate-500 bg-slate-100 p-2 rounded border border-slate-200">
+                               <MapPin size={14} />
+                               Current Location Filter: <strong>{adminService.getDestinations().find(d => d.id === activeDay.cityId)?.city || 'Unknown City'}</strong>
+                           </div>
+                        )}
+
                         <div className="space-y-3">
                             <div className="flex justify-between items-center mb-2">
                                 <h4 className="font-bold text-slate-700">Services</h4>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handleOpenAdd('HOTEL')} className="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded hover:bg-indigo-100 flex gap-1 items-center"><Plus size={12}/> Hotel</button>
-                                    <button onClick={() => handleOpenAdd('ACTIVITY')} className="text-xs bg-pink-50 text-pink-700 px-3 py-1.5 rounded hover:bg-pink-100 flex gap-1 items-center"><Plus size={12}/> Activity</button>
-                                    <button onClick={() => handleOpenAdd('TRANSFER')} className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-100 flex gap-1 items-center"><Plus size={12}/> Transfer</button>
+                                    <button onClick={() => handleOpenAdd('HOTEL')} className="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded hover:bg-indigo-100 flex gap-1 items-center font-bold border border-indigo-100"><Plus size={12}/> Hotel</button>
+                                    <button onClick={() => handleOpenAdd('ACTIVITY')} className="text-xs bg-pink-50 text-pink-700 px-3 py-1.5 rounded hover:bg-pink-100 flex gap-1 items-center font-bold border border-pink-100"><Plus size={12}/> Activity</button>
+                                    <button onClick={() => handleOpenAdd('TRANSFER')} className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-100 flex gap-1 items-center font-bold border border-blue-100"><Plus size={12}/> Transfer</button>
                                 </div>
                             </div>
 
                             {activeDay.services && activeDay.services.length > 0 ? (
                                 activeDay.services.map((svc) => (
-                                    <div key={svc.id} className="bg-white border border-slate-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
+                                    <div key={svc.id} className="bg-white border border-slate-200 rounded-xl p-4 flex justify-between items-center shadow-sm hover:border-brand-300 transition">
                                         <div className="flex items-center gap-3">
                                             <div className={`p-2 rounded-lg ${
                                                 svc.type === 'HOTEL' ? 'bg-indigo-100 text-indigo-600' :
@@ -182,8 +204,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                         <div className="flex items-center gap-4">
                                             <div className="text-right">
                                                 <p className="font-mono font-bold text-slate-700">{svc.currency || 'INR'} {(svc.cost * (svc.quantity||1) * (svc.duration_nights||1)).toLocaleString()}</p>
+                                                {svc.cost === 0 && <span className="text-[10px] text-red-500 flex items-center gap-1"><Info size={10}/> Price Missing</span>}
                                             </div>
-                                            <button onClick={() => handleRemoveService(activeDayIndex, svc.id)} className="text-slate-400 hover:text-red-500">
+                                            <button onClick={() => handleRemoveService(activeDayIndex, svc.id)} className="text-slate-400 hover:text-red-500 p-1.5 hover:bg-slate-100 rounded">
                                                 <Trash2 size={16} />
                                             </button>
                                         </div>
@@ -208,7 +231,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                 onClose={() => setIsModalOpen(false)}
                 type={modalType}
                 dayId={activeDayIndex.toString()}
-                destinationId="" 
+                destinationId={activeCityId} 
                 onSelect={handleAddService}
             />
         )}
