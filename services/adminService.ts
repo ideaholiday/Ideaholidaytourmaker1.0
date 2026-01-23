@@ -6,10 +6,6 @@ import { idGeneratorService } from './idGenerator';
 import { db } from './firebase'; 
 import { doc, setDoc, deleteDoc, getDocs, collection, query } from 'firebase/firestore'; 
 
-// ... (Keep INITIAL_DESTINATIONS, INITIAL_HOTELS, etc. arrays exactly as they are) ...
-// For brevity in this diff, I'm assuming the initial data constants are preserved above this class.
-// In the actual file, do NOT remove the constants.
-
 const INITIAL_DESTINATIONS: Destination[] = [
   { id: 'd11', country: 'India', city: 'Delhi', currency: 'INR', timezone: 'GMT+5:30', isActive: true, createdBy: 'u1' },
   { id: 'd1', country: 'UAE', city: 'Dubai', currency: 'INR', timezone: 'GMT+4', isActive: true, createdBy: 'u1' },
@@ -31,10 +27,26 @@ const INITIAL_HOTELS: Hotel[] = [
   { id: 'h_hkt_grace', name: 'Phuket Graceland', destinationId: 'd2', category: '4 Star', roomType: 'Superior', mealPlan: 'BB', cost: 6000, costType: 'Per Room', season: 'Off-Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR', description: 'Beachfront resort in Patong.', imageUrl: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&q=80&w=400' }
 ];
 
-// Placeholder for other initial data constants to save space in diff
-const INITIAL_ACTIVITIES: Activity[] = []; 
-const INITIAL_TRANSFERS: Transfer[] = [];
-const INITIAL_VISAS: Visa[] = [];
+const INITIAL_ACTIVITIES: Activity[] = [
+    { id: 'act_dxb_safari', activityName: 'Desert Safari with BBQ Dinner', destinationId: 'd1', activityType: 'Adventure', costAdult: 2500, costChild: 2000, ticketIncluded: true, transferIncluded: true, isActive: true, createdBy: 'u1', currency: 'INR', duration: '6 Hours', season: 'All Year', description: 'Dune bashing, camel ride, henna painting, and buffet dinner.' },
+    { id: 'act_dxb_burj', activityName: 'Burj Khalifa 124th Floor', destinationId: 'd1', activityType: 'City Tour', costAdult: 3500, costChild: 2800, ticketIncluded: true, transferIncluded: false, isActive: true, createdBy: 'u1', currency: 'INR', duration: '2 Hours', season: 'All Year', description: 'Non-prime hours entry ticket to At The Top.' },
+    { id: 'act_hkt_phi', activityName: 'Phi Phi Island by Speedboat', destinationId: 'd2', activityType: 'Adventure', costAdult: 4000, costChild: 3000, ticketIncluded: true, transferIncluded: true, isActive: true, createdBy: 'u1', currency: 'INR', duration: 'Full Day', season: 'All Year', description: 'Visit Maya Bay, Monkey Beach with lunch included.' },
+    { id: 'act_bkk_city', activityName: 'Bangkok City & Temple Tour', destinationId: 'd3', activityType: 'City Tour', costAdult: 1800, costChild: 1500, ticketIncluded: true, transferIncluded: true, isActive: true, createdBy: 'u1', currency: 'INR', duration: 'Half Day', season: 'All Year', description: 'Visit Golden Buddha and Marble Temple.' },
+    { id: 'act_del_agra', activityName: 'Same Day Agra Tour', destinationId: 'd11', activityType: 'City Tour', costAdult: 6500, costChild: 6500, ticketIncluded: false, transferIncluded: true, isActive: true, createdBy: 'u1', currency: 'INR', duration: '12 Hours', season: 'All Year', description: 'Private car from Delhi to Taj Mahal and back.' }
+];
+
+const INITIAL_TRANSFERS: Transfer[] = [
+    { id: 'tr_dxb_apt', transferName: 'DXB Airport to Hotel (PVT)', destinationId: 'd1', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 2200, costBasis: 'Per Vehicle', nightSurcharge: 500, isActive: true, createdBy: 'u1', currency: 'INR', meetingPoint: 'Arrival Hall', season: 'All Year' },
+    { id: 'tr_dxb_apt_van', transferName: 'DXB Airport to Hotel (Van)', destinationId: 'd1', transferType: 'PVT', vehicleType: 'HiAce Van', maxPassengers: 7, cost: 3500, costBasis: 'Per Vehicle', nightSurcharge: 500, isActive: true, createdBy: 'u1', currency: 'INR', meetingPoint: 'Arrival Hall', season: 'All Year' },
+    { id: 'tr_hkt_apt', transferName: 'Phuket Airport to Patong', destinationId: 'd2', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 1800, costBasis: 'Per Vehicle', nightSurcharge: 0, isActive: true, createdBy: 'u1', currency: 'INR', meetingPoint: 'Exit Gate 3', season: 'All Year' },
+    { id: 'tr_del_apt', transferName: 'Delhi Airport to City Hotel', destinationId: 'd11', transferType: 'PVT', vehicleType: 'Sedan', maxPassengers: 3, cost: 1200, costBasis: 'Per Vehicle', nightSurcharge: 300, isActive: true, createdBy: 'u1', currency: 'INR', meetingPoint: 'Pillar 10', season: 'All Year' }
+];
+
+const INITIAL_VISAS: Visa[] = [
+    { id: 'v_uae_30', country: 'UAE', visaType: 'Tourist Visa', processingTime: '2-3 Days', cost: 6500, documentsRequired: ['Passport', 'Photo'], isActive: true, createdBy: 'u1', validity: '30 Days', entryType: 'Single' },
+    { id: 'v_thai_evisa', country: 'Thailand', visaType: 'E-Visa on Arrival', processingTime: '24 Hours', cost: 2500, documentsRequired: ['Passport', 'Ticket'], isActive: true, createdBy: 'u1', validity: '15 Days', entryType: 'Single' }
+];
+
 const INITIAL_PRICING_RULE: PricingRule = { id: 'pr_default', name: 'Default', markupType: 'Percentage', companyMarkup: 10, agentMarkup: 10, gstPercentage: 5, roundOff: 'Nearest 10', baseCurrency: 'INR', isActive: true };
 const INITIAL_PACKAGES: FixedPackage[] = [];
 
