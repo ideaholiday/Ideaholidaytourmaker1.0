@@ -31,11 +31,9 @@ class InventoryController extends Controller
                 $q->whereIn('role', ['ADMIN', 'STAFF', 'SUPPLIER']);
             });
         } else {
-            // Activities & Transfers: Allow ONLY Admin and Staff (System Inventory)
-            // Operators (who might supply these) are excluded from the general builder search
-            // unless explicitly authorized, but per requirements, restricted to Admin only.
+            // Activities & Transfers: Include Operators (DMCs) who supply ground services
             $query->whereHas('supplier', function($q) {
-                $q->whereIn('role', ['ADMIN', 'STAFF']);
+                $q->whereIn('role', ['ADMIN', 'STAFF', 'OPERATOR']);
             });
         }
 

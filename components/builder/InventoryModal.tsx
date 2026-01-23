@@ -31,17 +31,18 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
         else if (type === 'ACTIVITY') mergedItems = [...adminService.getActivities()];
         else mergedItems = [...adminService.getTransfers()];
 
-        // 2. Fetch Approved Partner Inventory
-        // Rule: Only include Partner items if type is HOTEL (Hotel Partners). 
-        // Operators (Activities/Transfers) are excluded from general builder search.
-        if (type === 'HOTEL') {
-            const partnerItems = inventoryService.getApprovedItems(destinationId).filter(i => i.type === type);
-            mergedItems = [...mergedItems, ...partnerItems];
-        }
+        // 2. Fetch Approved Partner/Operator Inventory
+        // Include for ALL types (Hotel, Activity, Transfer) if approved
+        const partnerItems = inventoryService.getApprovedItems(destinationId).filter(i => i.type === type);
+        mergedItems = [...mergedItems, ...partnerItems];
 
-        // 3. Filter by Destination ID matches
+        // 3. Filter by Destination ID matches (for Admin items which might not be filtered yet)
         if (destinationId) {
-            mergedItems = mergedItems.filter(i => i.destinationId === destinationId);
+            mergedItems = mergedItems.filter(i => {
+                // Handle different ID field names across legacy/new types
+                const itemDestId = i.destinationId || i.location_id; 
+                return !itemDestId || itemDestId === destinationId;
+            });
         }
 
         setItems(mergedItems);
@@ -60,7 +61,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
           name: item.name || item.activityName || item.transferName,
           description: item.description, // Immutable description
           estimated_cost: item.cost || item.costAdult || item.costPrice || 0, // Visual only
-          currency: item.currency || 'USD',
+          currency: item.currency || 'INR',
           quantity: 1, 
           nights: type === 'HOTEL' ? 1 : undefined,
           meta: type === 'HOTEL' ? { roomType: item.roomType, mealPlan: item.mealPlan } : {}
@@ -107,7 +108,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                         <MapPin size={10} /> {getCityName(destinationId)}
                     </span>
                     <span className="ml-auto text-[10px] text-slate-400">
-                        {type === 'HOTEL' ? 'Showing Admin & Partner Hotels' : 'Showing Admin Inventory Only'}
+                        {type === 'HOTEL' ? 'Showing Admin & Partner Hotels' : 'Showing Approved Inventory'}
                     </span>
                 </div>
             )}
@@ -132,7 +133,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                                     <MapPin size={8} /> {locationName}
                                 </span>
                                 {isPartner ? (
-                                    <span className="text-[10px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 font-bold flex items-center gap-0.5" title="Partner Inventory">
+                                    <span className="text-[10px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 font-bold flex items-center gap-0.5" title="Partner/Operator Inventory">
                                         <User size={8} /> Partner
                                     </span>
                                 ) : (
@@ -158,7 +159,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                         </div>
                         
                         <div className="text-right flex flex-col items-end gap-2 pl-4 border-l border-slate-100">
-                            <span className="font-mono text-sm font-bold text-slate-700 block">{item.currency || 'USD'} {cost.toLocaleString()}</span>
+                            <span className="font-mono text-sm font-bold text-slate-700 block">{item.currency || 'INR'} {cost.toLocaleString()}</span>
                             <button 
                                 onClick={() => handleAddItem(item)}
                                 className="bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-brand-600 transition text-xs font-bold flex items-center gap-1 shadow-sm whitespace-nowrap"

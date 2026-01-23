@@ -40,11 +40,17 @@ class BuilderPricingService
                 // 1. RESOLVE INVENTORY COST
                 $costData = $this->resolveServiceCost($svc);
                 
-                $unitCost = $costData['cost'];
+                $unitCost = (float) $costData['cost'];
                 $supplierCurrency = $costData['currency'];
                 
                 $qty = (float)($svc['quantity'] ?? 1); 
-                $duration = (float)($svc['nights'] ?? 1); // For Hotels
+                
+                // LOGIC FIX: Duration (Nights) should only apply to HOTELS
+                // Activities and Transfers are typically priced per Unit or Per Pax per usage
+                $type = strtoupper($svc['type'] ?? 'CUSTOM');
+                $rawNights = (float)($svc['nights'] ?? 1);
+                
+                $duration = ($type === 'HOTEL') ? $rawNights : 1;
 
                 // Calculate Total for Line Item
                 $lineTotalSupplier = $unitCost * $qty * $duration;
@@ -113,10 +119,18 @@ class BuilderPricingService
 
     private function resolveServiceCost(array $serviceData): array
     {
+        // Helper to sanitize cost input
+        $sanitizeCost = function($val) {
+            if (is_string($val)) {
+                return (float) str_replace(',', '', $val);
+            }
+            return (float) $val;
+        };
+
         // 1. Custom Service (Frontend sends 'type': 'CUSTOM')
         if (($serviceData['type'] ?? '') === 'CUSTOM') {
             return [
-                'cost' => $serviceData['cost'] ?? 0, 
+                'cost' => $sanitizeCost($serviceData['cost'] ?? 0), 
                 'currency' => $serviceData['currency'] ?? 'INR',
                 'name' => $serviceData['name'] ?? 'Custom Service'
             ];
@@ -134,10 +148,11 @@ class BuilderPricingService
             }
         }
 
-        // 3. Fallback for Manual Items pretending to be System items (legacy)
+        // 3. Fallback: Trust Cost from Request (If DB lookup failed or mock item)
+        // This fixes the "0 price" issue when inventory is not yet in DB but frontend provides cost
         if (isset($serviceData['cost'])) {
             return [
-                'cost' => $serviceData['cost'],
+                'cost' => $sanitizeCost($serviceData['cost']),
                 'currency' => $serviceData['currency'] ?? 'INR',
                 'name' => $serviceData['name'] ?? 'Service'
             ];

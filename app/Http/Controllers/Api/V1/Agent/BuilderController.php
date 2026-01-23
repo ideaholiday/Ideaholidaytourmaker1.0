@@ -130,14 +130,39 @@ class BuilderController extends Controller
 
                 if (!empty($dayData['services'])) {
                     foreach ($dayData['services'] as $svc) {
+                        
+                        // Resolve Cost for Persistence (Reusing logic from BuilderPricingService concept)
+                        $cost = 0;
+                        $currency = 'INR';
+
+                        if (!empty($svc['inventory_id'])) {
+                             // Try to find in DB to ensure integrity
+                             $product = \App\Models\Product::with('currentVersion')->find($svc['inventory_id']);
+                             if ($product && $product->currentVersion) {
+                                 $cost = $product->currentVersion->net_cost;
+                                 $currency = $product->currentVersion->currency;
+                             }
+                        }
+                        
+                        // Fallback to payload cost if DB lookup failed OR if it's a custom item
+                        // Note: If product found, we use DB price. If not found or custom, use input price.
+                        if ($cost == 0 && (isset($svc['cost']) || isset($svc['estimated_cost']))) {
+                            // Frontend sends 'cost' mapped from 'estimated_cost' in context
+                            $cost = $svc['cost'] ?? $svc['estimated_cost'];
+                            $currency = $svc['currency'] ?? 'INR';
+                        }
+                        
+                        // Sanitize
+                        $cost = is_numeric($cost) ? $cost : 0;
+
                         $day->services()->create([
                             'inventory_type' => $svc['type'],
                             'inventory_id' => $svc['inventory_id'] ?? null,
                             'service_name' => $svc['name'],
                             'description_snapshot' => $svc['description'] ?? '', 
                             
-                            'supplier_net' => 0, // Should be populated from lookup logic
-                            'supplier_currency' => 'USD', // Default
+                            'supplier_net' => $cost, // Persist resolved cost
+                            'supplier_currency' => $currency,
                             
                             'quantity' => $svc['quantity'] ?? 1,
                             'duration_nights' => $svc['nights'] ?? 1,

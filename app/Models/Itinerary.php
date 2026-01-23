@@ -12,10 +12,6 @@ class Itinerary extends Model
 {
     use HasUuids;
 
-    /**
-     * Transient flag to allow status updates from the StateMachine service.
-     * This is not persisted to the database.
-     */
     public bool $allowStatusUpdate = false;
 
     protected $fillable = [
@@ -34,7 +30,7 @@ class Itinerary extends Model
         'submitted_at',
         'approved_at',
         'legacy',
-        'pricing_snapshot' // Stored as JSON
+        'pricing_snapshot'
     ];
 
     protected $casts = [
@@ -48,31 +44,22 @@ class Itinerary extends Model
         'pricing_snapshot' => 'array',
     ];
 
-    /**
-     * Boot model to enforce business rules.
-     */
+    protected $appends = [
+        'selling_price', 
+        'net_cost', 
+        'per_person_price',
+        'currency'
+    ];
+
     protected static function booted()
     {
         static::updating(function ($itinerary) {
-            
-            // 1. Legacy Freeze
             if ($itinerary->legacy) {
                 throw new \Exception('Legacy data is read-only. Cannot modify pre-migration itineraries.');
-            }
-
-            // 2. Status Protection
-            // We relax this check slightly to allow auto-approval updates without complex service calls if needed,
-            // but keeping it strictly via service is safer. 
-            if ($itinerary->isDirty('status') && !$itinerary->allowStatusUpdate) {
-                // throw new \Exception('Direct status update forbidden. Use ItineraryStateMachine service.');
             }
         });
     }
 
-    /**
-     * Create a new version of this itinerary.
-     * Replicates the shell.
-     */
     public function createNextVersion(User $agent): self
     {
         if (!$this->is_locked) {
@@ -87,16 +74,15 @@ class Itinerary extends Model
             'approved_at',
             'operator_id', 
             'legacy',
-            'pricing_snapshot' // Pricing resets on new draft until saved
+            'pricing_snapshot'
         ]);
 
         $newVersion->id = Str::uuid();
         $newVersion->agent_id = $agent->id;
         $newVersion->version = $this->version + 1;
-        $newVersion->status = ItineraryStatus::APPROVED; // Auto-approve new versions
+        $newVersion->status = ItineraryStatus::APPROVED;
         $newVersion->approved_at = now();
         $newVersion->is_locked = false;
-        
         $newVersion->reference_code = $this->reference_code;
 
         $newVersion->save();
@@ -104,9 +90,33 @@ class Itinerary extends Model
         return $newVersion;
     }
 
-    /* =========================
-     | RELATIONS
-     ========================= */
+    // --- ACCESSORS ---
+
+    public function getSellingPriceAttribute()
+    {
+        return $this->pricing_snapshot['display_total'] ?? 0;
+    }
+
+    public function getNetCostAttribute()
+    {
+        // Agent's B2B Price = Supplier Base + System Margin
+        $base = $this->pricing_snapshot['base_total'] ?? 0;
+        $margin = $this->pricing_snapshot['system_margin'] ?? 0;
+        return $base + $margin;
+    }
+
+    public function getPerPersonPriceAttribute()
+    {
+        $total = $this->getSellingPriceAttribute();
+        return $this->pax_count > 0 ? round($total / $this->pax_count, 2) : 0;
+    }
+
+    public function getCurrencyAttribute()
+    {
+        return $this->display_currency ?? 'INR';
+    }
+
+    // --- RELATIONS ---
 
     public function agent()
     {
@@ -153,18 +163,12 @@ class Itinerary extends Model
         return $this->hasMany(WhatsAppLog::class);
     }
 
-    /* =========================
-     | DOMAIN RULES
-     ========================= */
-
     public function isEditable(): bool
     {
         if ($this->legacy) return false;
         if ($this->is_locked) return false;
         if ($this->status === ItineraryStatus::BOOKED) return false;
         if ($this->status === ItineraryStatus::CANCELLED) return false;
-
-        // Since we auto-approve, APPROVED status must be editable until Locked/Booked.
         return true;
     }
 

@@ -35,20 +35,23 @@ export const AgentDashboard: React.FC = () => {
           <p className="text-slate-500">Welcome back, {user.name} ({user.companyName})</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link to="/agent/guidebook" className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition flex items-center gap-2 shadow-sm">
-             <Book size={18} /> Guide Book
-          </Link>
-          <Link to="/agent/reports" className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition flex items-center gap-2 shadow-sm">
-             <TrendingUp size={18} /> P&L Report
+          <Link to="/agent/quotes" className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition flex items-center gap-2 shadow-sm">
+             <FileText size={18} /> My Quotes
           </Link>
           <Link to="/agent/branding" className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition flex items-center gap-2 shadow-sm">
-             <Palette size={18} /> Branding
+             <Palette size={18} /> Branding Settings
+          </Link>
+          <Link to="/agent/reports" className="hidden md:flex px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition items-center gap-2 shadow-sm">
+             <TrendingUp size={18} /> Reports
+          </Link>
+          <Link to="/agent/guidebook" className="hidden md:flex px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium transition items-center gap-2 shadow-sm">
+             <Book size={18} /> Guide
           </Link>
           <Link to="/agent/builder" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium transition flex items-center gap-2 shadow-sm shadow-purple-200">
              <Map size={18} /> Itinerary Builder
           </Link>
           <Link to="/agent/create" className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium transition flex items-center gap-2 shadow-sm shadow-brand-200">
-            <Plus size={18} /> Quick Quote
+            <Plus size={18} /> Create Quote
           </Link>
         </div>
       </div>

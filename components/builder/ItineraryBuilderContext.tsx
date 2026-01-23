@@ -151,9 +151,9 @@ export const ItineraryBuilderProvider: React.FC<{ children: React.ReactNode }> =
                     type: s.type,
                     quantity: s.quantity,
                     nights: s.nights,
-                    // Send custom cost only if type is CUSTOM
-                    cost: s.type === 'CUSTOM' ? s.estimated_cost : undefined,
-                    currency: s.type === 'CUSTOM' ? s.currency : undefined
+                    // Send custom cost for ALL items as fallback if inventory lookup fails
+                    cost: s.estimated_cost,
+                    currency: s.currency
                 }))
             })),
             pax: state.paxCount,
@@ -200,6 +200,15 @@ export const ItineraryBuilderProvider: React.FC<{ children: React.ReactNode }> =
   };
 
   const saveItinerary = async (title: string, destinationSummary: string, travelDate: string) => {
+      // Map state days to backend expected structure (specifically estimated_cost -> cost)
+      const daysPayload = state.days.map(d => ({
+        ...d,
+        services: d.services.map(s => ({
+            ...s,
+            cost: s.estimated_cost // Ensure backend gets 'cost' key
+        }))
+      }));
+
       await apiClient.request('/builder/save', {
           method: 'POST',
           body: JSON.stringify({
@@ -207,7 +216,7 @@ export const ItineraryBuilderProvider: React.FC<{ children: React.ReactNode }> =
               destination_summary: destinationSummary,
               travel_date: travelDate,
               pax: state.paxCount,
-              days: state.days,
+              days: daysPayload,
               currency: state.currency
               // Backend will recalculate price and store snapshot
           })

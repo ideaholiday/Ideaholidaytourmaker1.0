@@ -120,6 +120,34 @@ The **Smart Builder** is our most powerful tool for creating detailed, day-by-da
         `
     },
     {
+        id: 'g11',
+        title: 'Troubleshooting: Price Not Calculated',
+        category: 'Platform Guide',
+        lastUpdated: '2024-02-01',
+        targetRoles: [UserRole.AGENT, UserRole.ADMIN, UserRole.STAFF],
+        content: `
+### Why is my Quote showing 0 Price?
+
+If you see the **"Price not calculated"** warning banner on your Quote Detail page, it means the system cannot generate a valid selling price. This is usually due to one of the following reasons:
+
+#### 1. Empty Itinerary
+You may have created a quote shell but haven't added any services yet.
+*   **Fix:** Click **Edit Itinerary** and add at least one Hotel, Transfer, or Activity.
+
+#### 2. Missing Costs in Custom Items
+If you added "Custom" services manually, you might have left the cost field as 0.
+*   **Fix:** Open the builder, find the custom service, and ensure a valid **Net Cost** is entered.
+
+#### 3. Unsaved Changes
+You might have made changes in the builder but closed the window without clicking "Save".
+*   **Fix:** Re-open the builder, verify your items, and click the **Save** button at the top right to trigger a price recalculation.
+
+#### 4. Inventory Issues
+Rarely, a linked system inventory item might have been deactivated by the admin.
+*   **Fix:** Remove the item with the missing price and re-add it from the active list.
+        `
+    },
+    {
         id: 'g6',
         title: 'Payments, Receipts & Credit Limits',
         category: 'Platform Guide',

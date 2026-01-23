@@ -58,6 +58,7 @@ export const QuoteDetail: React.FC = () => {
 
   const isAgent = user.role === UserRole.AGENT;
   const pricingRules = adminService.getPricingRule();
+  // We consider price valid for booking if it exists, but we allow 0 price for drafts/viewing
   const hasValidPrice = (quote.sellingPrice !== undefined && quote.sellingPrice > 0);
   const isBooked = quote.status === 'BOOKED' || quote.status === 'CONFIRMED';
 
@@ -196,6 +197,31 @@ export const QuoteDetail: React.FC = () => {
             <ArrowLeft size={18} className="mr-1" /> Back
         </button>
 
+        {/* PRICE WARNING BANNER */}
+        {!hasValidPrice && !isBooked && !isEditingItinerary && (
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-lg shadow-sm animate-in fade-in slide-in-from-top-2">
+                <div className="flex">
+                    <div className="flex-shrink-0">
+                        <AlertTriangle className="h-5 w-5 text-amber-500" aria-hidden="true" />
+                    </div>
+                    <div className="ml-3">
+                        <p className="text-sm font-bold text-amber-800">
+                            Price not calculated
+                        </p>
+                        <p className="text-xs text-amber-700 mt-1">
+                            Please edit the itinerary and save to generate a price before booking.
+                        </p>
+                        <button 
+                            onClick={() => setIsEditingItinerary(true)}
+                            className="mt-2 text-xs font-bold text-amber-800 hover:text-amber-900 underline"
+                        >
+                            Open Itinerary Builder
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* HEADER */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -268,14 +294,6 @@ export const QuoteDetail: React.FC = () => {
                 </div>
             </div>
         </div>
-
-        {/* PRICE WARNING */}
-        {!hasValidPrice && !isEditingItinerary && (
-             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex items-center gap-3 text-amber-800 animate-pulse">
-                <AlertTriangle size={20} />
-                <p className="font-bold text-sm">Price not calculated. Please edit the itinerary and save to generate a price before booking.</p>
-            </div>
-        )}
 
         {isEditingItinerary ? (
             <ItineraryBuilder 
