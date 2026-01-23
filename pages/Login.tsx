@@ -56,7 +56,8 @@ export const Login: React.FC = () => {
       await login(email, password);
       // Redirect handled by useEffect
     } catch (err: any) {
-      console.error("Login Error UI:", err);
+      // Logic: authService throws clean error messages, we just display them
+      // 'Firebase: ' prefix removal is just cleanup for raw firebase errors if they slip through
       const msg = err.message.replace('Firebase: ', '').replace('auth/', '');
       
       if (msg.includes('not verified') || msg.includes('email-not-verified')) {

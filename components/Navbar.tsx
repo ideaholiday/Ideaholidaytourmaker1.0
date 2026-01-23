@@ -17,7 +17,7 @@ export const Navbar: React.FC = () => {
 
   const canAccessCMS = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
   const isAgent = user?.role === UserRole.AGENT;
-  const isSupplier = user?.role === UserRole.SUPPLIER;
+  const isPartner = user?.role === UserRole.HOTEL_PARTNER;
 
   // Determine Home Link based on Role
   const getHomeLink = () => {
@@ -30,8 +30,8 @@ export const Navbar: React.FC = () => {
         return '/agent/dashboard';
       case UserRole.OPERATOR:
         return '/operator/dashboard';
-      case UserRole.SUPPLIER:
-        return '/supplier/dashboard';
+      case UserRole.HOTEL_PARTNER:
+        return '/partner/dashboard';
       default:
         return '/dashboard';
     }
@@ -90,19 +90,19 @@ export const Navbar: React.FC = () => {
                 </div>
               )}
 
-              {isSupplier && (
+              {isPartner && (
                 <Link 
-                  to="/supplier/dashboard" 
+                  to="/partner/dashboard" 
                   className="hidden md:flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-brand-600 mr-2 bg-slate-50 px-3 py-1.5 rounded-lg"
                 >
-                  <Store size={16} /> Supplier Extranet
+                  <Store size={16} /> Partner Extranet
                 </Link>
               )}
               
               <div className="hidden md:flex flex-col items-end mr-2">
                 <span className="text-sm font-bold text-slate-800">{user.name}</span>
                 <span className="text-[10px] uppercase tracking-wider text-brand-600 font-bold px-2 py-0.5 bg-brand-50 rounded-full">
-                  {user.role}
+                  {user.role.replace('_', ' ')}
                 </span>
               </div>
               <button 

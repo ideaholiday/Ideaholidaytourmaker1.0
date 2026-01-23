@@ -4,7 +4,7 @@ export enum UserRole {
   STAFF = 'STAFF',
   AGENT = 'AGENT',
   OPERATOR = 'OPERATOR',
-  SUPPLIER = 'SUPPLIER'
+  HOTEL_PARTNER = 'HOTEL_PARTNER'
 }
 
 export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'BLOCKED' | 'PENDING_VERIFICATION';
@@ -45,8 +45,8 @@ export type Permission =
   | 'EXPORT_ACCOUNTING' 
   | 'VIEW_FINANCE_REPORTS'
   | 'APPROVE_INVENTORY'
-  | 'MANAGE_CONTRACTS' // New
-  | 'APPROVE_CONTRACTS'; // New
+  | 'MANAGE_CONTRACTS'
+  | 'APPROVE_CONTRACTS';
 
 export interface User {
   id: string;
@@ -64,10 +64,10 @@ export interface User {
   permissions?: Permission[];
   assignedDestinations?: string[]; // For Operator
   serviceLocations?: string[];
-  linkedInventoryIds?: string[]; // For Supplier
-  supplierType?: 'HOTEL' | 'TRANSPORT';
+  linkedInventoryIds?: string[]; // For Hotel Partner
+  partnerType?: 'HOTEL' | 'TRANSPORT';
   agentBranding?: AgentBranding;
-  bankDetails?: BankDetails; // New: For Suppliers
+  bankDetails?: BankDetails; // For Hotel Partners
   customDomain?: string;
   logoUrl?: string; // Legacy
   joinedAt?: string;
@@ -88,16 +88,19 @@ export interface Message {
 
 export interface ItineraryService {
   id: string;
+  inventory_id?: string; // New: Link to source inventory item
   type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER' | 'OTHER';
-  name: string;
-  cost: number;
-  price: number;
+  name: string; // SNAPSHOT: Name at time of booking
+  cost: number; // SNAPSHOT: Net Cost at time of booking
+  price: number; // SNAPSHOT: Selling Price at time of booking
   isRef?: boolean;
   currency?: string;
-  meta?: any;
+  meta?: any; // SNAPSHOT: Room type, meal plan, etc.
   isOperatorInventory?: boolean; 
   operatorName?: string; 
   contractId?: string; // New: Link to contract snapshot
+  duration_nights?: number;
+  quantity?: number;
 }
 
 export interface ItineraryItem {
@@ -137,47 +140,43 @@ export interface QuickQuoteInputs {
   budgetPerPerson?: number;
 }
 
-export interface QuickQuoteTemplate {
-  id: string;
-  name: string;
-  description: string;
-  destination: string;
-  nights: number;
-  inputs: QuickQuoteInputs;
-  defaultPax: { adults: number; children: number };
-  tags: string[]; // e.g., 'Best Seller', 'Luxury', 'Budget'
-  isSystem: boolean;
-  createdBy: string; // 'admin' or agentId
-  createdAt: string;
-  basePriceEstimate?: number; // Optional visual guide
-}
-
 export interface Quote {
   id: string;
   uniqueRefNo: string;
-  leadGuestName?: string; // NEW FIELD: Guest Name
+  version: number; // VERSIONING: v1, v2, v3
+  isLocked: boolean; // VERSIONING: True if Approved/Booked
+  previousVersionId?: string; // Chain reference
+  
+  leadGuestName?: string;
   destination: string;
   travelDate: string;
   paxCount: number;
   serviceDetails: string;
   itinerary: ItineraryItem[];
+  
+  // Financial Snapshots
   price?: number; // B2B Price / Net Cost for Agent
   cost?: number; // System Net Cost (Admin View)
   sellingPrice?: number; // Agent Selling Price (Client View)
   markup?: number;
   currency: string;
+  
   agentId: string;
   agentName: string;
   staffId?: string;
   staffName?: string;
+  
   operatorId?: string;
   operatorName?: string;
   operatorStatus?: 'ASSIGNED' | 'ACCEPTED' | 'DECLINED' | 'PENDING';
   operatorPrice?: number;
   operatorDeclineReason?: string;
   netCostVisibleToOperator?: boolean;
-  status: 'PENDING' | 'CONFIRMED' | 'BOOKED' | 'CANCELLED' | 'IN_PROGRESS' | 'COMPLETED' | 'ESTIMATE';
+  
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'PENDING' | 'CONFIRMED' | 'BOOKED' | 'CANCELLED' | 'IN_PROGRESS' | 'COMPLETED' | 'ESTIMATE';
+  
   messages: Message[];
+  
   hotelMode?: 'CMS' | 'REF';
   childCount?: number;
   childAges?: number[];
@@ -291,6 +290,9 @@ export interface Destination {
   createdBy?: string;
 }
 
+// Reusing InventoryStatus for all items
+export type InventoryStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+
 export interface Hotel {
   id: string;
   name: string;
@@ -309,8 +311,8 @@ export interface Hotel {
   blackoutDates?: string[];
   isOperatorInventory?: boolean;
   operatorName?: string;
-  contractId?: string; // New
-  supplierId?: string; // New
+  contractId?: string; 
+  supplierId?: string;
   
   // Enhanced Fields
   description?: string;
@@ -319,6 +321,11 @@ export interface Hotel {
   contactPhone?: string;
   email?: string;
   website?: string;
+
+  // Workflow
+  status?: InventoryStatus;
+  rejectionReason?: string;
+  createdAt?: string; // Added for expiry calculation
 }
 
 export interface Activity {
@@ -349,6 +356,11 @@ export interface Activity {
   season?: 'Peak' | 'Off-Peak' | 'Shoulder' | 'All Year';
   validFrom?: string;
   validTo?: string;
+
+  // Workflow
+  status?: InventoryStatus;
+  rejectionReason?: string;
+  createdAt?: string;
 }
 
 export interface Transfer {
@@ -381,6 +393,11 @@ export interface Transfer {
   season?: 'Peak' | 'Off-Peak' | 'Shoulder' | 'All Year';
   validFrom?: string;
   validTo?: string;
+
+  // Workflow
+  status?: InventoryStatus;
+  rejectionReason?: string;
+  createdAt?: string;
 }
 
 export interface Visa {
@@ -427,6 +444,7 @@ export interface PricingRule {
   agentMarkup: number;
   gstPercentage: number;
   roundOff: 'Nearest 1' | 'Nearest 10' | 'Nearest 100' | 'None';
+  baseCurrency?: string; // Added baseCurrency
   isActive: boolean;
 }
 
@@ -653,14 +671,16 @@ export interface PaymentGateway {
     key: string;
 }
 
-// --- OPERATOR INVENTORY SYSTEM ---
-
-export type InventoryStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+// --- OPERATOR INVENTORY SYSTEM (VERSIONED) ---
 
 export interface OperatorInventoryItem {
-  id: string;
+  id: string; // Version ID (Unique per edit)
+  productId: string; // Logical ID (Constant across versions)
+  version: number;
+  isCurrent: boolean; // Only ONE version is current per productId (the Approved one)
+  
   operatorId: string;
-  operatorName: string; // Snapshot
+  operatorName: string; 
   type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER';
   
   // Common Fields
@@ -696,7 +716,7 @@ export interface OperatorInventoryItem {
   createdAt: string;
 }
 
-// --- SUPPLIER CONTRACT MODULE ---
+// --- HOTEL PARTNER CONTRACT MODULE ---
 
 export type ContractStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | 'REJECTED';
 export type PricingModel = 'NET' | 'COMMISSION' | 'RATE_CARD';
@@ -732,4 +752,47 @@ export interface SupplierContract {
   
   // Optional file attachment URL (Mock)
   documentUrl?: string;
+}
+
+export interface QuickQuoteTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  destination: string;
+  nights: number;
+  defaultPax: { adults: number; children: number };
+  inputs: QuickQuoteInputs;
+  tags?: string[];
+  isSystem: boolean;
+  createdBy: string;
+  createdAt: string;
+  basePriceEstimate?: number;
+}
+
+// --- OPS DASHBOARD ---
+
+export interface OpsStats {
+  pendingInventory: number;
+  pendingHotels: number;
+  expiringRates: number;
+  rejectedItems: number;
+}
+
+export interface SystemAlert {
+  id: string;
+  type: 'CRITICAL' | 'WARNING' | 'INFO';
+  title: string;
+  description: string;
+  actionLink?: string;
+  createdAt: string;
+}
+
+export interface ExpiringRate {
+  id: string;
+  type: 'HOTEL_RATE';
+  name: string;
+  details: string;
+  validTo: string;
+  daysRemaining: number;
+  supplierName: string;
 }

@@ -51,15 +51,22 @@ class AuthService {
   /**
    * STRICT ROLE RESOLVER
    * Determines the correct dashboard based on role.
-   * NO default fallbacks to Agent.
+   * Forces verification against User object, never fallback to default without check.
    */
   resolveDashboardPath(role: UserRole): string {
+      // SECURITY: Validate role is a known ENUM value
+      const knownRoles = Object.values(UserRole);
+      if (!knownRoles.includes(role)) {
+          console.error(`[Auth] Security Alert: Invalid role '${role}' attempted access.`);
+          return '/unauthorized';
+      }
+
       switch(role) {
           case UserRole.ADMIN: return '/admin/dashboard';
           case UserRole.STAFF: return '/admin/dashboard';
           case UserRole.AGENT: return '/agent/dashboard';
           case UserRole.OPERATOR: return '/operator/dashboard';
-          case UserRole.SUPPLIER: return '/supplier/dashboard';
+          case UserRole.HOTEL_PARTNER: return '/partner/dashboard';
           default: 
               console.warn(`[Auth] Unrecognized role: ${role}. Redirecting to Unauthorized.`);
               return '/unauthorized';
@@ -81,12 +88,23 @@ class AuthService {
     // 3. Firebase Authentication
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        // CRITICAL: Force synchronization with backend authority
+        // CRITICAL: Force synchronization with backend authority to get real role
         return this.handleFirebaseUser(userCredential.user, true);
     } catch (error: any) {
-        console.error("Login Error:", error);
+        // Filter out expected auth errors to reduce console noise
+        const expectedErrors = ['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password', 'auth/too-many-requests'];
+        
+        if (!expectedErrors.includes(error.code)) {
+            console.error("Login Error:", error);
+        } else {
+            console.warn("Login attempt failed:", error.code);
+        }
+
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
             throw new Error("Invalid email or password.");
+        }
+        if (error.code === 'auth/too-many-requests') {
+            throw new Error("Access temporarily blocked due to too many failed attempts. Please try again later.");
         }
         throw new Error(error.message || "Login failed.");
     }
@@ -134,9 +152,10 @@ class AuthService {
           authoritativeRole = mockConstant.role;
       }
 
-      // Priority B: Firestore 'user_roles' (Provisioning by Admin)
+      // Priority B: Firestore 'user_roles' (Provisioning by Admin) - The Truth Source
       if (!authoritativeRole && fbUser.email) {
           try {
+              // Check by Email first (Legacy/Invite flow)
               const roleRef = doc(db, 'user_roles', fbUser.email.toLowerCase());
               const roleSnap = await getDoc(roleRef);
               if (roleSnap.exists()) {
@@ -173,16 +192,24 @@ class AuthService {
 
       // 4. Apply Role & Data
       if (user) {
-          // If we found an authoritative role, enforce it.
+          // STRICT RULE: If we found an authoritative role, OVERWRITE local state.
           if (authoritativeRole) {
               user.role = authoritativeRole;
+          } else {
+              // Fallback safety: If no role found in cloud, revert to stored or default to Agent?
+              // Security choice: Keep existing if valid, else default.
+              if (!user.role) user.role = UserRole.AGENT; 
           }
+
           // If remote data has extra fields (permissions etc), merge them
           if (remoteData.permissions) user.permissions = remoteData.permissions;
           if (remoteData.assignedDestinations) user.assignedDestinations = remoteData.assignedDestinations;
           
           user.isVerified = fbUser.emailVerified;
           this.saveUsers();
+          
+          // Background sync to ensure cloud has latest metadata
+          this.syncUserToFirestore(user).catch(console.warn);
       } else {
           // 5. New User Creation (Registration)
           console.warn("[Auth] New user registration detected.");
@@ -218,7 +245,7 @@ class AuthService {
       this.users = this.loadUsers();
       const user = this.users.find(u => u.id === mockUser.id) || mockUser;
       
-      // Enforce the constant role
+      // Enforce the constant role for system users
       user.role = mockUser.role;
       this.saveUsers();
       
@@ -269,6 +296,7 @@ class AuthService {
               unsubscribe();
               if (fbUser) {
                   // Always force sync on session restore to fix stale roles
+                  // This is CRITICAL for the "Correct Auth Logic" requirement
                   const user = await this.handleFirebaseUser(fbUser, true);
                   resolve(user);
               } else {
@@ -326,7 +354,7 @@ class AuthService {
               permissions: user.permissions || [],
               assignedDestinations: user.assignedDestinations || [],
               linkedInventoryIds: user.linkedInventoryIds || [],
-              supplierType: user.supplierType || null,
+              partnerType: user.partnerType || null,
               updatedAt: new Date().toISOString()
           }, { merge: true });
       } catch (e) { console.error("Firestore Sync Error:", e); }

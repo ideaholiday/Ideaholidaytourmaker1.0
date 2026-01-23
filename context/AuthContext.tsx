@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(loggedInUser);
       setSessionStart(Date.now());
     } catch (error) {
-      console.error("Context Login Error", error);
+      // Error handling is managed by the UI component calling this
       throw error;
     } finally {
       setIsLoading(false);

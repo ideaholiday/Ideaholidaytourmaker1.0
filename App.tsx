@@ -24,6 +24,7 @@ import { authService } from './services/authService';
 // Admin CMS Imports
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { OpsDashboard } from './pages/admin/OpsDashboard'; // New
 import { UserManagement } from './pages/admin/UserManagement'; 
 import { AgentsList } from './pages/admin/AgentsList';
 import { AgentProfile } from './pages/admin/AgentProfile';
@@ -38,7 +39,7 @@ import { PaymentReminderSettings } from './pages/admin/PaymentReminderSettings';
 import { PLReports } from './pages/admin/PLReports'; 
 import { Destinations } from './pages/admin/Destinations';
 import { Hotels } from './pages/admin/Hotels';
-import { PricingRules } from './pages/admin/PricingRules';
+// import { PricingRules } from './pages/admin/PricingRules'; // Removed
 import { Sightseeing } from './pages/admin/Sightseeing';
 import { Transfers } from './pages/admin/Transfers';
 import { VisaPage } from './pages/admin/Visa';
@@ -48,7 +49,7 @@ import { QuickQuoteTemplateManager } from './pages/admin/QuickQuoteTemplateManag
 import { BookingManager } from './pages/admin/BookingManager';
 import { CurrencyManagement } from './pages/admin/CurrencyManagement';
 import { InventoryApproval } from './pages/admin/InventoryApproval';
-import { Suppliers } from './pages/admin/Suppliers'; 
+import { Suppliers } from './pages/admin/Suppliers'; // Still importing as Suppliers component but conceptually Partners
 import { Contracts } from './pages/admin/Contracts'; 
 import { ContractApproval } from './pages/admin/ContractApproval'; 
 
@@ -184,50 +185,56 @@ const App: React.FC = () => {
                     <Route path="/operator/profile" element={<OperatorProfilePage />} />
                 </Route>
 
-                {/* Supplier Specific */}
-                <Route element={<ProtectedRoute allowedRoles={[UserRole.SUPPLIER]} />}>
-                    <Route path="/supplier/dashboard" element={<SupplierDashboard />} />
+                {/* Hotel Partner Specific */}
+                <Route element={<ProtectedRoute allowedRoles={[UserRole.HOTEL_PARTNER]} />}>
+                    <Route path="/partner/dashboard" element={<SupplierDashboard />} />
                 </Route>
              </Route>
 
              {/* Admin CMS Routes */}
-             <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.STAFF]} />}>
+             <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.STAFF, UserRole.OPERATOR]} />}>
                <Route path="/admin" element={<AdminLayout />}>
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="destinations" element={<Destinations />} />
-                  <Route path="hotels" element={<Hotels />} />
-                  <Route path="sightseeing" element={<Sightseeing />} />
-                  <Route path="transfers" element={<Transfers />} />
-                  <Route path="visa" element={<VisaPage />} />
-                  <Route path="packages" element={<FixedPackages />} />
-                  <Route path="templates" element={<SystemTemplates />} />
-                  <Route path="quick-templates" element={<QuickQuoteTemplateManager />} />
-                  <Route path="contracts" element={<Contracts />} />
+                  {/* Shared Ops Dashboard */}
+                  <Route path="ops-dashboard" element={<OpsDashboard />} />
                   
-                  {/* Admin Only - User Management & Audit */}
-                  <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]} />}>
-                    <Route path="agents" element={<AgentsList />} />
-                    <Route path="agents/:id" element={<AgentProfile />} />
-                    <Route path="operators" element={<OperatorsList />} />
-                    <Route path="operators/:id" element={<OperatorProfile />} />
-                    <Route path="staff" element={<StaffManagement />} />
-                    <Route path="companies" element={<CompanyManagement />} /> 
-                    <Route path="financial-ledger-export" element={<FinancialLedgerExport />} />
-                    <Route path="pl-reports" element={<PLReports />} />
-                    <Route path="reminders" element={<PaymentReminderSettings />} />
-                    <Route path="audit" element={<AuditLogs />} />
-                    <Route path="users" element={<UserManagement />} /> 
-                    <Route path="currency" element={<CurrencyManagement />} />
-                  </Route>
-
-                  {/* Pricing & GST & Approvals for Admin/Staff */}
+                  {/* Admin Specific */}
                   <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.STAFF]} />}>
-                    <Route path="pricing" element={<PricingRules />} />
-                    <Route path="bookings" element={<BookingManager />} />
-                    <Route path="gst-reports" element={<GstDashboard />} />
-                    <Route path="approvals" element={<InventoryApproval />} />
-                    <Route path="suppliers" element={<Suppliers />} />
-                    <Route path="contract-approvals" element={<ContractApproval />} />
+                      <Route path="dashboard" element={<AdminDashboard />} />
+                      <Route path="destinations" element={<Destinations />} />
+                      <Route path="hotels" element={<Hotels />} />
+                      <Route path="sightseeing" element={<Sightseeing />} />
+                      <Route path="transfers" element={<Transfers />} />
+                      <Route path="visa" element={<VisaPage />} />
+                      <Route path="packages" element={<FixedPackages />} />
+                      <Route path="templates" element={<SystemTemplates />} />
+                      <Route path="quick-templates" element={<QuickQuoteTemplateManager />} />
+                      <Route path="contracts" element={<Contracts />} />
+                      
+                      {/* Admin Only - User Management & Audit */}
+                      <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]} />}>
+                        <Route path="agents" element={<AgentsList />} />
+                        <Route path="agents/:id" element={<AgentProfile />} />
+                        <Route path="operators" element={<OperatorsList />} />
+                        <Route path="operators/:id" element={<OperatorProfile />} />
+                        <Route path="staff" element={<StaffManagement />} />
+                        <Route path="companies" element={<CompanyManagement />} /> 
+                        <Route path="financial-ledger-export" element={<FinancialLedgerExport />} />
+                        <Route path="pl-reports" element={<PLReports />} />
+                        <Route path="reminders" element={<PaymentReminderSettings />} />
+                        <Route path="audit" element={<AuditLogs />} />
+                        <Route path="users" element={<UserManagement />} /> 
+                        <Route path="currency" element={<CurrencyManagement />} />
+                      </Route>
+
+                      {/* Pricing & GST & Approvals for Admin/Staff */}
+                      <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.STAFF]} />}>
+                        {/* <Route path="pricing" element={<PricingRules />} /> Removed */}
+                        <Route path="bookings" element={<BookingManager />} />
+                        <Route path="gst-reports" element={<GstDashboard />} />
+                        <Route path="approvals" element={<InventoryApproval />} />
+                        <Route path="partners" element={<Suppliers />} /> 
+                        <Route path="contract-approvals" element={<ContractApproval />} />
+                      </Route>
                   </Route>
                </Route>
              </Route>

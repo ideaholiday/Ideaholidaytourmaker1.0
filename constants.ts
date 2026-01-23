@@ -29,10 +29,10 @@ export const MOCK_USERS: User[] = [
     id: 'u5', 
     name: 'Hotel Manager', 
     email: 'hotel@partner.com', 
-    role: UserRole.SUPPLIER, 
+    role: UserRole.HOTEL_PARTNER, 
     companyName: 'Marina Hotels Group', 
     isVerified: true, 
-    supplierType: 'HOTEL', 
+    partnerType: 'HOTEL', 
     linkedInventoryIds: ['h1', 'h2'] // Linked to Marina Byblos & Atlantis
   }
 ];
@@ -41,6 +41,8 @@ export const INITIAL_QUOTES: Quote[] = [
   {
     id: 'q1',
     uniqueRefNo: 'IHT-2023-001',
+    version: 1,
+    isLocked: true,
     destination: 'Dubai, UAE',
     travelDate: '2023-11-15',
     paxCount: 2,
@@ -79,6 +81,8 @@ export const INITIAL_QUOTES: Quote[] = [
   {
     id: 'q2',
     uniqueRefNo: 'IHT-2023-088',
+    version: 1,
+    isLocked: false,
     destination: 'Thailand',
     travelDate: '2023-12-20',
     paxCount: 4,

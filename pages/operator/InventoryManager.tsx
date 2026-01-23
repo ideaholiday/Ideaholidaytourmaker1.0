@@ -5,7 +5,7 @@ import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { OperatorInventoryItem } from '../../types';
 import { InventoryStatusBadge } from '../../components/inventory/InventoryStatusBadge';
-import { Plus, Save, X, Box } from 'lucide-react';
+import { Plus, Save, X, Box, GitBranch } from 'lucide-react';
 
 export const InventoryManager: React.FC = () => {
   const { user } = useAuth();
@@ -71,6 +71,7 @@ export const InventoryManager: React.FC = () => {
           <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
             <tr>
               <th className="px-6 py-4 font-semibold">Service Name</th>
+              <th className="px-6 py-4 font-semibold">Version</th>
               <th className="px-6 py-4 font-semibold">Type</th>
               <th className="px-6 py-4 font-semibold">Net Rate</th>
               <th className="px-6 py-4 font-semibold">Status</th>
@@ -85,6 +86,11 @@ export const InventoryManager: React.FC = () => {
                     <div className="text-xs text-slate-400 font-normal">{item.description}</div>
                 </td>
                 <td className="px-6 py-4">
+                    <span className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-200 w-fit">
+                        <GitBranch size={10} /> v{item.version}
+                    </span>
+                </td>
+                <td className="px-6 py-4">
                     <span className="bg-slate-100 px-2 py-1 rounded text-xs font-mono">{item.type}</span>
                 </td>
                 <td className="px-6 py-4 font-mono">
@@ -92,6 +98,7 @@ export const InventoryManager: React.FC = () => {
                 </td>
                 <td className="px-6 py-4">
                     <InventoryStatusBadge status={item.status} reason={item.rejectionReason} />
+                    {item.isCurrent && <span className="text-[9px] text-green-600 font-bold ml-1">LIVE</span>}
                 </td>
                 <td className="px-6 py-4 text-slate-500">
                     {new Date(item.createdAt).toLocaleDateString()}
@@ -100,7 +107,7 @@ export const InventoryManager: React.FC = () => {
             ))}
             {items.length === 0 && (
                 <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                         You haven't submitted any inventory yet.
                     </td>
                 </tr>

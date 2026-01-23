@@ -1,91 +1,156 @@
 
 import { BRANDING } from '../constants';
+import { adminService } from './adminService';
+import { currencyService } from './currencyService';
 
-/**
- * API Client Service
- * 
- * This service acts as the bridge between the frontend and the backend (mock or real).
- * 
- * SECURITY FEATURES:
- * 1. Simulates `credentials: 'include'` by checking the 'mock_http_only_cookie'.
- * 2. Global 401 Interceptor: Dispatches 'auth:unauthorized' event.
- * 3. Centralized Error Handling.
- */
-
-// Simulating a secure HttpOnly cookie. Frontend code should NOT access this directly
-// except within this specific service which mocks the Browser/Network layer.
 const MOCK_COOKIE_NAME = 'iht_secure_session';
 
 class ApiClient {
   
-  /**
-   * Dispatches a global event when a 401 is detected.
-   * The AuthContext listens to this to force a UI logout.
-   */
   private triggerUnauthorized() {
     window.dispatchEvent(new Event('auth:unauthorized'));
   }
 
-  /**
-   * Helper to check if we have a valid session (Simulating server-side check)
-   */
   private hasValidSession(): boolean {
-    // In a real app, the browser sends the cookie automatically.
-    // Here, we check if our mock cookie exists.
     return !!localStorage.getItem(MOCK_COOKIE_NAME);
   }
 
-  /**
-   * Generic Request Wrapper
-   */
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    // 1. SIMULATE NETWORK LATENCY
-    // Reduced to 50ms for snappier UI response while still async
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    // 2. SIMULATE SECURITY CHECK (Middleware)
-    // Public endpoints that don't require auth
-    // Note: We use .includes() so partial matches work (e.g. query params)
     const publicEndpoints = [
         '/auth/login', 
         '/auth/forgot-password', 
         '/auth/signup', 
-        '/auth/activate', 
-        '/auth/resend-verification',
         '/public/',
-        '/api/public', // Fallback
-        'auth/' // Broad match for auth related routes
+        'auth/' 
     ];
     
-    // Normalize endpoint to lowercase for checking
     const lowerEndpoint = endpoint.toLowerCase();
     const isPublic = publicEndpoints.some(p => lowerEndpoint.includes(p.toLowerCase()));
 
-    // Strict check: If NOT public AND NO session => 401
     if (!isPublic && !this.hasValidSession()) {
       console.warn(`[API] 401 Unauthorized access to ${endpoint}`);
       this.triggerUnauthorized();
       throw new Error("401 Unauthorized");
     }
 
-    // 3. MOCK RESPONSE HANDLER
-    // In production, this would be: const response = await fetch(url, { ...options, credentials: 'include' });
-    // Here we pass through, assuming the 'Service' layer mocks the data return.
+    // --- Backend Pricing Engine Simulation ---
+    if (endpoint.includes('/builder/calculate')) {
+       const body = options.body ? JSON.parse(options.body as string) : {};
+       
+       let supplierCostTotal = 0; // Raw Partner Net (INR)
+       let manualCostTotal = 0; // Manual items (INR)
+       const currency = 'INR'; // Base Calculation Currency forced to INR
+
+       if (body.days && Array.isArray(body.days)) {
+           body.days.forEach((day: any) => {
+               day.services?.forEach((svc: any) => {
+                   const qty = Number(svc.quantity) || 1;
+                   const nights = Number(svc.nights) || 1;
+                   
+                   if (svc.inventory_id) {
+                       // SYSTEM ITEM: Strict Lookup from "Database" (AdminService)
+                       const adminPrice = this.getAdminItemPrice(svc.inventory_id, svc.type);
+                       // We ignore stored currency and assume INR because we forced migration
+                       const priceInBase = adminPrice; 
+                       
+                       supplierCostTotal += (priceInBase * qty * nights);
+                   } else {
+                       // MANUAL ITEM: Trust Agent Input
+                       const manualCost = Number(svc.cost) || 0;
+                       // Assume input is INR
+                       manualCostTotal += (manualCost * qty * nights);
+                   }
+               });
+           });
+       }
+
+       // --- PRICING ALGORITHM (INR) ---
+       
+       // 1. Platform Margin (Admin Profit)
+       // Applied ONLY to System Inventory (Supplier Cost)
+       const platformMarginPercent = 0.10; // 10%
+       const platformMarginValue = supplierCostTotal * platformMarginPercent;
+
+       // 2. Platform Net Cost (B2B Price for Agent)
+       // This is what the Agent owes the platform.
+       const platformNetCost = supplierCostTotal + platformMarginValue + manualCostTotal;
+
+       // 3. Agent Markup (Agent Profit)
+       // Applied on top of the B2B Price
+       // Use overridden markup from request if present, else default
+       const agentMarkupPercent = body.markup !== undefined ? Number(body.markup) / 100 : 0.15; 
+       const agentMarkupValue = platformNetCost * agentMarkupPercent;
+
+       // 4. Final Selling Price (Client Price)
+       const finalSellingPrice = platformNetCost + agentMarkupValue;
+
+       // 5. Output
+       return Promise.resolve({
+           currency: 'INR',
+           
+           // Detailed Breakdown
+           supplier_cost: Number(supplierCostTotal.toFixed(2)),       
+           platform_margin: Number(platformMarginValue.toFixed(2)),   
+           
+           net_cost: Number(platformNetCost.toFixed(2)),              // AGENT B2B PRICE
+           
+           agent_markup: Number(agentMarkupValue.toFixed(2)),         // Agent Profit
+           selling_price: Math.ceil(finalSellingPrice),               // Final Client Price
+           
+           breakdown: {
+               supplier_base: supplierCostTotal,
+               margin_base: platformMarginValue,
+               manual_total: manualCostTotal
+           }
+       } as any);
+    }
+
+    if (endpoint.includes('/builder/save')) {
+        return Promise.resolve({
+            id: `itin_${Date.now()}`,
+            version: 1,
+            reference: 'MOCK-REF-' + Math.floor(Math.random() * 1000),
+            message: 'Itinerary saved successfully.'
+        } as any);
+    }
+    
+    if (endpoint.includes('/auth/login')) return Promise.resolve({} as any);
+    if (endpoint.includes('/auth/signup')) return Promise.resolve({} as any);
+
     return Promise.resolve({} as T); 
   }
 
-  // --- MOCK COOKIE MANAGEMENT (Server-Side Simulation) ---
-  
-  /**
-   * Sets the session cookie (Called by AuthService on Login)
-   */
+  // Helper to simulate DB Lookup
+  private getAdminItemPrice(id: string, type: string): number {
+      const hotels = adminService.getHotels();
+      const activities = adminService.getActivities();
+      const transfers = adminService.getTransfers();
+
+      if (type === 'HOTEL') {
+          const h = hotels.find(x => x.id === id);
+          return h ? h.cost : 0;
+      }
+      if (type === 'ACTIVITY') {
+          const a = activities.find(x => x.id === id);
+          return a ? a.costAdult : 0; 
+      }
+      if (type === 'TRANSFER') {
+          const t = transfers.find(x => x.id === id);
+          return t ? t.cost : 0;
+      }
+      return 0;
+  }
+
+  private getAdminItemCurrency(id: string, type: string): string {
+      return 'INR'; // Enforced
+  }
+
   setSession(token: string) {
     localStorage.setItem(MOCK_COOKIE_NAME, token);
   }
 
-  /**
-   * Clears the session cookie (Called by AuthService on Logout)
-   */
   clearSession() {
     localStorage.removeItem(MOCK_COOKIE_NAME);
   }

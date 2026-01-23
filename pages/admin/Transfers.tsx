@@ -1,25 +1,23 @@
 
 import React, { useState, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
-import { currencyService } from '../../services/currencyService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Transfer } from '../../types';
-import { Edit2, Trash2, Plus, X, Car, Briefcase, MapPin, Image as ImageIcon, Search, CheckSquare, Square, DollarSign, Calendar, Check } from 'lucide-react';
+import { Edit2, Trash2, Plus, X, Car, MapPin, Image as ImageIcon, Search, DollarSign, Calendar, Check } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 
 export const Transfers: React.FC = () => {
   const { user } = useAuth();
   const allDestinations = adminService.getDestinations();
   const allTransfers = adminService.getTransfers();
-  const currencies = currencyService.getCurrencies();
   
-  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.SUPPLIER;
+  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.HOTEL_PARTNER;
   const showCost = user?.role !== UserRole.AGENT;
 
   let displayedTransfers = allTransfers;
   if (user?.role === UserRole.OPERATOR) {
       displayedTransfers = allTransfers.filter(t => t.createdBy === user.id);
-  } else if (user?.role === UserRole.SUPPLIER) {
+  } else if (user?.role === UserRole.HOTEL_PARTNER) {
       displayedTransfers = allTransfers.filter(t => user.linkedInventoryIds?.includes(t.id));
   }
 
@@ -39,8 +37,8 @@ export const Transfers: React.FC = () => {
       setEditingTransfer(transfer);
       setFormData(transfer);
     } else {
-      if (user?.role === UserRole.SUPPLIER) {
-          alert("Suppliers cannot create new inventory. Please contact Admin.");
+      if (user?.role === UserRole.HOTEL_PARTNER) {
+          alert("Partners cannot create new inventory. Please contact Admin.");
           return;
       }
       setEditingTransfer(null);
@@ -54,7 +52,7 @@ export const Transfers: React.FC = () => {
         costBasis: 'Per Vehicle',
         nightSurcharge: 0,
         cost: 0,
-        currency: 'USD',
+        currency: 'INR', // Enforced INR
         description: '',
         notes: '',
         meetingPoint: 'Arrival Hall',
@@ -80,7 +78,7 @@ export const Transfers: React.FC = () => {
       maxPassengers: Number(formData.maxPassengers),
       luggageCapacity: Number(formData.luggageCapacity),
       cost: Number(formData.cost),
-      currency: formData.currency || 'USD',
+      currency: 'INR', // Enforced INR
       costBasis: (formData.costBasis || 'Per Vehicle') as any,
       nightSurcharge: Number(formData.nightSurcharge),
       isActive: formData.isActive || false,
@@ -107,7 +105,7 @@ export const Transfers: React.FC = () => {
 
   const refreshList = () => {
     const freshAll = adminService.getTransfers();
-    if (user?.role === UserRole.SUPPLIER) {
+    if (user?.role === UserRole.HOTEL_PARTNER) {
         setTransfers(freshAll.filter(t => user.linkedInventoryIds?.includes(t.id)));
     } else if (user?.role === UserRole.OPERATOR) {
         setTransfers(freshAll.filter(t => t.createdBy === user.id));
@@ -134,7 +132,7 @@ export const Transfers: React.FC = () => {
         </div>
         {canEdit && (
             <div className="flex gap-3">
-                {user?.role !== UserRole.SUPPLIER && (
+                {user?.role !== UserRole.HOTEL_PARTNER && (
                     <InventoryImportExport 
                         data={displayedTransfers}
                         headers={['id', 'transferName', 'destinationId', 'transferType', 'vehicleType', 'maxPassengers', 'luggageCapacity', 'cost', 'currency', 'costBasis', 'nightSurcharge', 'meetingPoint', 'imageUrl', 'season', 'validFrom', 'validTo', 'isActive']}
@@ -146,7 +144,7 @@ export const Transfers: React.FC = () => {
                     />
                 )}
                 <button onClick={() => handleOpenModal()} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition shadow-lg shadow-brand-200 font-medium">
-                    <Plus size={20} /> {user?.role === UserRole.SUPPLIER ? 'Edit Selected' : 'Add Transfer'}
+                    <Plus size={20} /> {user?.role === UserRole.HOTEL_PARTNER ? 'Edit Selected' : 'Add Transfer'}
                 </button>
             </div>
         )}
@@ -244,8 +242,8 @@ export const Transfers: React.FC = () => {
                   </td>
                   {showCost && (
                     <td className="px-6 py-4 font-mono text-slate-900 font-medium">
-                        <div>{transfer.currency || 'USD'} {transfer.cost} <span className="text-xs text-slate-400">/{transfer.costBasis === 'Per Vehicle' ? 'Veh' : 'Pax'}</span></div>
-                        {transfer.nightSurcharge > 0 && <span className="text-amber-600 text-xs font-bold">+ {transfer.currency} {transfer.nightSurcharge} Night</span>}
+                        <div>{transfer.currency || 'INR'} {transfer.cost} <span className="text-xs text-slate-400">/{transfer.costBasis === 'Per Vehicle' ? 'Veh' : 'Pax'}</span></div>
+                        {transfer.nightSurcharge > 0 && <span className="text-amber-600 text-xs font-bold">+ {transfer.currency || 'INR'} {transfer.nightSurcharge} Night</span>}
                     </td>
                   )}
                   <td className="px-6 py-4">
@@ -260,7 +258,7 @@ export const Transfers: React.FC = () => {
                             <button onClick={() => handleOpenModal(transfer)} className="p-2 text-slate-500 hover:text-brand-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition shadow-sm">
                                 <Edit2 size={16} />
                             </button>
-                            {user?.role !== UserRole.SUPPLIER && (
+                            {user?.role !== UserRole.HOTEL_PARTNER && (
                                 <button onClick={() => handleDelete(transfer.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition shadow-sm">
                                 <Trash2 size={16} />
                                 </button>
@@ -295,7 +293,7 @@ export const Transfers: React.FC = () => {
               <div className="space-y-4">
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Transfer Name</label>
-                    <input required type="text" disabled={user?.role === UserRole.SUPPLIER} value={formData.transferName || ''} onChange={e => setFormData({...formData, transferName: e.target.value})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white font-medium shadow-sm transition disabled:bg-slate-50" placeholder="e.g. DXB Airport to City Hotel" />
+                    <input required type="text" disabled={user?.role === UserRole.HOTEL_PARTNER} value={formData.transferName || ''} onChange={e => setFormData({...formData, transferName: e.target.value})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white font-medium shadow-sm transition disabled:bg-slate-50" placeholder="e.g. DXB Airport to City Hotel" />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-5">
@@ -303,14 +301,14 @@ export const Transfers: React.FC = () => {
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Destination</label>
                         <div className="relative">
                             <MapPin size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
-                            <select disabled={user?.role === UserRole.SUPPLIER} value={formData.destinationId} onChange={e => setFormData({...formData, destinationId: e.target.value})} className="w-full border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm transition appearance-none disabled:bg-slate-50">
+                            <select disabled={user?.role === UserRole.HOTEL_PARTNER} value={formData.destinationId} onChange={e => setFormData({...formData, destinationId: e.target.value})} className="w-full border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm transition appearance-none disabled:bg-slate-50">
                             {allDestinations.map(d => <option key={d.id} value={d.id}>{d.city}, {d.country}</option>)}
                             </select>
                         </div>
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Type</label>
-                        <select disabled={user?.role === UserRole.SUPPLIER} value={formData.transferType} onChange={e => setFormData({...formData, transferType: e.target.value as any})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm transition disabled:bg-slate-50">
+                        <select disabled={user?.role === UserRole.HOTEL_PARTNER} value={formData.transferType} onChange={e => setFormData({...formData, transferType: e.target.value as any})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm transition disabled:bg-slate-50">
                         <option value="PVT">Private (PVT)</option>
                         <option value="SIC">Shared (SIC)</option>
                         </select>
@@ -320,7 +318,7 @@ export const Transfers: React.FC = () => {
                 <div className="grid grid-cols-2 gap-5">
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Vehicle Type</label>
-                        <input required type="text" disabled={user?.role === UserRole.SUPPLIER} value={formData.vehicleType || ''} onChange={e => setFormData({...formData, vehicleType: e.target.value})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white shadow-sm transition disabled:bg-slate-50" placeholder="e.g. Sedan, Van" />
+                        <input required type="text" disabled={user?.role === UserRole.HOTEL_PARTNER} value={formData.vehicleType || ''} onChange={e => setFormData({...formData, vehicleType: e.target.value})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white shadow-sm transition disabled:bg-slate-50" placeholder="e.g. Sedan, Van" />
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Meeting Point</label>
@@ -331,7 +329,7 @@ export const Transfers: React.FC = () => {
                 <div className="grid grid-cols-2 gap-5">
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Max Pax</label>
-                        <input required type="number" min="1" disabled={user?.role === UserRole.SUPPLIER} value={formData.maxPassengers || ''} onChange={e => setFormData({...formData, maxPassengers: Number(e.target.value)})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white shadow-sm transition disabled:bg-slate-50" />
+                        <input required type="number" min="1" disabled={user?.role === UserRole.HOTEL_PARTNER} value={formData.maxPassengers || ''} onChange={e => setFormData({...formData, maxPassengers: Number(e.target.value)})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white shadow-sm transition disabled:bg-slate-50" />
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Luggage (Bags)</label>
@@ -352,20 +350,17 @@ export const Transfers: React.FC = () => {
                       <div className="col-span-1">
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Cost Rate</label>
                         <div className="flex gap-2">
-                            <select 
-                              value={formData.currency} 
-                              onChange={e => setFormData({...formData, currency: e.target.value})} 
-                              className="w-24 border border-slate-300 rounded-xl px-2 py-2.5 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none font-bold"
-                            >
-                              {currencies.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
-                            </select>
-                            <input required type="number" min="0" value={formData.cost || ''} onChange={e => setFormData({...formData, cost: Number(e.target.value)})} className="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
+                            {/* ENFORCED INR CURRENCY - NO DROPDOWN */}
+                            <div className="w-24 border border-slate-200 bg-slate-50 rounded-xl px-2 py-2.5 text-sm font-bold text-slate-600 flex items-center justify-center">
+                                INR
+                            </div>
+                            <input required type="number" min="0" value={formData.cost || ''} onChange={e => setFormData({...formData, cost: Number(e.target.value), currency: 'INR'})} className="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
                         </div>
                       </div>
 
                       <div className="col-span-1">
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Rate Basis</label>
-                        <select disabled={user?.role === UserRole.SUPPLIER} value={formData.costBasis} onChange={e => setFormData({...formData, costBasis: e.target.value as any})} className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm transition disabled:bg-slate-100">
+                        <select disabled={user?.role === UserRole.HOTEL_PARTNER} value={formData.costBasis} onChange={e => setFormData({...formData, costBasis: e.target.value as any})} className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm transition disabled:bg-slate-100">
                             <option value="Per Vehicle">Per Vehicle</option>
                             <option value="Per Person">Per Person</option>
                         </select>

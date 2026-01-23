@@ -15,7 +15,7 @@ const DEFAULT_RULES: PricingRule = {
 };
 
 const DEFAULT_INPUT: PricingInput = {
-  targetCurrency: 'USD',
+  targetCurrency: 'INR', // Default to INR
   travelers: { adults: 2, children: 0, infants: 0 },
   hotel: { nights: 3, cost: 0, costType: 'Per Room', rooms: 1, currency: 'USD' },
   transfers: [],

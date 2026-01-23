@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { PricingRule } from '../../types';
@@ -27,6 +28,17 @@ export const PricingRules: React.FC = () => {
           <p>
             <strong>Logic Flow:</strong> Net Cost + Company Markup + Agent Markup + GST = Final Price.
           </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">Base Currency</label>
+          <div className="flex items-center gap-4">
+             {/* LOCKED TO INR */}
+             <div className="w-32 border border-slate-200 bg-slate-50 text-slate-600 font-bold rounded-lg px-3 py-2">
+                 INR (₹)
+             </div>
+             <span className="text-slate-500 text-sm">System locked to Indian Rupee.</span>
+          </div>
         </div>
 
         <div>

@@ -31,7 +31,8 @@ export const Destinations: React.FC = () => {
       setFormData(dest);
     } else {
       setEditingDest(null);
-      setFormData({ isActive: true, currency: 'USD', timezone: 'GMT' });
+      // Enforce INR default
+      setFormData({ isActive: true, currency: 'INR', timezone: 'GMT+5:30' });
     }
     setIsModalOpen(true);
   };
@@ -44,7 +45,7 @@ export const Destinations: React.FC = () => {
       id: editingDest?.id || '', 
       country: formData.country!,
       city: formData.city!,
-      currency: formData.currency || 'USD',
+      currency: 'INR', // Enforced INR
       timezone: formData.timezone || 'GMT',
       isActive: formData.isActive || false,
       createdBy: editingDest?.createdBy || user?.id
@@ -212,13 +213,10 @@ export const Destinations: React.FC = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Currency</label>
                   <div className="relative">
                     <Coins size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
-                    <input 
-                        type="text" 
-                        value={formData.currency || ''}
-                        onChange={e => setFormData({...formData, currency: e.target.value})}
-                        placeholder="USD"
-                        className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none bg-white font-medium uppercase shadow-sm"
-                    />
+                    {/* ENFORCED INR DISPLAY */}
+                    <div className="w-full pl-11 pr-4 py-3 border border-slate-200 bg-slate-50 rounded-xl font-bold text-slate-600">
+                        INR
+                    </div>
                   </div>
                 </div>
                  <div>

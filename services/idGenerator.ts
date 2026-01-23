@@ -6,7 +6,7 @@ const STORAGE_KEY_ID_COUNTERS = 'iht_id_counters';
 interface IdCounters {
   AGENT: number;
   OPERATOR: number;
-  SUPPLIER: number;
+  PARTNER: number;
   STAFF: number;
   ADMIN: number;
 }
@@ -14,7 +14,7 @@ interface IdCounters {
 const DEFAULT_COUNTERS: IdCounters = {
   AGENT: 100,
   OPERATOR: 20,
-  SUPPLIER: 10,
+  PARTNER: 10,
   STAFF: 5,
   ADMIN: 1
 };
@@ -48,9 +48,9 @@ class IdGeneratorService {
         prefix = 'OP';
         count = ++counters.OPERATOR;
         break;
-      case UserRole.SUPPLIER:
-        prefix = 'SP';
-        count = ++counters.SUPPLIER;
+      case UserRole.HOTEL_PARTNER:
+        prefix = 'HP';
+        count = ++counters.PARTNER;
         break;
       case UserRole.STAFF:
         prefix = 'ST';

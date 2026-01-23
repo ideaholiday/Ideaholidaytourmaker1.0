@@ -5,7 +5,7 @@ import { profileService } from '../../services/profileService';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
-import { Users, BookCheck, Briefcase, DollarSign, Store, Shield, UserPlus } from 'lucide-react';
+import { Users, BookCheck, Briefcase, DollarSign, Store, Shield, UserPlus, ArrowRight } from 'lucide-react';
 import { SupplierDashboard } from '../supplier/SupplierDashboard';
 import { StaffDashboard } from '../staff/StaffDashboard';
 
@@ -14,8 +14,8 @@ export const AdminDashboard: React.FC = () => {
   
   if (!user) return null;
 
-  // --- SUPPLIER VIEW ---
-  if (user.role === UserRole.SUPPLIER) {
+  // --- PARTNER VIEW ---
+  if (user.role === UserRole.HOTEL_PARTNER) {
       return <SupplierDashboard />;
   }
 
@@ -106,13 +106,13 @@ export const AdminDashboard: React.FC = () => {
                   </div>
               </Link>
 
-              <Link to="/admin/users?createRole=SUPPLIER" className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center gap-3 group">
+              <Link to="/admin/users?createRole=HOTEL_PARTNER" className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center gap-3 group">
                   <div className="bg-purple-100 text-purple-600 p-2.5 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition">
                       <Store size={20} />
                   </div>
                   <div>
-                      <h4 className="font-bold text-slate-700">Add Supplier</h4>
-                      <p className="text-xs text-slate-500">Hotel/Transport</p>
+                      <h4 className="font-bold text-slate-700">Add Hotel Partner</h4>
+                      <p className="text-xs text-slate-500">Inventory Owner</p>
                   </div>
               </Link>
 
@@ -161,17 +161,38 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Financial Snapshot */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="font-bold text-slate-900 mb-4">Financial Health</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-600">Pending Payments</span>
-              <span className="font-mono font-bold text-red-600">${stats.pendingPayments.toLocaleString()}</span>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between">
+          <div>
+            <h3 className="font-bold text-slate-900 mb-4">Financial Health</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Pending Payments</span>
+                <span className="font-mono font-bold text-red-600">${stats.pendingPayments.toLocaleString()}</span>
+              </div>
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div className="bg-red-500 h-full" style={{width: '45%'}}></div>
+              </div>
+              <p className="text-xs text-slate-400">45% of total outstanding</p>
             </div>
-            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-               <div className="bg-red-500 h-full" style={{width: '45%'}}></div>
-            </div>
-            <p className="text-xs text-slate-400">45% of total outstanding</p>
+          </div>
+          
+           {/* Quick Shortcuts Box */}
+           <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-lg p-5 text-white mt-6">
+              <h3 className="font-bold text-md mb-3">Quick Shortcuts</h3>
+              <div className="space-y-2">
+                  <Link to="/admin/hotels" className="block p-2.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition flex items-center justify-between">
+                      <span>Manage Hotel Inventory</span>
+                      <ArrowRight size={12} className="opacity-50" />
+                  </Link>
+                  <Link to="/admin/partners" className="block p-2.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition flex items-center justify-between">
+                      <span>Supplier Directory</span>
+                      <ArrowRight size={12} className="opacity-50" />
+                  </Link>
+                   <Link to="/admin/contracts" className="block p-2.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition flex items-center justify-between">
+                      <span>Manage Contracts</span>
+                      <ArrowRight size={12} className="opacity-50" />
+                  </Link>
+              </div>
           </div>
         </div>
       </div>

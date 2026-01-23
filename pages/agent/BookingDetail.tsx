@@ -5,7 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { bookingService } from '../../services/bookingService';
 import { gstService } from '../../services/gstService';
 import { Booking, Message, UserRole } from '../../types';
-import { ChatPanel } from '../../components/ChatPanel';
 import { ItineraryView } from '../../components/ItineraryView';
 import { BookingStatusTimeline } from '../../components/booking/BookingStatusTimeline';
 import { PaymentPanel } from '../../components/booking/PaymentPanel';
@@ -28,20 +27,6 @@ export const BookingDetail: React.FC = () => {
   }, [id]);
 
   if (!booking || !user) return <div className="p-8 text-center">Loading Booking...</div>;
-
-  const handleSendMessage = (text: string) => {
-    const msg: Message = {
-      id: `msg_${Date.now()}`,
-      senderId: user.id,
-      senderName: user.name,
-      senderRole: user.role,
-      content: text,
-      timestamp: new Date().toISOString(),
-      isSystem: false
-    };
-    bookingService.addComment(booking.id, msg);
-    setBooking(bookingService.getBooking(booking.id) || null);
-  };
 
   const handleDownloadPDF = () => {
       const mockQuote: any = {
@@ -68,11 +53,8 @@ export const BookingDetail: React.FC = () => {
   };
 
   const handleShareClientLink = () => {
-      // White Label Logic
       const domain = user.customDomain || window.location.host;
       const protocol = window.location.protocol;
-      
-      // If using local dev, keep port
       const url = `${protocol}//${domain}/#/view/${booking.id}`;
       
       navigator.clipboard.writeText(url);
@@ -93,7 +75,7 @@ export const BookingDetail: React.FC = () => {
   };
 
   const isCancellable = ['CONFIRMED', 'BOOKED', 'IN_PROGRESS'].includes(booking.status);
-  const isCancelled = booking.status.includes('CANCELLED') || booking.status === 'CANCELLATION_REQUESTED';
+  const isCancelled = booking.status.includes('CANCEL') || booking.status === 'CANCELLATION_REQUESTED';
   const hasInvoice = !!gstService.getInvoiceByBooking(booking.id);
 
   return (
@@ -140,7 +122,7 @@ export const BookingDetail: React.FC = () => {
 
         {/* Cancellation Banner */}
         {booking.status === 'CANCELLATION_REQUESTED' && (
-            <div className="bg-amber-50 border-b border-amber-200 p-4 flex items-center gap-3 text-amber-800 text-sm">
+            <div className="bg-amber-50 border border-amber-200 p-4 flex items-center gap-3 text-amber-800 text-sm">
                 <AlertTriangle size={20} />
                 <p><strong>Cancellation Requested:</strong> Your request is under review by the admin team. Final refund amount (if any) will be updated shortly.</p>
             </div>
@@ -185,18 +167,8 @@ export const BookingDetail: React.FC = () => {
                 <PaymentPanel 
                     booking={booking}
                     user={user}
-                    onRecordPayment={() => {}} // Read only in this view basically unless wired
+                    onRecordPayment={() => {}} 
                 />
-                
-                <div className="mt-6 h-[400px]">
-                    <h3 className="text-sm font-bold text-slate-700 mb-3">Communication</h3>
-                    <ChatPanel 
-                        user={user}
-                        messages={booking.comments}
-                        onSendMessage={handleSendMessage}
-                        className="h-full"
-                    />
-                </div>
             </div>
         </div>
       </div>

@@ -1,25 +1,23 @@
 
 import React, { useState } from 'react';
 import { adminService } from '../../services/adminService';
-import { currencyService } from '../../services/currencyService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Hotel } from '../../types';
-import { Edit2, Trash2, Plus, X, Search, Hotel as HotelIcon, Calendar, Check, DollarSign, Image as ImageIcon, Phone, Mail, MapPin } from 'lucide-react';
+import { Edit2, Plus, X, Search, Hotel as HotelIcon, Calendar, DollarSign, Image as ImageIcon, Phone, Mail, MapPin } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 
 export const Hotels: React.FC = () => {
   const { user } = useAuth();
   const allDestinations = adminService.getDestinations();
   const allHotels = adminService.getHotels();
-  const currencies = currencyService.getCurrencies();
   
-  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.SUPPLIER;
+  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.HOTEL_PARTNER;
   const showCost = user?.role !== UserRole.AGENT;
 
   let displayedHotels = allHotels;
   if (user?.role === UserRole.OPERATOR) {
       displayedHotels = allHotels.filter(h => h.createdBy === user.id);
-  } else if (user?.role === UserRole.SUPPLIER) {
+  } else if (user?.role === UserRole.HOTEL_PARTNER) {
       displayedHotels = allHotels.filter(h => user.linkedInventoryIds?.includes(h.id));
   }
   
@@ -38,8 +36,8 @@ export const Hotels: React.FC = () => {
       setEditingHotel(hotel);
       setFormData(hotel);
     } else {
-      if (user?.role === UserRole.SUPPLIER) {
-          alert("Suppliers cannot create new inventory. Please contact Admin to link new properties.");
+      if (user?.role === UserRole.HOTEL_PARTNER) {
+          alert("Partners cannot create new inventory properties. Please contact Admin to link new properties.");
           return;
       }
       setEditingHotel(null);
@@ -50,7 +48,7 @@ export const Hotels: React.FC = () => {
         mealPlan: 'BB',
         costType: 'Per Room',
         season: 'Off-Peak',
-        currency: 'USD',
+        currency: 'INR', // Enforced INR
         validFrom: new Date().toISOString().split('T')[0],
         validTo: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
         description: '',
@@ -77,7 +75,7 @@ export const Hotels: React.FC = () => {
       mealPlan: formData.mealPlan as any,
       cost: Number(formData.cost),
       costType: formData.costType as any,
-      currency: formData.currency || 'USD',
+      currency: 'INR', // Enforced INR
       season: formData.season as any,
       validFrom: formData.validFrom || new Date().toISOString().split('T')[0],
       validTo: formData.validTo || new Date().toISOString().split('T')[0],
@@ -93,7 +91,7 @@ export const Hotels: React.FC = () => {
     });
 
     const freshAll = adminService.getHotels();
-    if (user?.role === UserRole.SUPPLIER) {
+    if (user?.role === UserRole.HOTEL_PARTNER) {
         setHotels(freshAll.filter(h => user.linkedInventoryIds?.includes(h.id)));
     } else if (user?.role === UserRole.OPERATOR) {
         setHotels(freshAll.filter(h => h.createdBy === user.id));
@@ -119,7 +117,7 @@ export const Hotels: React.FC = () => {
         </div>
         {canEdit && (
             <div className="flex gap-3">
-                {user?.role !== UserRole.SUPPLIER && (
+                {user?.role !== UserRole.HOTEL_PARTNER && (
                     <InventoryImportExport 
                         data={displayedHotels}
                         headers={['id', 'name', 'destinationId', 'category', 'roomType', 'mealPlan', 'cost', 'currency', 'costType', 'season', 'isActive']}
@@ -128,7 +126,7 @@ export const Hotels: React.FC = () => {
                     />
                 )}
                 <button onClick={() => handleOpenModal()} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition shadow-lg shadow-brand-200 font-medium">
-                    <Plus size={20} /> {user?.role === UserRole.SUPPLIER ? 'Edit Selected' : 'Add Rate'}
+                    <Plus size={20} /> {user?.role === UserRole.HOTEL_PARTNER ? 'Edit Selected' : 'Add Rate'}
                 </button>
             </div>
         )}
@@ -197,7 +195,7 @@ export const Hotels: React.FC = () => {
                   </td>
                   {showCost && (
                     <td className="px-6 py-4 text-right">
-                        <span className="font-mono text-base font-bold text-slate-900">{hotel.currency || 'USD'} {hotel.cost.toLocaleString()}</span>
+                        <span className="font-mono text-base font-bold text-slate-900">₹ {hotel.cost.toLocaleString()}</span>
                         <span className="block text-[10px] text-slate-400 font-medium uppercase">{hotel.costType}</span>
                     </td>
                   )}
@@ -240,7 +238,7 @@ export const Hotels: React.FC = () => {
                     <input 
                         required 
                         type="text" 
-                        disabled={user?.role === UserRole.SUPPLIER} 
+                        disabled={user?.role === UserRole.HOTEL_PARTNER} 
                         value={formData.name || ''} 
                         onChange={e => setFormData({...formData, name: e.target.value})} 
                         className="w-full pl-4 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white text-slate-900 font-medium transition-all shadow-sm disabled:bg-slate-50 disabled:text-slate-500"
@@ -252,7 +250,7 @@ export const Hotels: React.FC = () => {
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Destination</label>
                         <select 
-                            disabled={user?.role === UserRole.SUPPLIER} 
+                            disabled={user?.role === UserRole.HOTEL_PARTNER} 
                             value={formData.destinationId} 
                             onChange={e => setFormData({...formData, destinationId: e.target.value})} 
                             className="w-full pl-3 pr-8 py-3 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-brand-500 outline-none font-medium shadow-sm transition disabled:bg-slate-50"
@@ -382,13 +380,10 @@ export const Hotels: React.FC = () => {
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Cost (Base Rate)</label>
                         <div className="flex gap-2">
-                            <select 
-                                value={formData.currency} 
-                                onChange={e => setFormData({...formData, currency: e.target.value})} 
-                                className="w-24 px-2 py-3 border border-slate-300 rounded-xl bg-white font-bold focus:ring-2 focus:ring-brand-500 outline-none shadow-sm"
-                            >
-                                {currencies.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
-                            </select>
+                            {/* ENFORCED INR CURRENCY - NO DROPDOWN */}
+                            <div className="w-24 px-2 py-3 border border-slate-200 bg-slate-50 rounded-xl font-bold text-slate-600 flex items-center justify-center">
+                                INR
+                            </div>
                             <input 
                                 required 
                                 type="number" 
@@ -398,7 +393,6 @@ export const Hotels: React.FC = () => {
                                 placeholder="0.00" 
                             />
                         </div>
-                        <p className="text-[10px] text-slate-500 mt-1 ml-1">Select Currency is critical for accurate quotes.</p>
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Rate Basis</label>
@@ -407,7 +401,7 @@ export const Hotels: React.FC = () => {
                             onChange={e => setFormData({...formData, costType: e.target.value as any})} 
                             className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-brand-500 outline-none font-medium shadow-sm"
                         >
-                            <option>Per Room</option><option>Per Person</option>
+                            <option value="Per Room">Per Room</option><option value="Per Person">Per Person</option>
                         </select>
                       </div>
                   </div>

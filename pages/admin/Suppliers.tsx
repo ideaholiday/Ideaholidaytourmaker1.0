@@ -3,13 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService'; 
 import { User, UserRole, BankDetails, Hotel, Transfer } from '../../types'; 
 import { useAuth } from '../../context/AuthContext';
-import { Edit2, Trash2, Plus, X, Search, Building, CreditCard, Link as LinkIcon, CheckSquare, Square } from 'lucide-react';
+import { Edit2, Trash2, Plus, X, Search, Building, CreditCard, Link as LinkIcon, CheckSquare, Square, Store } from 'lucide-react';
 
-export const Suppliers: React.FC = () => {
+export const Suppliers: React.FC = () => { // Kept file export name same to avoid App.tsx import break
   const { user } = useAuth();
-  const [suppliers, setSuppliers] = useState<User[]>([]); 
+  const [partners, setPartners] = useState<User[]>([]); 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<User | null>(null);
+  const [editingPartner, setEditingPartner] = useState<User | null>(null);
   const [search, setSearch] = useState('');
   
   // Inventory Data for Linking
@@ -26,23 +26,23 @@ export const Suppliers: React.FC = () => {
 
   const loadData = () => {
     const allUsers = adminService.getUsers();
-    setSuppliers(allUsers.filter(u => u.role === UserRole.SUPPLIER));
+    setPartners(allUsers.filter(u => u.role === UserRole.HOTEL_PARTNER));
     setAllHotels(adminService.getHotels());
     setAllTransfers(adminService.getTransfers());
   };
 
-  const handleOpenModal = (supplier?: User) => {
-    if (supplier) {
-      setEditingSupplier(supplier);
-      setFormData({ ...supplier });
-      setBankData(supplier.bankDetails || { currency: 'USD' });
+  const handleOpenModal = (partner?: User) => {
+    if (partner) {
+      setEditingPartner(partner);
+      setFormData({ ...partner });
+      setBankData(partner.bankDetails || { currency: 'USD' });
     } else {
-      setEditingSupplier(null);
+      setEditingPartner(null);
       setFormData({
-        role: UserRole.SUPPLIER,
+        role: UserRole.HOTEL_PARTNER,
         isVerified: true,
         status: 'ACTIVE',
-        supplierType: 'HOTEL', // Default
+        partnerType: 'HOTEL', // Default
         name: '',
         email: '',
         companyName: '',
@@ -60,13 +60,13 @@ export const Suppliers: React.FC = () => {
 
     const cleanUser: any = {
       ...formData,
-      id: editingSupplier?.id || '',
+      id: editingPartner?.id || '',
       updatedAt: new Date().toISOString(),
-      role: UserRole.SUPPLIER,
+      role: UserRole.HOTEL_PARTNER,
       bankDetails: bankData as BankDetails
     };
 
-    if (!editingSupplier) {
+    if (!editingPartner) {
         cleanUser.joinedAt = new Date().toISOString();
         cleanUser.password = 'password123'; // Default for new users
     }
@@ -77,7 +77,7 @@ export const Suppliers: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Delete this supplier? This action cannot be undone.')) {
+    if (window.confirm('Delete this partner? This action cannot be undone.')) {
       adminService.deleteUser(id);
       loadData();
     }
@@ -91,7 +91,7 @@ export const Suppliers: React.FC = () => {
       setFormData({ ...formData, linkedInventoryIds: updated });
   };
 
-  const filteredSuppliers = suppliers.filter(s => 
+  const filteredPartners = partners.filter(s => 
     s.name.toLowerCase().includes(search.toLowerCase()) || 
     s.companyName?.toLowerCase().includes(search.toLowerCase()) ||
     s.email.toLowerCase().includes(search.toLowerCase())
@@ -101,14 +101,14 @@ export const Suppliers: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Supplier Management</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Hotel Partners</h1>
           <p className="text-slate-500">Manage vendor accounts, bank details, and inventory assignments.</p>
         </div>
         <button 
           onClick={() => handleOpenModal()}
           className="bg-brand-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-brand-700 transition shadow-sm"
         >
-          <Plus size={18} /> Add Supplier
+          <Plus size={18} /> Add Partner
         </button>
       </div>
 
@@ -117,7 +117,7 @@ export const Suppliers: React.FC = () => {
           <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
           <input 
             type="text" 
-            placeholder="Search suppliers by name, company, or email..." 
+            placeholder="Search partners by name, company, or email..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none w-full md:w-96"
@@ -138,7 +138,7 @@ export const Suppliers: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredSuppliers.map((s) => (
+            {filteredPartners.map((s) => (
               <tr key={s.id} className="hover:bg-slate-50 transition">
                 <td className="px-6 py-4">
                   <div className="font-medium text-slate-900">{s.name}</div>
@@ -156,9 +156,9 @@ export const Suppliers: React.FC = () => {
                 </td>
                 <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
-                        s.supplierType === 'HOTEL' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-blue-50 text-blue-700 border-blue-100'
+                        s.partnerType === 'HOTEL' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-blue-50 text-blue-700 border-blue-100'
                     }`}>
-                        {s.supplierType || 'HOTEL'}
+                        {s.partnerType || 'HOTEL'}
                     </span>
                 </td>
                 <td className="px-6 py-4">
@@ -180,7 +180,7 @@ export const Suppliers: React.FC = () => {
                     <button 
                         onClick={() => handleDelete(s.id)}
                         className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded transition"
-                        title="Delete Supplier"
+                        title="Delete Partner"
                     >
                         <Trash2 size={16} />
                     </button>
@@ -188,10 +188,10 @@ export const Suppliers: React.FC = () => {
                 </td>
               </tr>
             ))}
-            {filteredSuppliers.length === 0 && (
+            {filteredPartners.length === 0 && (
                 <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                        No suppliers found matching criteria.
+                        No partners found matching criteria.
                     </td>
                 </tr>
             )}
@@ -204,12 +204,12 @@ export const Suppliers: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl max-w-4xl w-full p-0 shadow-2xl max-h-[90vh] flex flex-col">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
-                <h2 className="text-xl font-bold text-slate-900">{editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}</h2>
+                <h2 className="text-xl font-bold text-slate-900">{editingPartner ? 'Edit Partner' : 'Add New Partner'}</h2>
                 <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-200 rounded-full transition"><X size={20}/></button>
             </div>
             
             <div className="flex-1 overflow-y-auto p-6">
-                <form id="supplierForm" onSubmit={handleSave} className="space-y-8">
+                <form id="partnerForm" onSubmit={handleSave} className="space-y-8">
                     
                     {/* 1. Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -248,7 +248,7 @@ export const Suppliers: React.FC = () => {
                                 value={formData.email || ''} 
                                 onChange={e => setFormData({...formData, email: e.target.value})}
                                 className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
-                                placeholder="vendor@example.com"
+                                placeholder="partner@example.com"
                             />
                         </div>
                         <div>
@@ -262,10 +262,10 @@ export const Suppliers: React.FC = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Supplier Type</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Partner Type</label>
                             <select 
-                                value={formData.supplierType || 'HOTEL'} 
-                                onChange={e => setFormData({...formData, supplierType: e.target.value as any})}
+                                value={formData.partnerType || 'HOTEL'} 
+                                onChange={e => setFormData({...formData, partnerType: e.target.value as any})}
                                 className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none"
                             >
                                 <option value="HOTEL">Hotel Provider</option>
@@ -362,10 +362,10 @@ export const Suppliers: React.FC = () => {
                         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2">
                             <LinkIcon size={16} className="text-brand-500"/> Inventory Mapping
                         </h3>
-                        <p className="text-xs text-slate-500 mb-2">Select the {formData.supplierType === 'HOTEL' ? 'Hotels' : 'Transfers'} this supplier manages.</p>
+                        <p className="text-xs text-slate-500 mb-2">Select the {formData.partnerType === 'HOTEL' ? 'Hotels' : 'Transfers'} this partner manages.</p>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                            {formData.supplierType === 'HOTEL' ? (
+                            {formData.partnerType === 'HOTEL' ? (
                                 allHotels.map(h => (
                                     <label key={h.id} className={`flex items-center gap-2 p-2 rounded cursor-pointer transition ${formData.linkedInventoryIds?.includes(h.id) ? 'bg-white border border-brand-200 shadow-sm' : 'hover:bg-white border border-transparent'}`}>
                                         <div className={`text-brand-600 ${formData.linkedInventoryIds?.includes(h.id) ? 'opacity-100' : 'opacity-40'}`}>
@@ -402,7 +402,7 @@ export const Suppliers: React.FC = () => {
                                     </label>
                                 ))
                             )}
-                            {(formData.supplierType === 'HOTEL' ? allHotels.length : allTransfers.length) === 0 && (
+                            {(formData.partnerType === 'HOTEL' ? allHotels.length : allTransfers.length) === 0 && (
                                 <div className="col-span-3 text-center text-xs text-slate-400 py-4">No inventory items available to link. Add them in Inventory sections first.</div>
                             )}
                         </div>
@@ -415,8 +415,8 @@ export const Suppliers: React.FC = () => {
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-200 rounded-lg font-medium transition">
                     Cancel
                 </button>
-                <button type="submit" form="supplierForm" className="px-6 py-2.5 bg-brand-600 text-white hover:bg-brand-700 rounded-lg font-bold shadow-lg transition">
-                    {editingSupplier ? 'Update Supplier' : 'Create Account'}
+                <button type="submit" form="partnerForm" className="px-6 py-2.5 bg-brand-600 text-white hover:bg-brand-700 rounded-lg font-bold shadow-lg transition">
+                    {editingPartner ? 'Update Partner' : 'Create Account'}
                 </button>
             </div>
           </div>

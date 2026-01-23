@@ -26,11 +26,11 @@ export const Contracts: React.FC = () => {
   const loadData = () => {
     // Load Suppliers
     const allUsers = adminService.getUsers();
-    setSuppliers(allUsers.filter(u => u.role === UserRole.SUPPLIER && u.status === 'ACTIVE'));
+    setSuppliers(allUsers.filter(u => u.role === UserRole.HOTEL_PARTNER && u.status === 'ACTIVE'));
     setDestinations(adminService.getDestinations().filter(d => d.isActive));
 
     // Load Contracts
-    if (user?.role === UserRole.SUPPLIER) {
+    if (user?.role === UserRole.HOTEL_PARTNER) {
         setContracts(contractService.getContractsBySupplier(user.id));
     } else {
         setContracts(contractService.getAllContracts());
@@ -53,7 +53,7 @@ export const Contracts: React.FC = () => {
         validTo: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
         applicableCities: [],
         blackoutDates: [],
-        supplierId: user?.role === UserRole.SUPPLIER ? user.id : ''
+        supplierId: user?.role === UserRole.HOTEL_PARTNER ? user.id : ''
       });
     }
     setIsModalOpen(true);
@@ -183,7 +183,7 @@ export const Contracts: React.FC = () => {
                                   required 
                                   value={formData.supplierId} 
                                   onChange={e => setFormData({...formData, supplierId: e.target.value})} 
-                                  disabled={user?.role === UserRole.SUPPLIER} // Supplier cannot change self
+                                  disabled={user?.role === UserRole.HOTEL_PARTNER} // Supplier cannot change self
                                   className="w-full border p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none"
                               >
                                   <option value="">Select Supplier...</option>

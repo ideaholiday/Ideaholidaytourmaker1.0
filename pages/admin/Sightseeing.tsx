@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Activity } from '../../types';
-import { Edit2, Trash2, Plus, X, Camera, Clock, Image as ImageIcon, Search, ArrowUpDown, CheckSquare, Square, MapPin, Calendar, DollarSign, Check } from 'lucide-react';
+import { Edit2, Trash2, Plus, X, Camera, Clock, Image as ImageIcon, Search, DollarSign, Check, MapPin, Calendar } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 
 export const Sightseeing: React.FC = () => {
@@ -27,7 +27,6 @@ export const Sightseeing: React.FC = () => {
   const [filterDest, setFilterDest] = useState('ALL');
   const [filterSeason, setFilterSeason] = useState('ALL');
   
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState<Partial<Activity>>({});
 
   const handleOpenModal = (activity?: Activity) => {
@@ -44,7 +43,7 @@ export const Sightseeing: React.FC = () => {
         transferIncluded: false,
         costAdult: 0,
         costChild: 0,
-        currency: 'USD',
+        currency: 'INR', // Enforced INR
         description: '',
         duration: '4 Hours',
         startTime: 'Flexible',
@@ -67,7 +66,7 @@ export const Sightseeing: React.FC = () => {
       activityType: (formData.activityType || 'City Tour') as any,
       costAdult: Number(formData.costAdult),
       costChild: Number(formData.costChild),
-      currency: formData.currency || 'USD',
+      currency: 'INR', // Enforced INR
       ticketIncluded: formData.ticketIncluded || false,
       transferIncluded: formData.transferIncluded || false,
       isActive: formData.isActive || false,
@@ -211,7 +210,7 @@ export const Sightseeing: React.FC = () => {
                   </td>
                   {showCost && (
                     <td className="px-6 py-4 text-slate-900 font-mono font-medium">
-                        {activity.currency || 'USD'} {activity.costAdult} <span className="text-slate-400 mx-1">/</span> {activity.costChild}
+                        {activity.currency || 'INR'} {activity.costAdult} <span className="text-slate-400 mx-1">/</span> {activity.costChild}
                     </td>
                   )}
                   <td className="px-6 py-4 text-xs space-y-1">
@@ -314,13 +313,10 @@ export const Sightseeing: React.FC = () => {
                   <div className="grid grid-cols-3 gap-5">
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Currency</label>
-                        <select 
-                          value={formData.currency} 
-                          onChange={e => setFormData({...formData, currency: e.target.value})} 
-                          className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none font-bold"
-                        >
-                          {['USD', 'AED', 'THB', 'INR', 'EUR', 'GBP'].map(c => <option key={c}>{c}</option>)}
-                        </select>
+                        {/* ENFORCED INR CURRENCY - NO DROPDOWN */}
+                        <div className="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-600">
+                           INR
+                        </div>
                       </div>
                       <div>
                           <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Adult Cost</label>

@@ -5,7 +5,7 @@ import { permissionService } from '../../services/permissionService';
 import { useAuth } from '../../context/AuthContext';
 import { OperatorInventoryItem } from '../../types';
 import { InventoryStatusBadge } from '../../components/inventory/InventoryStatusBadge';
-import { Check, X, Search, Filter, Box, ShieldAlert } from 'lucide-react';
+import { Check, X, Search, Filter, Box, ShieldAlert, GitBranch } from 'lucide-react';
 
 export const InventoryApproval: React.FC = () => {
   const { user } = useAuth();
@@ -24,7 +24,7 @@ export const InventoryApproval: React.FC = () => {
 
   const handleApprove = (id: string) => {
     if (!user) return;
-    if (window.confirm("Approve this inventory item? It will become available to all agents.")) {
+    if (window.confirm("Approve this version? It will become the live version for all agents.")) {
         inventoryService.approveItem(id, user);
         loadItems();
     }
@@ -97,6 +97,7 @@ export const InventoryApproval: React.FC = () => {
           <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
             <tr>
               <th className="px-6 py-4 font-semibold">Item Details</th>
+              <th className="px-6 py-4 font-semibold">Version</th>
               <th className="px-6 py-4 font-semibold">Operator</th>
               <th className="px-6 py-4 font-semibold">Type</th>
               <th className="px-6 py-4 font-semibold">Net Cost</th>
@@ -111,6 +112,11 @@ export const InventoryApproval: React.FC = () => {
                   <p className="font-bold text-slate-900">{item.name}</p>
                   <p className="text-xs text-slate-500 line-clamp-1">{item.description || 'No description'}</p>
                 </td>
+                <td className="px-6 py-4">
+                    <span className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-200 w-fit">
+                        <GitBranch size={10} /> v{item.version}
+                    </span>
+                </td>
                 <td className="px-6 py-4 text-slate-600">
                     <span className="font-medium">{item.operatorName}</span>
                     <div className="text-xs text-slate-400">ID: {item.operatorId}</div>
@@ -123,6 +129,7 @@ export const InventoryApproval: React.FC = () => {
                 </td>
                 <td className="px-6 py-4">
                     <InventoryStatusBadge status={item.status} reason={item.rejectionReason} />
+                    {item.isCurrent && <span className="text-[9px] text-green-600 font-bold ml-1">LIVE</span>}
                 </td>
                 <td className="px-6 py-4 text-right">
                     {item.status === 'PENDING_APPROVAL' && (
@@ -148,7 +155,7 @@ export const InventoryApproval: React.FC = () => {
             ))}
             {filteredItems.length === 0 && (
                 <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                         No inventory items found in this category.
                     </td>
                 </tr>

@@ -1,533 +1,257 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { agentService } from '../services/agentService';
-import { bookingService } from '../services/bookingService'; // Import Booking Service
-import { currencyService } from '../services/currencyService';
-import { INITIAL_QUOTES } from '../constants';
-import { Quote, Message, UserRole, ItineraryItem, Traveler } from '../types';
-import { usePricingEngine } from '../hooks/usePricingEngine';
-import { formatWhatsAppQuote } from '../utils/whatsappFormatter';
-import { generateQuotePDF } from '../utils/pdfGenerator';
-import { QuoteHeader } from '../components/QuoteHeader';
+import { useAuth } from '../../context/AuthContext';
+import { agentService } from '../../services/agentService';
+import { adminService } from '../../services/adminService';
+import { currencyService } from '../../services/currencyService';
+import { Quote, ItineraryItem, UserRole } from '../../types';
 import { ItineraryView } from '../components/ItineraryView';
-import { ItineraryBuilder } from '../components/ItineraryBuilder';
 import { PriceSummary } from '../components/PriceSummary';
-import { ChatPanel } from '../components/ChatPanel';
-import { OperatorQuoteView } from '../components/OperatorQuoteView';
-import { OperatorAssignmentPanel } from '../components/OperatorAssignmentPanel';
-import { BookingWizard } from '../components/agent/BookingWizard'; // Import BookingWizard
-import { ArrowLeft, Sparkles, Calculator, Download, Share2, FileText, Edit, Wallet, Printer, AlertTriangle, CheckCircle, CreditCard, X, EyeOff, Coins, Globe, RefreshCw, User, Save } from 'lucide-react';
+import { ArrowLeft, Edit2, Download, Share2, GitBranch, AlertTriangle } from 'lucide-react';
+import { calculatePriceFromNet } from '../utils/pricingEngine';
+import { usePricingEngine } from '../hooks/usePricingEngine';
+import { ItineraryBuilder } from '../components/ItineraryBuilder';
+import { generateQuotePDF } from '../utils/pdfGenerator';
+import { formatWhatsAppQuote } from '../utils/whatsappFormatter';
 
 export const QuoteDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
-  const [quote, setQuote] = useState<Quote | undefined>(undefined);
-  
-  // UI Tabs & Modes
-  const [activeTab, setActiveTab] = useState<'ITINERARY' | 'COSTING'>('ITINERARY');
+  const [quote, setQuote] = useState<Quote | null>(null);
   const [isEditingItinerary, setIsEditingItinerary] = useState(false);
-
-  // Guest Name Editing
-  const [isEditingGuestName, setIsEditingGuestName] = useState(false);
-  const [tempGuestName, setTempGuestName] = useState('');
-
-  // Agent Markup State
-  const [agentMarkupAmount, setAgentMarkupAmount] = useState<number>(0);
-
-  // Currency Display State
-  const [displayCurrency, setDisplayCurrency] = useState('USD');
-  const availableCurrencies = currencyService.getCurrencies();
-
-  // Booking State
-  const [showBookingModal, setShowBookingModal] = useState(false);
-
-  // Pricing Hook
-  const { input, setInput, breakdown, updateHotel, updateRules } = usePricingEngine();
-
-  // Load Data
-  useEffect(() => {
-    if (!id || !user) return;
-
-    const allQuotes = agentService.getQuotes(user.id);
-    let found = allQuotes.find(q => q.id === id);
-    
-    // Fallback to constants (Mock Data)
-    if (!found) {
-        found = INITIAL_QUOTES.find(q => q.id === id);
-    }
-
-    if (found) {
-        setQuote(found);
-        setTempGuestName(found.leadGuestName || '');
-        setDisplayCurrency(found.currency || 'USD');
-        
-        // Initialize Markup State for Agents
-        if (found.sellingPrice && found.price) {
-            setAgentMarkupAmount(found.sellingPrice - found.price);
-        } else {
-            setAgentMarkupAmount(0);
-        }
-
-        // Initialize calculator with quote data
-        setInput(prev => ({
-            ...prev,
-            travelers: { adults: found!.paxCount, children: 0, infants: 0 },
-            hotel: { ...prev.hotel, cost: found!.cost || 0 }, 
-            rules: { ...prev.rules, companyMarkup: 10, agentMarkup: 5 }
-        }));
-    }
-  }, [id, user, setInput]);
-
-  if (!user || !quote) return <div className="p-8 text-center">Loading or Access Denied...</div>;
-
-  const isOperator = user.role === UserRole.OPERATOR;
-  const isAdminOrStaff = user.role === UserRole.ADMIN || user.role === UserRole.STAFF;
-  const isAgent = user.role === UserRole.AGENT;
-  const canEdit = isAgent || isAdminOrStaff;
-  const isQuickQuote = quote.type === 'QUICK';
   
-  // Dynamic Price Conversion Logic
-  const convertedPrice = currencyService.convert(quote.price || 0, quote.currency || 'USD', displayCurrency);
-  const convertedSellingPrice = currencyService.convert(quote.sellingPrice || 0, quote.currency || 'USD', displayCurrency);
-  const convertedBreakdown = breakdown ? {
-      ...breakdown,
-      netCost: currencyService.convert(breakdown.netCost, quote.currency || 'USD', displayCurrency),
-      companyMarkupValue: currencyService.convert(breakdown.companyMarkupValue, quote.currency || 'USD', displayCurrency),
-      agentMarkupValue: currencyService.convert(breakdown.agentMarkupValue, quote.currency || 'USD', displayCurrency),
-      gstAmount: currencyService.convert(breakdown.gstAmount, quote.currency || 'USD', displayCurrency),
-      finalPrice: convertedSellingPrice,
-      perPersonPrice: convertedSellingPrice / quote.paxCount
-  } : null;
+  const { updateHotel, setInput } = usePricingEngine();
 
-  const handleSendMessage = (text: string) => {
-    const msg: Message = {
-      id: Date.now().toString(),
-      senderId: user.id,
-      senderName: user.name,
-      senderRole: user.role,
-      content: text,
-      timestamp: new Date().toISOString(),
-      isSystem: false
-    };
+  useEffect(() => {
+    loadQuote();
+  }, [id, user]);
+
+  const loadQuote = () => {
+    if (id && user) {
+        const storedQuotes = localStorage.getItem('iht_agent_quotes');
+        const parsedQuotes: Quote[] = storedQuotes ? JSON.parse(storedQuotes) : [];
+        const found = parsedQuotes.find(q => q.id === id);
+
+        if (found) {
+            setQuote(found);
+            setInput(prev => ({
+                ...prev,
+                targetCurrency: found.currency || 'INR', 
+                travelers: { adults: found.paxCount, children: found.childCount || 0, infants: 0 },
+                hotel: { 
+                    nights: 1, 
+                    cost: found.cost || 0, 
+                    costType: 'Per Person', 
+                    rooms: 1, 
+                    currency: found.currency || 'INR'
+                }
+            }));
+        }
+    }
+  };
+
+  if (!quote || !user) return <div className="p-8">Loading Quote...</div>;
+
+  const isAgent = user.role === UserRole.AGENT;
+  const pricingRules = adminService.getPricingRule();
+  const hasValidPrice = (quote.sellingPrice !== undefined && quote.sellingPrice > 0);
+
+  // --- ACTIONS ---
+
+  const handleUpdateItinerary = (newItinerary: ItineraryItem[], financials?: { net: number, selling: number, currency: string }) => {
     
-    const updatedQuote = { ...quote, messages: [...quote.messages, msg] };
-    setQuote(updatedQuote);
-    agentService.updateQuote(updatedQuote);
-  };
+    // IF Financials passed from Builder (Recommended Path)
+    // We use the robust calculation from the builder's backend simulation directly
+    if (financials) {
+         const updatedQuote: Quote = { 
+            ...quote, 
+            itinerary: newItinerary,
+            currency: financials.currency,
+            cost: 0, // Not exposed in simple view
+            price: financials.net, // B2B
+            sellingPrice: financials.selling, // Client
+            type: 'DETAILED' as const,
+            status: quote.status
+        };
 
-  const handleOperatorAssignment = (operatorId: string, operatorName: string, pricing: { mode: 'NET' | 'FIXED', price?: number }) => {
-      // (Implementation same as previous)
-  };
+        agentService.updateQuote(updatedQuote);
+        setQuote(updatedQuote);
+        setIsEditingItinerary(false);
+        return;
+    }
 
-  const handleUpdateItinerary = (newItinerary: ItineraryItem[]) => {
-    let calculatedCost = 0;
-    const quoteCurrency = quote.currency || 'USD';
+    // FALLBACK CALCULATION (If saving without builder calculation logic - e.g. legacy)
+    // NOTE: This logic is prone to errors if multipliers are missed.
+    let calculatedRawCost = 0;
+    const quoteCurrency = quote.currency || 'INR';
 
     newItinerary.forEach(day => {
         if (day.services) {
             day.services.forEach(svc => {
                 if (!svc.isRef) {
-                    // Correct Currency Logic: Convert Item's Currency to Quote's Currency
-                    const serviceCost = currencyService.convert(svc.cost, svc.currency || 'USD', quoteCurrency);
-                    calculatedCost += serviceCost; 
+                    // Logic Update: Ensure Quantity and Nights are factored in
+                    const qty = svc.quantity || 1;
+                    const nights = svc.duration_nights || 1;
+                    const unitCost = currencyService.convert(svc.cost, svc.currency || 'USD', quoteCurrency);
+                    
+                    calculatedRawCost += (unitCost * qty * nights); 
                 }
             });
         }
     });
 
-    const hasNewPricing = calculatedCost > 0;
-    const b2bPrice = hasNewPricing ? Math.ceil(calculatedCost * 1.15) : (quote.price || 0);
-    
-    // Agent markup is stored in quote currency on this page
-    const newSellingPrice = b2bPrice + agentMarkupAmount;
+    const currentAgentMarkupValue = undefined; 
 
-    const updatedQuote = { 
+    // This computes Selling Price based on Supplier Net
+    // Note: 'calculatedRawCost' here acts as the 'Net B2B Cost' (platform margin already in unit cost usually for agents)
+    // Actually, in our mock, unit cost from admin IS supplier cost. 
+    // So we use calculatePriceFromNet which adds Platform Margin.
+    const financialsCalc = calculatePriceFromNet(
+        calculatedRawCost,
+        pricingRules,
+        quote.paxCount,
+        currentAgentMarkupValue, 
+        quoteCurrency
+    );
+
+    const updatedQuote: Quote = { 
         ...quote, 
         itinerary: newItinerary,
-        // Keep quote currency consistent
         currency: quoteCurrency,
-        cost: hasNewPricing ? calculatedCost : quote.cost,
-        price: b2bPrice,
-        sellingPrice: newSellingPrice,
-        type: 'DETAILED' as const, // Upgrade type
-        status: 'PENDING' as const // Reset estimate status
+        cost: calculatedRawCost, 
+        price: financialsCalc.platformNetCost, 
+        sellingPrice: financialsCalc.finalPrice, 
+        type: 'DETAILED' as const,
+        status: quote.status
     };
 
-    setQuote(updatedQuote);
     agentService.updateQuote(updatedQuote);
+    setQuote(updatedQuote);
     setIsEditingItinerary(false);
-
-    if (hasNewPricing) {
-        updateHotel('cost', calculatedCost); 
-        updateHotel('nights', 1);
-    }
   };
 
-  const handleAgentMarkupChange = (amount: number) => {
-      setAgentMarkupAmount(amount);
-      const b2bPrice = quote.price || 0;
-      const updatedQuote = {
-          ...quote,
-          sellingPrice: b2bPrice + amount
-      };
-      setQuote(updatedQuote);
-      agentService.updateQuote(updatedQuote);
-  }
-
-  const handleSaveGuestName = () => {
-      const updatedQuote = { ...quote, leadGuestName: tempGuestName };
-      setQuote(updatedQuote);
-      agentService.updateQuote(updatedQuote);
-      setIsEditingGuestName(false);
+  const handleShareWhatsApp = () => {
+     const mockBreakdown: any = {
+         finalPrice: quote.sellingPrice || 0,
+         perPersonPrice: ((quote.sellingPrice || 0) / quote.paxCount)
+     };
+     const text = formatWhatsAppQuote(quote, mockBreakdown, true);
+     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+     window.open(url, '_blank');
   };
 
-  const handleCopyWhatsApp = () => {
-    // Use converted prices
-    const priceToShare = isAgent ? convertedSellingPrice : convertedPrice;
-    const breakdownOverride = { ...convertedBreakdown, finalPrice: priceToShare || 0, perPersonPrice: (priceToShare || 0) / quote.paxCount } as any;
-    
-    // Pass displayed currency symbol
-    const text = formatWhatsAppQuote({ ...quote, currency: displayCurrency }, breakdownOverride, !isOperator);
-    navigator.clipboard.writeText(text);
-    alert('Quote copied to clipboard! Ready to paste in WhatsApp.');
-  };
-
-  const handleDownloadPDF = () => {
-    generateQuotePDF({ ...quote, currency: displayCurrency, sellingPrice: convertedSellingPrice, price: convertedPrice }, convertedBreakdown, user.role, user);
-  };
-
-  const handleShareClientLink = () => {
-      const url = `${window.location.origin}/#/view/${quote.id}`;
-      navigator.clipboard.writeText(url);
-      alert("White-Label Client Link copied!\n\nThis public link will show YOUR agency branding and hide Idea Holiday.");
-  };
-
-  // --- BOOKING LOGIC ---
-  const handleOpenBooking = () => { setShowBookingModal(true); };
-  
-  const submitBooking = (travelers: Traveler[]) => {
-      if (!user || !quote) return;
-      if (isQuickQuote) {
-          alert("Please convert this estimate to a Detailed Itinerary before booking.");
-          return;
-      }
-      
-      const newBooking = bookingService.createBookingFromQuote(quote, user, travelers);
-      setShowBookingModal(false);
-      
-      alert(`Booking Created Successfully! Ref: ${newBooking.uniqueRefNo}`);
-      navigate(`/booking/${newBooking.id}`);
-  };
-
-  const handleConvert = () => {
-      if (confirm("This will convert the Estimate into a Detailed Itinerary for customization. Proceed?")) {
-          setIsEditingItinerary(true);
+  const handleCreateRevision = () => {
+      if (confirm("Create a new version to edit? The current version will remain locked as history.")) {
+          const newQuote = agentService.createRevision(quote.id, user);
+          if (newQuote) {
+              navigate(`/quote/${newQuote.id}`);
+          }
       }
   };
 
-  // --------------------------------------------------------
-  // OPERATOR VIEW
-  // --------------------------------------------------------
-  if (isOperator) {
-      return (
-          <div className="flex-1 container mx-auto px-4 py-8">
-              <button onClick={() => navigate('/operator/dashboard')} className="flex items-center text-slate-500 hover:text-slate-800 mb-6">
-                  <ArrowLeft size={18} className="mr-1" /> Back to Dashboard
-              </button>
-              <OperatorQuoteView 
-                  quote={quote} 
-                  user={user}
-                  onUpdateStatus={() => {}} // Simple placeholder
-                  onSendMessage={handleSendMessage}
-              />
-          </div>
-      );
-  }
-
-  // --------------------------------------------------------
-  // AGENT / STAFF / ADMIN VIEW
-  // --------------------------------------------------------
   return (
-    <div className="flex-1 container mx-auto px-4 py-8">
-      <button onClick={() => navigate('/dashboard')} className="flex items-center text-slate-500 hover:text-slate-800 mb-6">
-        <ArrowLeft size={18} className="mr-1" /> Back to Dashboard
-      </button>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* LEFT COLUMN: Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Header Actions */}
-          <div className="flex flex-wrap justify-between items-center gap-4">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                Quote <span className="text-slate-400 font-normal">#{quote.uniqueRefNo}</span>
-                {isQuickQuote && <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded font-bold uppercase">Estimate</span>}
-                </h1>
-                
-                {isEditingGuestName ? (
-                    <div className="flex items-center gap-2 mt-1">
-                        <User size={14} className="text-slate-400"/>
-                        <input 
-                            type="text" 
-                            value={tempGuestName} 
-                            onChange={e => setTempGuestName(e.target.value)} 
-                            className="border border-slate-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
-                            placeholder="Enter Guest Name"
-                            autoFocus
-                        />
-                        <button onClick={handleSaveGuestName} className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200"><CheckCircle size={16} /></button>
-                        <button onClick={() => setIsEditingGuestName(false)} className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-200"><X size={16} /></button>
+    <div className="container mx-auto px-4 py-8">
+        <button onClick={() => navigate(-1)} className="flex items-center text-slate-500 mb-4 hover:text-slate-800">
+            <ArrowLeft size={18} className="mr-1" /> Back
+        </button>
+
+        {/* HEADER */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <div className="flex items-center gap-3 mb-1">
+                        <h1 className="text-2xl font-bold text-slate-900">Quote: {quote.uniqueRefNo}</h1>
+                        <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs font-mono border border-slate-200 flex items-center gap-1">
+                            <GitBranch size={10} /> v{quote.version}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${quote.status === 'BOOKED' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {quote.status}
+                        </span>
                     </div>
-                ) : (
-                    <div className="text-sm text-slate-600 mt-1 flex items-center gap-1.5 font-medium group cursor-pointer" onClick={() => canEdit && setIsEditingGuestName(true)}>
-                        <User size={14} className="text-slate-400"/>
-                        Prepared for: <span className="text-slate-800">{quote.leadGuestName || 'Client Name'}</span>
-                        {canEdit && <Edit size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                    <div className="text-sm text-slate-500 flex items-center gap-3">
+                        <span>{quote.destination}</span>
+                        <span>•</span>
+                        <span>{quote.paxCount} Pax</span>
+                        <span>•</span>
+                        <span>{new Date(quote.travelDate).toLocaleDateString()}</span>
                     </div>
-                )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                    
+                    {/* Edit Action */}
+                    {!quote.isLocked && isAgent && !isEditingItinerary && (
+                         <button onClick={() => setIsEditingItinerary(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium">
+                            <Edit2 size={16} /> Edit Itinerary
+                        </button>
+                    )}
+
+                    {/* Versioning if Locked */}
+                    {quote.isLocked && isAgent && (
+                        <button onClick={handleCreateRevision} className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 text-sm font-bold transition">
+                            <GitBranch size={16} /> New Version
+                        </button>
+                    )}
+
+                    {/* Share / PDF */}
+                    {hasValidPrice && (
+                        <>
+                            <button onClick={handleShareWhatsApp} className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 text-sm font-bold transition">
+                                <Share2 size={16} /> WhatsApp
+                            </button>
+                            <button onClick={() => generateQuotePDF(quote, null, user.role, user)} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-bold transition shadow-sm">
+                                <Download size={16} /> Download PDF
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
-            <div className="flex gap-2">
-              {isAgent && (
-                  <button onClick={handleShareClientLink} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm font-medium">
-                    <Globe size={18} /> Client Link
-                  </button>
-              )}
-              
-              {isAgent && !isQuickQuote && (quote.status === 'PENDING' || quote.status === 'CONFIRMED') && (
-                  <button onClick={handleOpenBooking} className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm font-medium animate-pulse">
-                    <CreditCard size={18} /> Book Now
-                  </button>
-              )}
-              
-              <button onClick={handleCopyWhatsApp} className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition shadow-sm">
-                <Share2 size={18} /> WhatsApp
-              </button>
-              <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition shadow-sm">
-                <Download size={18} /> PDF
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Quote Banner */}
-          {isQuickQuote && (
-              <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg flex justify-between items-center shadow-sm">
-                  <div>
-                      <h3 className="font-bold text-amber-800 flex items-center gap-2"><Sparkles size={18}/> Quick Estimate</h3>
-                      <p className="text-sm text-amber-700">This price is based on average rates. Convert to a detailed itinerary to book.</p>
-                  </div>
-                  <button onClick={handleConvert} className="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-amber-700 flex items-center gap-2 shadow-sm">
-                      <RefreshCw size={16} /> Convert to Detailed
-                  </button>
-              </div>
-          )}
-
-          {/* Quote Preview Card */}
-          <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-             
-             {/* Header Logic */}
-             {isAgent ? (
-                 <div className="bg-slate-50 p-6 border-b border-slate-200">
-                     <div className="flex items-center gap-3">
-                         <div className="bg-indigo-600 p-2 rounded text-white"><Wallet size={24}/></div>
-                         <div>
-                             <h2 className="font-bold text-xl text-slate-900">{user.companyName || user.name}</h2>
-                             <p className="text-xs text-slate-500">Authorized Travel Partner (Your Branding)</p>
-                         </div>
-                     </div>
-                 </div>
-             ) : (
-                 <QuoteHeader />
-             )}
-             
-             <div className="p-8">
-               <div className="flex justify-between items-start mb-8 p-4 bg-slate-50 rounded-lg">
-                 <div>
-                   <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Prepared For</p>
-                   <p className="text-lg font-bold text-slate-900">{quote.paxCount} Travellers</p>
-                   <p className="text-sm text-slate-600">{quote.destination}</p>
-                 </div>
-                 <div className="text-right">
-                   <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Travel Date</p>
-                   <p className="text-lg font-bold text-slate-900">{quote.travelDate}</p>
-                   <p className="text-sm text-slate-600">Valid until {new Date(new Date(quote.travelDate).getTime() - 7 * 86400000).toLocaleDateString()}</p>
-                 </div>
-               </div>
-
-               {/* Tabs */}
-               <div className="flex border-b border-slate-200 mb-6">
-                 <button 
-                    onClick={() => setActiveTab('ITINERARY')}
-                    className={`px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === 'ITINERARY' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                 >
-                   <span className="flex items-center gap-2"><FileText size={16}/> Itinerary</span>
-                 </button>
-                 {!isQuickQuote && (
-                    <button 
-                        onClick={() => setActiveTab('COSTING')}
-                        className={`px-6 py-3 text-sm font-medium border-b-2 transition ${activeTab === 'COSTING' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                    >
-                    <span className="flex items-center gap-2">
-                        <Calculator size={16}/> 
-                        {isAgent ? 'Profit & Branding' : 'Costing & Adjustments'}
-                    </span>
-                    </button>
-                 )}
-               </div>
-
-               {/* Tab Content */}
-               {activeTab === 'ITINERARY' && (
-                 <div>
-                   {isEditingItinerary ? (
-                     <ItineraryBuilder 
-                       initialItinerary={quote.itinerary && quote.itinerary.length > 0 ? quote.itinerary : [{ day: 1, title: 'Arrival', description: 'Arrive and transfer to hotel.', inclusions: [], services: [] }]}
-                       destination={quote.destination}
-                       onSave={handleUpdateItinerary}
-                       onCancel={() => setIsEditingItinerary(false)}
-                     />
-                   ) : (
-                     <>
-                        <div className="flex justify-end mb-4">
-                            {canEdit && quote.status !== 'BOOKED' && !isQuickQuote && (
-                                <button 
-                                    onClick={() => setIsEditingItinerary(true)} 
-                                    className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-800 font-medium"
-                                >
-                                    <Edit size={16} /> Edit Itinerary
-                                </button>
-                            )}
-                        </div>
-                       {quote.itinerary && quote.itinerary.length > 0 ? (
-                         <ItineraryView itinerary={quote.itinerary} startDate={quote.travelDate} />
-                       ) : (
-                         <div className="prose prose-slate max-w-none text-sm whitespace-pre-wrap bg-slate-50 p-4 rounded-lg border border-slate-100">
-                             <h4 className="font-bold text-slate-700 mb-2">Package Inclusions (Estimate):</h4>
-                             {quote.serviceDetails}
-                         </div>
-                       )}
-                     </>
-                   )}
-                   
-                   <div className="mt-8 pt-8 border-t border-slate-100">
-                     <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-slate-900 text-lg">
-                                {isAgent ? 'Client Price Summary' : 'Quotation Summary'}
-                            </h3>
-                            
-                            {/* Currency Switcher */}
-                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-300">
-                                <Coins size={16} className="text-slate-500" />
-                                <select 
-                                    value={displayCurrency}
-                                    onChange={(e) => setDisplayCurrency(e.target.value)}
-                                    className="text-sm font-medium text-slate-700 bg-transparent outline-none cursor-pointer"
-                                >
-                                    {availableCurrencies.map(c => (
-                                        <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <span className="text-base font-bold text-slate-900 block">
-                                    {isQuickQuote ? 'Estimated Total' : 'Total Package Cost'}
-                                </span>
-                                <span className="text-xs text-slate-500">(Incl. of all taxes)</span>
-                            </div>
-                            <div className="text-right">
-                                {isQuickQuote && <span className="block text-[10px] text-amber-600 font-bold uppercase tracking-wide">Starting From</span>}
-                                <span className="text-2xl font-bold text-brand-700 font-mono">
-                                    {currencyService.getSymbol(displayCurrency)} {isAgent ? convertedSellingPrice.toLocaleString() : convertedPrice.toLocaleString()}
-                                </span>
-                            </div>
-                        </div>
-                        
-                        {quote.hotelMode === 'REF' && (
-                           <div className="mt-3 bg-amber-50 border border-amber-100 p-3 rounded flex gap-2 text-sm text-amber-800">
-                               <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                               <span>Reference Hotel cost is excluded from this total.</span>
-                           </div>
-                        )}
-                     </div>
-                   </div>
-                 </div>
-               )}
-
-               {/* COSTING VIEWS (ADMIN/STAFF or AGENT) */}
-               {activeTab === 'COSTING' && (
-                   <div className="space-y-6 animate-in fade-in">
-                       {/* Simplified View for Agent Markup Logic */}
-                       {isAgent ? (
-                           <div className="bg-indigo-50 border border-indigo-100 p-5 rounded-xl">
-                               <h3 className="font-bold text-indigo-900 flex items-center gap-2 mb-4"><Wallet size={20} /> Pricing Control</h3>
-                               <div className="bg-white p-4 rounded-lg border border-indigo-100 shadow-sm">
-                                  <label className="text-xs text-slate-500 uppercase font-semibold block mb-1">Your Markup (Flat {displayCurrency})</label>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 font-bold">+</span>
-                                    <input 
-                                        type="number" 
-                                        min="0"
-                                        // This is a simplification: We assume markup is input in Display Currency
-                                        value={Math.round(currencyService.convert(agentMarkupAmount, 'USD', displayCurrency))}
-                                        onChange={(e) => {
-                                            const val = Number(e.target.value);
-                                            // Convert back to base for storage
-                                            handleAgentMarkupChange(currencyService.convert(val, displayCurrency, 'USD'));
-                                        }}
-                                        className="w-full border border-indigo-200 rounded px-2 py-1 font-mono font-bold text-green-600 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    />
-                                  </div>
-                               </div>
-                           </div>
-                       ) : (
-                           // Admin Costing
-                           <div className="bg-amber-50 p-4 rounded-lg text-amber-800 text-sm mb-4 border border-amber-200 flex gap-2">
-                               <EyeOff size={16} className="shrink-0 mt-0.5" />
-                               <p>Admin Override Mode. Changes affect final price.</p>
-                           </div>
-                       )}
-                       
-                       <div className="pt-4 border-t border-slate-100">
-                          <PriceSummary breakdown={convertedBreakdown} role={user.role} currency={displayCurrency} />
-                       </div>
-                   </div>
-               )}
-
-             </div>
-          </div>
         </div>
 
-        {/* RIGHT COLUMN: Sidebar (Chat / Assignment) */}
-        <div className="lg:col-span-1 space-y-6">
-            {!isQuickQuote && isAdminOrStaff && (
-                <OperatorAssignmentPanel 
-                    quote={quote}
-                    onAssign={handleOperatorAssignment}
-                />
-            )}
-            <ChatPanel 
-                user={user}
-                messages={quote.messages}
-                onSendMessage={handleSendMessage}
-                className="h-[600px] sticky top-24"
+        {/* PRICE WARNING */}
+        {!hasValidPrice && !isEditingItinerary && (
+             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex items-center gap-3 text-amber-800 animate-pulse">
+                <AlertTriangle size={20} />
+                <p className="font-bold text-sm">Price not calculated. Please edit the itinerary and save to generate a price before downloading PDF.</p>
+            </div>
+        )}
+
+        {isEditingItinerary ? (
+            <ItineraryBuilder 
+                initialItinerary={quote.itinerary} 
+                destination={quote.destination}
+                pax={quote.paxCount}
+                onSave={handleUpdateItinerary}
+                onCancel={() => setIsEditingItinerary(false)}
             />
-        </div>
-      </div>
-
-      <BookingWizard 
-        quote={quote}
-        isOpen={showBookingModal}
-        onClose={() => setShowBookingModal(false)}
-        onSubmit={submitBooking}
-      />
+        ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h2 className="text-lg font-bold mb-4">Itinerary</h2>
+                        <ItineraryView itinerary={quote.itinerary} />
+                    </div>
+                </div>
+                <div className="lg:col-span-1 space-y-6">
+                    <PriceSummary 
+                        breakdown={{
+                            supplierCost: quote.cost || 0,
+                            platformNetCost: quote.price || 0,
+                            finalPrice: quote.sellingPrice || 0,
+                            agentMarkupValue: (quote.sellingPrice || 0) - (quote.price || 0),
+                            gstAmount: 0, 
+                            companyMarkupValue: (quote.price || 0) - (quote.cost || 0),
+                            subtotal: quote.sellingPrice || 0,
+                            perPersonPrice: quote.paxCount > 0 ? (quote.sellingPrice || 0) / quote.paxCount : 0
+                        }}
+                        role={user.role}
+                        currency={quote.currency || 'INR'}
+                    />
+                </div>
+            </div>
+        )}
     </div>
   );
 };

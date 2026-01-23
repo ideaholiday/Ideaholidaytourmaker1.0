@@ -8,7 +8,7 @@ import { quickQuoteTemplateService } from '../../services/quickQuoteTemplateServ
 import { calculateQuickEstimate } from '../../services/quickQuotePricing';
 import { calculateRequiredRooms, getDestinationDefaults } from '../../utils/quickQuoteDefaults';
 import { QuickQuoteInputs, Quote, QuickQuoteTemplate, ItineraryItem } from '../../types';
-import { MapPin, Calendar, Users, Hotel, Coffee, Car, Star, DollarSign, ArrowRight, Sparkles, AlertCircle, Save, X, LayoutTemplate, User } from 'lucide-react';
+import { MapPin, Calendar, Users, Hotel, Coffee, Car, Star, DollarSign, ArrowRight, Sparkles, AlertCircle, Save, X, LayoutTemplate, User, IndianRupee } from 'lucide-react';
 import { TemplateSelector } from '../../components/quickQuote/TemplateSelector';
 
 export const QuickQuote: React.FC = () => {
@@ -192,6 +192,7 @@ export const QuickQuote: React.FC = () => {
               itinerary: skeletonItinerary, // Attach generated items
               price: estimates.total, // System Net Estimate (Hidden internal ref)
               sellingPrice: estimates.total, // Suggested Selling
+              currency: 'INR', // Explicitly set INR
               serviceDetails: `${nights}N Trip to ${destination}. ${inputs.hotelCategory} Hotel (${inputs.mealPlan}). ${inputs.sightseeingIntensity} Sightseeing.`
           };
 
@@ -419,13 +420,13 @@ export const QuickQuote: React.FC = () => {
                     <div className="flex justify-between items-start mb-6">
                         <div>
                             <p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Estimated Cost</p>
-                            <h2 className="text-4xl font-bold mt-1">${estimates.total.toLocaleString()}</h2>
+                            <h2 className="text-4xl font-bold mt-1">₹ {estimates.total.toLocaleString()}</h2>
                             <p className="text-sm text-slate-300 mt-1">
-                                ~ ${estimates.perPerson.toLocaleString()} per person
+                                ~ ₹ {estimates.perPerson.toLocaleString()} per person
                             </p>
                         </div>
                         <div className="bg-white/10 p-2 rounded-lg">
-                            <DollarSign size={24} className="text-green-400" />
+                            <IndianRupee size={24} className="text-green-400" />
                         </div>
                     </div>
 

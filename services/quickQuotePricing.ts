@@ -4,12 +4,13 @@ import { QuickQuoteInputs } from '../types';
 /**
  * MOCK PRICING DATABASE
  * In production, this would fetch average rates from historical data or a rate sheet.
+ * VALUES ARE IN INR
  */
 const BASE_RATES: Record<string, number> = {
-    '3 Star': 60,
-    '4 Star': 100,
-    '5 Star': 200,
-    'Luxury': 450
+    '3 Star': 4000,
+    '4 Star': 7000,
+    '5 Star': 15000,
+    'Luxury': 35000
 };
 
 const MEAL_MULTIPLIERS: Record<string, number> = {
@@ -22,11 +23,11 @@ const MEAL_MULTIPLIERS: Record<string, number> = {
 
 const SIGHTSEEING_PACKAGES: Record<string, number> = {
     'None': 0,
-    'Standard': 50,  // Per Pax Per Trip (Avg)
-    'Premium': 120   // Per Pax Per Trip (Avg)
+    'Standard': 3000,  // Per Pax Per Trip (Avg)
+    'Premium': 8000    // Per Pax Per Trip (Avg)
 };
 
-const TRANSFER_COST_PER_PAX = 30; // Avg round trip airport + basic intercity
+const TRANSFER_COST_PER_PAX = 2000; // Avg round trip airport + basic intercity
 
 export const calculateQuickEstimate = (
     destination: string, 
@@ -37,7 +38,7 @@ export const calculateQuickEstimate = (
     
     // 1. Hotel Cost
     // Cost per room per night * number of rooms * nights
-    const baseRate = BASE_RATES[inputs.hotelCategory] || 100;
+    const baseRate = BASE_RATES[inputs.hotelCategory] || 7000;
     const mealMult = MEAL_MULTIPLIERS[inputs.mealPlan] || 1.1;
     const nightlyRoomRate = baseRate * mealMult;
     

@@ -3,19 +3,22 @@ import { PricingInput, PricingBreakdown, PricingRule } from '../types';
 import { roundPrice } from './rounding';
 import { currencyService } from '../services/currencyService';
 
+const BASE_CURRENCY = 'INR';
+
 /**
- * Calculates Supplier Net Cost (Raw Inventory Cost) converted to Target Currency.
+ * Helper: Normalize any amount to System Base Currency (INR)
  */
-export const calculateSupplierCost = (input: PricingInput): number => {
-  const { travelers, hotel, transfers, activities, visa, targetCurrency } = input;
+const normalizeToBase = (amount: number, sourceCurrency?: string): number => {
+    return currencyService.convertToBase(amount, sourceCurrency || BASE_CURRENCY);
+};
+
+/**
+ * Calculates Supplier Net Cost (Raw Inventory Cost) in BASE CURRENCY (INR).
+ */
+export const calculateSupplierCostBase = (input: PricingInput): number => {
+  const { travelers, hotel, transfers, activities, visa } = input;
   const totalPax = travelers.adults + travelers.children; 
   
-  // Helper: Convert amount from Source Currency to Quote Target Currency
-  const toTarget = (amount: number, sourceCurrency?: string) => {
-      const currency = sourceCurrency || 'USD'; // Fallback only if data missing
-      return currencyService.convert(amount, currency, targetCurrency);
-  };
-
   // 1. Hotel Cost
   let hotelCost = 0;
   if (hotel.costType === 'Per Room') {
@@ -23,10 +26,10 @@ export const calculateSupplierCost = (input: PricingInput): number => {
   } else {
     hotelCost = hotel.cost * hotel.nights * totalPax;
   }
-  const hotelCostTotal = toTarget(hotelCost, hotel.currency);
+  const hotelCostBase = normalizeToBase(hotelCost, hotel.currency);
 
   // 2. Transfer Cost
-  let transferCostTotal = 0;
+  let transferCostBase = 0;
   transfers.forEach(t => {
     let cost = 0;
     if (t.costBasis === 'Per Vehicle') {
@@ -34,30 +37,33 @@ export const calculateSupplierCost = (input: PricingInput): number => {
     } else {
       cost = t.cost * totalPax;
     }
-    transferCostTotal += toTarget(cost, t.currency);
+    transferCostBase += normalizeToBase(cost, t.currency);
   });
 
   // 3. Activity Cost
-  let activityCostTotal = 0;
+  let activityCostBase = 0;
   activities.forEach(a => {
     const cost = (a.costAdult * travelers.adults) + (a.costChild * travelers.children);
-    activityCostTotal += toTarget(cost, a.currency);
+    activityCostBase += normalizeToBase(cost, a.currency);
   });
 
   // 4. Visa Cost
-  const visaCostTotal = visa.enabled ? toTarget(visa.costPerPerson * totalPax, visa.currency) : 0;
+  const visaCostBase = visa.enabled ? normalizeToBase(visa.costPerPerson * totalPax, visa.currency) : 0;
 
-  return hotelCostTotal + transferCostTotal + activityCostTotal + visaCostTotal;
+  return hotelCostBase + transferCostBase + activityCostBase + visaCostBase;
 };
 
 /**
- * Calculates Markup Value based on amount and rule (Percentage vs Fixed).
+ * Calculates Markup Value based on amount and rule.
+ * Always returns value in the same currency as baseAmount.
  */
 const calculateMarkupValue = (baseAmount: number, markup: number, type: 'Percentage' | 'Fixed', paxCount: number): number => {
+    if (baseAmount <= 0) return 0; // Safeguard: No markup on zero cost
+    
     if (type === 'Percentage') {
         return baseAmount * (markup / 100);
     }
-    // Fixed markup is usually Per Person in travel
+    // Fixed markup is usually Per Person
     return markup * paxCount;
 };
 
@@ -65,86 +71,117 @@ const calculateMarkupValue = (baseAmount: number, markup: number, type: 'Percent
  * Master Calculation Function
  */
 export const calculateQuotePrice = (input: PricingInput): PricingBreakdown => {
-  const supplierCost = calculateSupplierCost(input);
+  // Step 1: Net Cost in Base
+  const supplierCostBase = calculateSupplierCostBase(input);
   const totalPax = input.travelers.adults + input.travelers.children;
 
-  // 1. Company Markup (Platform Margin)
-  const companyMarkupValue = calculateMarkupValue(supplierCost, input.rules.companyMarkup, input.rules.markupType, totalPax);
+  // Step 2: Company Markup (Platform Margin) in Base
+  const companyMarkupValueBase = calculateMarkupValue(supplierCostBase, input.rules.companyMarkup, input.rules.markupType, totalPax);
   
-  // 2. Platform Net Cost (This is what the Agent Sees as "Net Cost")
-  const platformNetCost = supplierCost + companyMarkupValue;
+  // Platform Net (B2B Price) in Base
+  const platformNetCostBase = supplierCostBase + companyMarkupValueBase;
 
-  // 3. Agent Markup (Added by Agent)
-  const agentMarkupValue = calculateMarkupValue(platformNetCost, input.rules.agentMarkup, input.rules.markupType, totalPax);
+  // Step 3: Agent Markup in Base
+  let agentMarkupValueBase = 0;
+  // Prevent markup on empty itinerary
+  if (platformNetCostBase > 0) {
+      if (input.rules.markupType === 'Fixed') {
+          const fixedInTarget = input.rules.agentMarkup * totalPax;
+          agentMarkupValueBase = normalizeToBase(fixedInTarget, input.targetCurrency);
+      } else {
+          agentMarkupValueBase = calculateMarkupValue(platformNetCostBase, input.rules.agentMarkup, 'Percentage', totalPax);
+      }
+  }
 
-  // 4. Subtotal (Before Tax)
-  const subtotal = platformNetCost + agentMarkupValue;
+  // Step 4: Subtotal (Before Tax) in Base
+  const subtotalBase = platformNetCostBase + agentMarkupValueBase;
 
-  // 5. GST (Tax on Subtotal)
-  const gstAmount = subtotal * (input.rules.gstPercentage / 100);
+  // Step 5: GST (Tax) in Base
+  const gstAmountBase = subtotalBase * (input.rules.gstPercentage / 100);
 
-  // 6. Final Calculation
-  let rawFinalPrice = subtotal + gstAmount;
+  // Step 6: Final Total in Base
+  const finalPriceBase = subtotalBase + gstAmountBase;
 
-  // 7. Rounding
-  const finalPrice = roundPrice(rawFinalPrice, input.rules.roundOff);
+  // --- CONVERSION TO TARGET CURRENCY ---
+  // Since system is INR only, this is 1:1
+  
+  const convert = (val: number) => currencyService.convert(val, BASE_CURRENCY, input.targetCurrency);
+
+  const finalPriceTarget = convert(finalPriceBase);
+  const roundedFinalPrice = roundPrice(finalPriceTarget, input.rules.roundOff);
 
   return {
-    supplierCost: Number(supplierCost.toFixed(2)),
-    companyMarkupValue: Number(companyMarkupValue.toFixed(2)),
-    platformNetCost: Number(platformNetCost.toFixed(2)),
-    agentMarkupValue: Number(agentMarkupValue.toFixed(2)),
-    subtotal: Number(subtotal.toFixed(2)),
-    gstAmount: Number(gstAmount.toFixed(2)),
-    finalPrice: finalPrice,
-    perPersonPrice: totalPax > 0 ? Number((finalPrice / totalPax).toFixed(2)) : 0,
+    supplierCost: Number(convert(supplierCostBase).toFixed(2)),
+    companyMarkupValue: Number(convert(companyMarkupValueBase).toFixed(2)),
+    platformNetCost: Number(convert(platformNetCostBase).toFixed(2)),
+    agentMarkupValue: Number(convert(agentMarkupValueBase).toFixed(2)),
+    subtotal: Number(convert(subtotalBase).toFixed(2)),
+    gstAmount: Number(convert(gstAmountBase).toFixed(2)),
+    finalPrice: roundedFinalPrice,
+    perPersonPrice: totalPax > 0 ? Number((roundedFinalPrice / totalPax).toFixed(2)) : 0,
     
-    // Legacy support alias
-    netCost: Number(platformNetCost.toFixed(2))
+    // Legacy alias
+    netCost: Number(convert(platformNetCostBase).toFixed(2))
   };
 };
 
 /**
  * Simplified Calculator for direct values (e.g. SmartBuilder live view)
- * Assumes inputs are already summed/converted to target currency.
+ * Input 'netCost' is assumed to be in BASE CURRENCY (INR).
  */
 export const calculatePriceFromNet = (
-    netCost: number, 
+    netCostBase: number, 
     rules: PricingRule, 
     paxCount: number,
-    agentMarkupOverride?: number
+    agentMarkupOverride?: number, // Flat override in Target Currency
+    targetCurrency: string = 'INR'
 ): PricingBreakdown => {
-    // Treat input 'netCost' as 'supplierCost' effectively
-    const supplierCost = netCost;
     
-    const companyMarkupValue = calculateMarkupValue(supplierCost, rules.companyMarkup, rules.markupType, paxCount);
-    const platformNetCost = supplierCost + companyMarkupValue;
-    
-    const effectiveAgentMarkup = agentMarkupOverride !== undefined ? agentMarkupOverride : rules.agentMarkup;
-    
-    let agentMarkupValue = 0;
-    if (agentMarkupOverride !== undefined) {
-        // Flat markup override is assumed to be in target currency already
-        agentMarkupValue = agentMarkupOverride;
-    } else {
-        // Use rule
-        agentMarkupValue = calculateMarkupValue(platformNetCost, rules.agentMarkup, rules.markupType, paxCount);
+    if (netCostBase <= 0) {
+        return {
+            supplierCost: 0, companyMarkupValue: 0, platformNetCost: 0, agentMarkupValue: 0,
+            subtotal: 0, gstAmount: 0, finalPrice: 0, perPersonPrice: 0, netCost: 0
+        };
     }
 
-    const subtotal = platformNetCost + agentMarkupValue;
-    const gstAmount = subtotal * (rules.gstPercentage / 100);
-    const rawFinalPrice = subtotal + gstAmount;
-    const finalPrice = roundPrice(rawFinalPrice, rules.roundOff);
+    // 1. Platform Margin
+    const companyMarkupValueBase = calculateMarkupValue(netCostBase, rules.companyMarkup, rules.markupType, paxCount);
+    const platformNetCostBase = netCostBase + companyMarkupValueBase;
+    
+    // 2. Agent Markup
+    let agentMarkupValueBase = 0;
+    if (agentMarkupOverride !== undefined) {
+        // Normalize override to base
+        agentMarkupValueBase = normalizeToBase(agentMarkupOverride, targetCurrency);
+    } else {
+        if (rules.markupType === 'Fixed') {
+             const fixedInTarget = rules.agentMarkup * paxCount;
+             agentMarkupValueBase = normalizeToBase(fixedInTarget, targetCurrency);
+        } else {
+             agentMarkupValueBase = calculateMarkupValue(platformNetCostBase, rules.agentMarkup, 'Percentage', paxCount);
+        }
+    }
+
+    // 3. Tax
+    const subtotalBase = platformNetCostBase + agentMarkupValueBase;
+    const gstAmountBase = subtotalBase * (rules.gstPercentage / 100);
+    const finalPriceBase = subtotalBase + gstAmountBase;
+
+    // 4. Convert All to Target
+    const convert = (val: number) => currencyService.convert(val, BASE_CURRENCY, targetCurrency);
+    
+    const finalPriceTarget = convert(finalPriceBase);
+    const roundedFinalPrice = roundPrice(finalPriceTarget, rules.roundOff);
 
     return {
-        supplierCost,
-        companyMarkupValue,
-        platformNetCost,
-        agentMarkupValue,
-        subtotal,
-        gstAmount,
-        finalPrice,
-        perPersonPrice: paxCount > 0 ? Number((finalPrice / paxCount).toFixed(2)) : 0,
-        netCost: platformNetCost
+        supplierCost: Number(convert(netCostBase).toFixed(2)),
+        companyMarkupValue: Number(convert(companyMarkupValueBase).toFixed(2)),
+        platformNetCost: Number(convert(platformNetCostBase).toFixed(2)),
+        agentMarkupValue: Number(convert(agentMarkupValueBase).toFixed(2)),
+        subtotal: Number(convert(subtotalBase).toFixed(2)),
+        gstAmount: Number(convert(gstAmountBase).toFixed(2)),
+        finalPrice: roundedFinalPrice,
+        perPersonPrice: paxCount > 0 ? Number((roundedFinalPrice / paxCount).toFixed(2)) : 0,
+        netCost: Number(convert(platformNetCostBase).toFixed(2))
     };
 }

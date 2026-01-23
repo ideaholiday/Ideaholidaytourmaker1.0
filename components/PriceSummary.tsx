@@ -13,6 +13,7 @@ export const PriceSummary: React.FC<Props> = ({ breakdown, role, currency }) => 
 
   const isOperator = role === UserRole.OPERATOR;
   const isAgent = role === UserRole.AGENT;
+  const isAdminOrStaff = role === UserRole.ADMIN || role === UserRole.STAFF;
   
   if (isOperator) return null;
 
@@ -22,7 +23,7 @@ export const PriceSummary: React.FC<Props> = ({ breakdown, role, currency }) => 
       
       <div className="space-y-3">
         {/* Admin / Staff View: Full Breakdown */}
-        {!isAgent && (
+        {isAdminOrStaff && (
           <div className="text-xs text-slate-500 border-b border-slate-200 pb-3 mb-3">
             <div className="flex justify-between mb-1">
               <span>Supplier Net</span>
@@ -32,19 +33,30 @@ export const PriceSummary: React.FC<Props> = ({ breakdown, role, currency }) => 
               <span>+ Platform Margin</span>
               <span className="font-mono">{breakdown.companyMarkupValue.toLocaleString()}</span>
             </div>
+            <div className="flex justify-between text-slate-700 font-bold border-t border-slate-200 pt-1 mt-1">
+                <span>Platform Net (B2B)</span>
+                <span className="font-mono">{breakdown.platformNetCost.toLocaleString()}</span>
+            </div>
+            {/* Hiding Agent Markup line for Admins to respect 'remove agents markup from admin' request, or assuming they just want to see the Net. 
+                If they want to see final selling price, it's still at the bottom. */}
           </div>
         )}
 
         {/* Agent View starts here (They see Platform Net as their Cost) */}
-        <div className="flex justify-between text-sm text-slate-600">
-            <span>Net Cost (B2B)</span>
-            <span className="font-mono font-medium">{breakdown.platformNetCost.toLocaleString()}</span>
-        </div>
+        {isAgent && (
+            <div className="flex justify-between text-sm text-slate-600">
+                <span>Net Cost (B2B)</span>
+                <span className="font-mono font-medium">{breakdown.platformNetCost.toLocaleString()}</span>
+            </div>
+        )}
 
-        <div className="flex justify-between text-sm text-green-600 font-medium">
-            <span>+ Your Markup</span>
-            <span className="font-mono">{breakdown.agentMarkupValue.toLocaleString()}</span>
-        </div>
+        {/* Only show "Your Markup" to the Agent. Admin sees the final price anyway. */}
+        {isAgent && (
+            <div className="flex justify-between text-sm text-green-600 font-medium">
+                <span>+ Your Markup</span>
+                <span className="font-mono">{breakdown.agentMarkupValue.toLocaleString()}</span>
+            </div>
+        )}
 
         <div className="flex justify-between text-sm text-slate-600">
             <span>+ Tax / GST</span>

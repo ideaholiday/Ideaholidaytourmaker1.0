@@ -2,17 +2,16 @@
 import React, { useState } from 'react';
 import { Quote, User, UserRole, Message } from '../types';
 import { ItineraryView } from './ItineraryView';
-import { ChatPanel } from './ChatPanel';
-import { CheckCircle, XCircle, AlertTriangle, Briefcase, MapPin, Calendar, Users, DollarSign, Send, EyeOff, User as UserIcon } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, Briefcase, MapPin, Calendar, Users, DollarSign, EyeOff, User as UserIcon } from 'lucide-react';
 
 interface Props {
   quote: Quote;
   user: User;
   onUpdateStatus: (status: 'ACCEPTED' | 'DECLINED', reason?: string) => void;
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string) => void; // Kept in interface to avoid breaking parents, but unused
 }
 
-export const OperatorQuoteView: React.FC<Props> = ({ quote, user, onUpdateStatus, onSendMessage }) => {
+export const OperatorQuoteView: React.FC<Props> = ({ quote, user, onUpdateStatus }) => {
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
 
@@ -24,10 +23,6 @@ export const OperatorQuoteView: React.FC<Props> = ({ quote, user, onUpdateStatus
 
   const operatorStatus = quote.operatorStatus || 'PENDING';
 
-  // --- STRICT PRICING LOGIC ---
-  // 1. If operatorPrice is set, show that.
-  // 2. If netCostVisibleToOperator is true, show net cost.
-  // 3. Otherwise, show nothing/pending.
   const displayPrice = quote.operatorPrice 
       ? quote.operatorPrice 
       : (quote.netCostVisibleToOperator ? quote.cost : null);
@@ -107,10 +102,9 @@ export const OperatorQuoteView: React.FC<Props> = ({ quote, user, onUpdateStatus
               </div>
           </div>
 
-          {/* 3. Sidebar: Pricing & Chat */}
+          {/* 3. Sidebar: Pricing */}
           <div className="lg:col-span-1 space-y-6">
               
-              {/* Privacy-Safe Pricing Box */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                   <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
                       <DollarSign size={18} className="text-brand-600"/> Operational Revenue
@@ -138,14 +132,6 @@ export const OperatorQuoteView: React.FC<Props> = ({ quote, user, onUpdateStatus
                       <p><strong>Note:</strong> This amount excludes any agent markups or platform fees. It is strictly the cost of services provided.</p>
                   </div>
               </div>
-
-              {/* Communication Channel */}
-              <ChatPanel 
-                  user={user} 
-                  messages={quote.messages} 
-                  onSendMessage={onSendMessage} 
-                  className="h-[500px]"
-              />
           </div>
       </div>
 

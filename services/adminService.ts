@@ -11,88 +11,88 @@ const INITIAL_DESTINATIONS: Destination[] = [
   // India
   { id: 'd11', country: 'India', city: 'Delhi', currency: 'INR', timezone: 'GMT+5:30', isActive: true, createdBy: 'u1' },
 
-  // UAE
-  { id: 'd1', country: 'UAE', city: 'Dubai', currency: 'AED', timezone: 'GMT+4', isActive: true, createdBy: 'u1' },
-  { id: 'd4', country: 'UAE', city: 'Abu Dhabi', currency: 'AED', timezone: 'GMT+4', isActive: true, createdBy: 'u1' },
+  // UAE (Updated to INR)
+  { id: 'd1', country: 'UAE', city: 'Dubai', currency: 'INR', timezone: 'GMT+4', isActive: true, createdBy: 'u1' },
+  { id: 'd4', country: 'UAE', city: 'Abu Dhabi', currency: 'INR', timezone: 'GMT+4', isActive: true, createdBy: 'u1' },
   
-  // Thailand
-  { id: 'd2', country: 'Thailand', city: 'Phuket', currency: 'THB', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
-  { id: 'd3', country: 'Thailand', city: 'Bangkok', currency: 'THB', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
-  { id: 'd5', country: 'Thailand', city: 'Pattaya', currency: 'THB', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
-  { id: 'd6', country: 'Thailand', city: 'Krabi', currency: 'THB', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
+  // Thailand (Updated to INR)
+  { id: 'd2', country: 'Thailand', city: 'Phuket', currency: 'INR', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
+  { id: 'd3', country: 'Thailand', city: 'Bangkok', currency: 'INR', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
+  { id: 'd5', country: 'Thailand', city: 'Pattaya', currency: 'INR', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
+  { id: 'd6', country: 'Thailand', city: 'Krabi', currency: 'INR', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
 
-  // Vietnam
-  { id: 'd7', country: 'Vietnam', city: 'Ha Noi', currency: 'USD', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
-  { id: 'd8', country: 'Vietnam', city: 'Ha Long Bay', currency: 'USD', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
-  { id: 'd9', country: 'Vietnam', city: 'Da Nang', currency: 'USD', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
-  { id: 'd10', country: 'Vietnam', city: 'Ho Chi Minh City', currency: 'USD', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
+  // Vietnam (Updated to INR)
+  { id: 'd7', country: 'Vietnam', city: 'Ha Noi', currency: 'INR', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
+  { id: 'd8', country: 'Vietnam', city: 'Ha Long Bay', currency: 'INR', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
+  { id: 'd9', country: 'Vietnam', city: 'Da Nang', currency: 'INR', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
+  { id: 'd10', country: 'Vietnam', city: 'Ho Chi Minh City', currency: 'INR', timezone: 'GMT+7', isActive: true, createdBy: 'u1' },
 ];
 
 const INITIAL_HOTELS: Hotel[] = [
   // India - Delhi
-  { id: 'h16', name: 'Taj Palace', destinationId: 'd11', category: 'Luxury', roomType: 'Superior Room', mealPlan: 'BB', cost: 12000, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2024-12-31', isActive: true, createdBy: 'u1', currency: 'INR' },
+  { id: 'h_del_taj', name: 'Taj Palace', destinationId: 'd11', category: 'Luxury', roomType: 'Superior Room', mealPlan: 'BB', cost: 12000, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR' },
   { 
-    id: 'h1', name: 'Marina Byblos', destinationId: 'd1', category: '4 Star', roomType: 'Deluxe Room', mealPlan: 'BB', cost: 350, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2024-12-31', isActive: true, createdBy: 'u1', currency: 'AED',
+    id: 'h_dxb_marina', name: 'Marina Byblos', destinationId: 'd1', category: '4 Star', roomType: 'Deluxe Room', mealPlan: 'BB', cost: 8500, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR',
     description: 'Located in Dubai Marina with easy access to JBR Beach.',
     imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=400'
   },
-  { id: 'h2', name: 'Atlantis The Palm', destinationId: 'd1', category: 'Luxury', roomType: 'Ocean King', mealPlan: 'HB', cost: 1500, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2024-12-31', isActive: true, createdBy: 'u1', currency: 'AED' },
-  { id: 'h3', name: 'Phuket Graceland', destinationId: 'd2', category: '4 Star', roomType: 'Superior', mealPlan: 'BB', cost: 2500, costType: 'Per Room', season: 'Off-Peak', validFrom: '2023-01-01', validTo: '2024-12-31', isActive: true, createdBy: 'u1', currency: 'THB' }
+  { id: 'h_dxb_atlantis', name: 'Atlantis The Palm', destinationId: 'd1', category: 'Luxury', roomType: 'Ocean King', mealPlan: 'HB', cost: 45000, costType: 'Per Room', season: 'Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR' },
+  { id: 'h_hkt_grace', name: 'Phuket Graceland', destinationId: 'd2', category: '4 Star', roomType: 'Superior', mealPlan: 'BB', cost: 6000, costType: 'Per Room', season: 'Off-Peak', validFrom: '2023-01-01', validTo: '2025-12-31', isActive: true, createdBy: 'u1', currency: 'INR' }
 ];
 
 const INITIAL_ACTIVITIES: Activity[] = [
   { 
-    id: 'a1', 
+    id: 'a_dxb_safari', 
     activityName: 'Desert Safari', 
     destinationId: 'd1', 
     activityType: 'Adventure', 
-    costAdult: 120, 
-    costChild: 100, 
+    costAdult: 3500, 
+    costChild: 2500, 
     ticketIncluded: true, 
     transferIncluded: true, 
     isActive: true, 
     createdBy: 'u1', 
-    currency: 'AED', 
+    currency: 'INR', 
     description: 'Dune bashing, BBQ dinner', 
     duration: '6 Hours', 
     startTime: '3:00 PM',
     imageUrl: 'https://images.unsplash.com/photo-1547234935-80c7142ee969?auto=format&fit=crop&q=80&w=400',
     season: 'All Year',
     validFrom: '2024-01-01',
-    validTo: '2024-12-31'
+    validTo: '2025-12-31'
   },
   { 
-    id: 'a2', 
+    id: 'a_dxb_burj', 
     activityName: 'Burj Khalifa 124th Floor', 
     destinationId: 'd1', 
     activityType: 'City Tour', 
-    costAdult: 150, 
-    costChild: 110, 
+    costAdult: 4500, 
+    costChild: 3500, 
     ticketIncluded: true, 
     transferIncluded: false, 
     isActive: true, 
     createdBy: 'u1', 
-    currency: 'AED', 
+    currency: 'INR', 
     description: 'Non-prime hours ticket',
     duration: '2 Hours',
     startTime: 'Flexible',
     imageUrl: 'https://images.unsplash.com/photo-1582672060674-bc2bd808a8b5?auto=format&fit=crop&q=80&w=400',
     season: 'All Year',
     validFrom: '2024-01-01',
-    validTo: '2024-12-31'
+    validTo: '2025-12-31'
   },
   { 
-    id: 'a3', 
+    id: 'a_hkt_phiphi', 
     activityName: 'Phi Phi Island Tour', 
     destinationId: 'd2', 
     activityType: 'Adventure', 
-    costAdult: 1800, 
-    costChild: 1200, 
+    costAdult: 4000, 
+    costChild: 3000, 
     ticketIncluded: true, 
     transferIncluded: true, 
     isActive: true, 
     createdBy: 'u1', 
-    currency: 'THB', 
+    currency: 'INR', 
     description: 'By Speedboat + Lunch',
     duration: 'Full Day',
     startTime: '8:00 AM',
@@ -105,16 +105,16 @@ const INITIAL_ACTIVITIES: Activity[] = [
 
 const INITIAL_TRANSFERS: Transfer[] = [
   { 
-    id: 't1', 
+    id: 't_dxb_arr_pvt', 
     transferName: 'DXB Airport Arrival', 
     destinationId: 'd1', 
     transferType: 'PVT', 
     vehicleType: 'Sedan', 
     maxPassengers: 3, 
-    cost: 100, 
-    currency: 'AED', 
+    cost: 2500, 
+    currency: 'INR', 
     costBasis: 'Per Vehicle', 
-    nightSurcharge: 20, 
+    nightSurcharge: 500, 
     isActive: true, 
     createdBy: 'u1',
     luggageCapacity: 2,
@@ -122,19 +122,19 @@ const INITIAL_TRANSFERS: Transfer[] = [
     imageUrl: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=400',
     season: 'All Year',
     validFrom: '2024-01-01',
-    validTo: '2024-12-31'
+    validTo: '2025-12-31'
   },
   { 
-    id: 't2', 
+    id: 't_hkt_arr_van', 
     transferName: 'HKT Airport Arrival', 
     destinationId: 'd2', 
     transferType: 'PVT', 
     vehicleType: 'Van', 
     maxPassengers: 8, 
-    cost: 800, 
-    currency: 'THB', 
+    cost: 3000, 
+    currency: 'INR', 
     costBasis: 'Per Vehicle', 
-    nightSurcharge: 200, 
+    nightSurcharge: 800, 
     isActive: true, 
     createdBy: 'u1',
     luggageCapacity: 6,
@@ -142,46 +142,47 @@ const INITIAL_TRANSFERS: Transfer[] = [
     imageUrl: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?auto=format&fit=crop&q=80&w=400',
     season: 'All Year',
     validFrom: '2024-01-01',
-    validTo: '2024-12-31'
+    validTo: '2025-12-31'
   }
 ];
 
 const INITIAL_VISAS: Visa[] = [
   { 
-    id: 'v1', 
+    id: 'v_uae_30', 
     country: 'UAE', 
     visaType: 'Tourist 30 Days', 
     processingTime: '2-3 Days', 
-    cost: 350, 
+    cost: 7000, 
     documentsRequired: ['Passport Front/Back', 'Photo'], 
     isActive: true, 
     createdBy: 'u1',
     validity: '30 Days from Entry',
     entryType: 'Single'
   },
-  { id: 'v2', country: 'Thailand', visaType: 'E-Visa', processingTime: '4-5 Days', cost: 2000, documentsRequired: ['Passport', 'Flight Ticket', 'Hotel Voucher'], isActive: true, createdBy: 'u1' }
+  { id: 'v_thai_evisa', country: 'Thailand', visaType: 'E-Visa', processingTime: '4-5 Days', cost: 4500, documentsRequired: ['Passport', 'Flight Ticket', 'Hotel Voucher'], isActive: true, createdBy: 'u1' }
 ];
 
 const INITIAL_PRICING_RULE: PricingRule = {
-  id: 'pr1',
+  id: 'pr_default',
   name: 'Default',
   markupType: 'Percentage',
   companyMarkup: 10,
   agentMarkup: 10,
   gstPercentage: 5,
   roundOff: 'Nearest 10',
+  baseCurrency: 'INR', // Explicitly set Base to INR for this region to match inventory
   isActive: true
 };
 
 const INITIAL_PACKAGES: FixedPackage[] = [
   {
-    id: 'fp1', 
+    id: 'fp_dxb_saver', 
     packageName: 'Dubai Super Saver', 
     destinationId: 'd1', 
     nights: 4, 
     inclusions: ['4N Stay', 'Airport Transfers', 'City Tour', 'Desert Safari'], 
     exclusions: ['Flights', 'Visa', 'Tourism Dirham'], 
-    fixedPrice: 1250, 
+    fixedPrice: 35000, 
     validDates: ['2023-11-15', '2023-12-05'], 
     isActive: true, 
     createdBy: 'u1',
@@ -344,7 +345,14 @@ class AdminService {
   // --- PRICING RULE ---
   getPricingRule(): PricingRule {
     const stored = localStorage.getItem(KEYS.PRICING);
-    return stored ? JSON.parse(stored) : INITIAL_PRICING_RULE;
+    if (stored) {
+        const parsed = JSON.parse(stored);
+        if (!parsed.baseCurrency) {
+            parsed.baseCurrency = 'INR';
+        }
+        return parsed;
+    }
+    return INITIAL_PRICING_RULE;
   }
   savePricingRule(rule: PricingRule) {
     localStorage.setItem(KEYS.PRICING, JSON.stringify(rule));
