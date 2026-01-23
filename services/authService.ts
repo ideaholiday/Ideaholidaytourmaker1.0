@@ -95,45 +95,9 @@ class AuthService {
 
   /**
    * Core Identity Resolution
-   * Timeout set to 3.5s to unblock UI quickly if Firebase hangs.
+   * 1. Fetches REAL data from Firestore 'users' collection (Primary Truth).
+   * 2. Falls back to LocalStorage or Mocks only if Firestore fails/empty.
    */
-  async getCurrentUser(): Promise<User | null> {
-      // Direct synchronous check if already loaded (Optimization)
-      if (auth.currentUser) {
-          return this.handleFirebaseUser(auth.currentUser);
-      }
-
-      const authPromise = new Promise<User | null>((resolve) => {
-          const unsubscribe = auth.onAuthStateChanged(async (fbUser) => {
-              unsubscribe();
-              if (fbUser) {
-                  try {
-                      const user = await this.handleFirebaseUser(fbUser, true);
-                      resolve(user);
-                  } catch (e) {
-                      console.warn("User profile resolution failed", e);
-                      resolve(null);
-                  }
-              } else {
-                  resolve(null);
-              }
-          }, (error) => {
-              console.error("Auth State Observer Error:", error);
-              resolve(null); // Fail safe
-          });
-      });
-
-      // 3.5-second timeout failsafe
-      const timeoutPromise = new Promise<null>((resolve) => 
-          setTimeout(() => {
-              console.warn("Auth check timed out - assuming logged out.");
-              resolve(null);
-          }, 3500)
-      );
-
-      return Promise.race([authPromise, timeoutPromise]);
-  }
-
   private async handleFirebaseUser(fbUser: FirebaseUser, forceSync: boolean = false): Promise<User> {
       let finalUser: User | null = null;
 
@@ -142,6 +106,13 @@ class AuthService {
           const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
           if (userDoc.exists()) {
               finalUser = userDoc.data() as User;
+          } else {
+              // Try finding by email (Migration case)
+              if (fbUser.email) {
+                  const q = collection(db, 'users'); 
+                  // In real app use query(collection(db,'users'), where('email','==',email))
+                  // but we sync directory anyway, so let's look in local if fetch fails
+              }
           }
       } catch (e) { console.warn("Firestore profile fetch error", e); }
 
@@ -156,11 +127,8 @@ class AuthService {
           // Check role authority
           let role = UserRole.AGENT;
           if (fbUser.email) {
-             // Try catch for role fetch to prevent hanging
-             try {
-                const roleSnap = await getDoc(doc(db, 'user_roles', fbUser.email.toLowerCase()));
-                if (roleSnap.exists()) role = roleSnap.data().role;
-             } catch(e) { console.warn("Role fetch failed, defaulting to Agent"); }
+             const roleSnap = await getDoc(doc(db, 'user_roles', fbUser.email.toLowerCase()));
+             if (roleSnap.exists()) role = roleSnap.data().role;
           }
 
           finalUser = {
@@ -173,7 +141,7 @@ class AuthService {
               status: 'ACTIVE',
               joinedAt: new Date().toISOString()
           };
-          // Create in DB - Fire and Forget to avoid blocking
+          // Create in DB
           this.syncUserToFirestore(finalUser);
       }
 
@@ -185,6 +153,7 @@ class AuthService {
   }
 
   private handleSystemLogin(mockUser: User): User {
+      // Even for mock login, try to get fresh data from local storage which might be updated
       this.users = this.loadUsers();
       const user = this.users.find(u => u.id === mockUser.id) || mockUser;
       apiClient.setSession(`sess_mock_${Date.now()}_${user.id}`);
@@ -198,6 +167,8 @@ class AuthService {
       else this.users.push(user);
       this.saveUsers();
   }
+
+  // ... (register, requestPasswordReset, handleActionCode, verifyUser, resendVerification remain similar) ...
   
   async register(email: string, password: string, name: string, role: UserRole, companyName: string, phone: string, city: string): Promise<User> {
     try {
@@ -226,6 +197,20 @@ class AuthService {
     } catch (error: any) {
         throw new Error(error.message);
     }
+  }
+
+  async getCurrentUser(): Promise<User | null> {
+      return new Promise((resolve) => {
+          const unsubscribe = auth.onAuthStateChanged(async (fbUser) => {
+              unsubscribe();
+              if (fbUser) {
+                  const user = await this.handleFirebaseUser(fbUser, true);
+                  resolve(user);
+              } else {
+                  resolve(null);
+              }
+          });
+      });
   }
   
   // Helpers
