@@ -45,6 +45,17 @@ class AuthService {
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(this.users));
   }
 
+  private isOfflineError(e: any): boolean {
+      return (
+          e.code === 'permission-denied' || 
+          e.code === 'unavailable' || 
+          e.code === 'not-found' || 
+          e.message?.includes('permission-denied') || 
+          e.message?.includes('not-found') ||
+          e.message?.includes('offline')
+      );
+  }
+
   /**
    * Syncs the entire user directory from Firestore.
    * Ensures Admin has the latest list of all agents/operators.
@@ -62,7 +73,7 @@ class AuthService {
               console.log("✅ User Directory Synced from Cloud");
           }
       } catch (e: any) {
-          if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+          if (this.isOfflineError(e)) {
               console.warn("⚠️ Auth Service: Backend unavailable. Switching to Offline Mode.");
               this.isOffline = true;
           } else {
@@ -71,38 +82,22 @@ class AuthService {
       }
   }
 
-  resolveDashboardPath(role: UserRole): string {
-      const knownRoles = Object.values(UserRole);
-      if (!knownRoles.includes(role)) {
-          return '/unauthorized';
-      }
-
-      switch(role) {
-          case UserRole.ADMIN: return '/admin/dashboard';
-          case UserRole.STAFF: return '/admin/dashboard';
-          case UserRole.AGENT: return '/agent/dashboard';
-          case UserRole.OPERATOR: return '/operator/dashboard';
-          case UserRole.HOTEL_PARTNER: return '/partner/dashboard';
-          default: return '/unauthorized';
-      }
-  }
-
   async login(email: string, password: string): Promise<User> {
     this.resetAuthState();
-    await apiClient.request('/auth/login', { method: 'POST' });
-
-    // Mock Login Fallback (Only if explicitly using mock credentials for dev)
-    const mockUser = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (mockUser && password === 'password123') {
-        // Even for mock login, try to find this user in Firestore first to get latest branding
-        // This is safe because we wrap call inside handleSystemLogin logic or skip if offline
-        return this.handleSystemLogin(mockUser);
-    }
-
+    
+    // Authenticate with Firebase first
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         // Force sync true to ensure we get latest profile on explicit login
-        return this.handleFirebaseUser(userCredential.user, true);
+        const user = await this.handleFirebaseUser(userCredential.user, true);
+        
+        // After fetching/resolving user, we can simulate an API login call to sync session
+        await apiClient.request(`/auth/${user.role.toLowerCase()}/login`, { 
+            method: 'POST',
+            body: JSON.stringify({ email, password, device_name: 'web' })
+        });
+        
+        return user;
     } catch (error: any) {
         if (error.code === 'auth/invalid-credential') throw new Error("Invalid email or password.");
         throw new Error(error.message || "Login failed.");
@@ -122,55 +117,48 @@ class AuthService {
 
   /**
    * Core logic to resolve a Firebase User to an App User.
-   * PRIORITIZES FIRESTORE DATA over local storage to fix Branding Reset bug.
+   * Now integrates with Laravel API endpoint to get centralized routing logic.
    */
   private async handleFirebaseUser(fbUser: FirebaseUser, forceSync: boolean = false): Promise<User> {
       let finalUser: User | null = null;
       let isNew = false;
+      let dashboardRoute = '/';
 
-      // 1. CRITICAL: Fetch full profile from Firestore 'users' collection
-      if (!this.isOffline) {
+      // 1. Try to fetch Authoritative Profile from Backend API
+      // This enforces "Centralize role resolution... in the Laravel backend"
+      try {
+          if (!this.isOffline) {
+             const apiResponse: any = await apiClient.request('/auth/me');
+             if (apiResponse && apiResponse.user) {
+                 finalUser = {
+                     ...apiResponse.user,
+                     dashboardRoute: apiResponse.dashboard_route
+                 };
+             }
+          }
+      } catch (e) {
+          console.warn("API Profile Sync Failed, falling back to Firestore/Local", e);
+      }
+
+      // 2. Fallback: Fetch from Firestore 'users' collection
+      if (!finalUser && !this.isOffline) {
           try {
               const userDocRef = doc(db, 'users', fbUser.uid);
               const userDoc = await getDoc(userDocRef);
               
               if (userDoc.exists()) {
                   finalUser = userDoc.data() as User;
-                  // Merge local defaults if fields are missing in cloud (backward compatibility)
                   if (!finalUser.role) finalUser.role = UserRole.AGENT;
               }
           } catch (e: any) {
-              if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
-                  this.isOffline = true; // Switch to offline for this session
+              if (this.isOfflineError(e)) {
+                  this.isOffline = true;
+                  console.warn("⚠️ Firestore unavailable (Profile). Offline mode active.");
               }
-              console.warn("Firestore profile fetch failed (Falling back to local)", e.code);
           }
       }
 
-      // 2. If no full profile in 'users', check 'user_roles' or create new
-      if (!finalUser && !this.isOffline) {
-          if (fbUser.email) {
-              try {
-                  const roleSnap = await getDoc(doc(db, 'user_roles', fbUser.email.toLowerCase()));
-                  if (roleSnap.exists()) {
-                      const data = roleSnap.data();
-                      finalUser = {
-                          id: fbUser.uid,
-                          uniqueId: idGeneratorService.generateUniqueId(data.role as UserRole),
-                          name: fbUser.displayName || fbUser.email.split('@')[0],
-                          email: fbUser.email,
-                          role: data.role as UserRole,
-                          isVerified: fbUser.emailVerified,
-                          status: 'ACTIVE',
-                          joinedAt: new Date().toISOString()
-                      };
-                      isNew = true;
-                  }
-              } catch (e) { console.warn("Role map fetch failed", e); }
-          }
-      }
-
-      // 3. Fallback to Local Cache (Offline support only if Cloud failed)
+      // 3. Fallback to Local Cache
       if (!finalUser) {
           this.users = this.loadUsers();
           finalUser = this.users.find(u => u.id === fbUser.uid || u.email.toLowerCase() === fbUser.email?.toLowerCase()) || null;
@@ -191,10 +179,15 @@ class AuthService {
           };
       }
 
-      // 5. Update Local Cache with the Authoritative User Object
+      // 5. Hydrate Dashboard Route if missing (Offline/Fallback Logic)
+      if (!finalUser.dashboardRoute) {
+          finalUser.dashboardRoute = this.getOfflineDashboardRoute(finalUser.role);
+      }
+
+      // 6. Update Local Cache
       this.updateLocalUser(finalUser);
       
-      // 6. Sync back to Cloud if it's a new user or forcing sync
+      // 7. Sync back to Cloud if it's a new user or forcing sync
       if ((isNew || forceSync) && !this.isOffline) {
           this.syncUserToFirestore(finalUser).catch(console.warn);
       }
@@ -203,21 +196,36 @@ class AuthService {
       return finalUser;
   }
 
+  // Fallback for offline mode when API is unreachable
+  private getOfflineDashboardRoute(role: UserRole): string {
+      switch(role) {
+          case UserRole.ADMIN: return '/admin/dashboard';
+          case UserRole.STAFF: return '/admin/dashboard';
+          case UserRole.AGENT: return '/agent/dashboard';
+          case UserRole.OPERATOR: return '/operator/dashboard';
+          case UserRole.HOTEL_PARTNER: return '/partner/dashboard';
+          default: return '/unauthorized';
+      }
+  }
+
   private handleSystemLogin(mockUser: User): User {
       this.users = this.loadUsers();
-      // Ensure we don't overwrite a newer cloud version in local storage if exists
       const existingIndex = this.users.findIndex(u => u.id === mockUser.id);
       
+      const userWithRoute = {
+          ...mockUser,
+          dashboardRoute: this.getOfflineDashboardRoute(mockUser.role)
+      };
+
       if (existingIndex >= 0) {
-          // If local has more data (e.g. branding), keep local, else mock
-          this.users[existingIndex] = mockUser;
+          this.users[existingIndex] = userWithRoute;
       } else {
-          this.users.push(mockUser);
+          this.users.push(userWithRoute);
       }
       
       this.saveUsers();
       apiClient.setSession(`sess_mock_${Date.now()}_${mockUser.id}`);
-      return mockUser;
+      return userWithRoute;
   }
 
   private updateLocalUser(user: User) {
@@ -246,10 +254,10 @@ class AuthService {
             city,
             isVerified: false, 
             status: 'PENDING_VERIFICATION',
-            joinedAt: new Date().toISOString()
+            joinedAt: new Date().toISOString(),
+            dashboardRoute: this.getOfflineDashboardRoute(role)
         };
 
-        // Save immediately to Cloud and Local
         await this.syncUserToFirestore(newUser);
         this.updateLocalUser(newUser);
         
@@ -348,7 +356,7 @@ class AuthService {
               }, { merge: true });
           }
       } catch (e: any) { 
-           if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+           if (this.isOfflineError(e)) {
               this.isOffline = true;
           } else {
               console.error("Firestore Sync Error:", e);

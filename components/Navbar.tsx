@@ -2,13 +2,14 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { BRANDING } from '../constants';
 import { LogOut, LayoutDashboard, FileText, PlusCircle, Store, UserPlus, Globe } from 'lucide-react';
 import { UserRole } from '../types';
+import { useClientBranding } from '../hooks/useClientBranding';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { agencyName, logoUrl, styles, isPlatformDefault } = useClientBranding();
 
   const handleLogout = () => {
     logout();
@@ -19,42 +20,37 @@ export const Navbar: React.FC = () => {
   const isAgent = user?.role === UserRole.AGENT;
   const isPartner = user?.role === UserRole.HOTEL_PARTNER;
 
-  // Determine Home Link based on Role
-  const getHomeLink = () => {
-    if (!user) return '/';
-    switch (user.role) {
-      case UserRole.ADMIN:
-      case UserRole.STAFF:
-        return '/admin/dashboard';
-      case UserRole.AGENT:
-        return '/agent/dashboard';
-      case UserRole.OPERATOR:
-        return '/operator/dashboard';
-      case UserRole.HOTEL_PARTNER:
-        return '/partner/dashboard';
-      default:
-        return '/dashboard';
-    }
-  };
+  // Use the backend-provided route if available, otherwise default to home
+  const homeLink = user?.dashboardRoute || '/';
 
   return (
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 backdrop-blur-md bg-white/90 support-[backdrop-filter]:bg-white/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         
         {/* Logo Section */}
-        <Link to={getHomeLink()} className="flex items-center gap-3 group">
+        <Link to={homeLink} className="flex items-center gap-3 group">
           <div className="relative">
-             {/* Tilted Axis Container for Earth-like effect */}
-             <div className="bg-gradient-to-br from-brand-500 to-brand-700 text-white p-2 rounded-xl shadow-lg shadow-brand-500/30 transition-all duration-300 group-hover:scale-110 group-hover:rotate-[15deg] rotate-6">
-                <Globe size={22} strokeWidth={2} className="animate-spin-slow" />
-             </div>
+             {/* Logo Container */}
+             {logoUrl ? (
+                 <img src={logoUrl} alt={agencyName} className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
+             ) : (
+                <div 
+                    className="p-2 rounded-xl shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:rotate-[15deg] rotate-6 text-white"
+                    style={isPlatformDefault ? { background: 'linear-gradient(135deg, #0ea5e9, #0369a1)' } : styles.primaryBg}
+                >
+                    <Globe size={22} strokeWidth={2} className="animate-spin-slow" />
+                </div>
+             )}
           </div>
           <div className="flex flex-col justify-center">
-            <span className="font-extrabold text-xl text-slate-900 tracking-tight leading-none hidden sm:block group-hover:text-brand-700 transition-colors">
-              {BRANDING.name}
+            <span 
+                className="font-extrabold text-xl tracking-tight leading-none hidden sm:block transition-colors"
+                style={isPlatformDefault ? { color: '#0f172a' } : { color: '#0f172a' }} // Default text color dark
+            >
+              {agencyName}
             </span>
             <span className="font-extrabold text-xl text-slate-900 tracking-tight leading-none sm:hidden group-hover:text-brand-700 transition-colors">
-              ITM
+              {agencyName.substring(0, 3).toUpperCase()}
             </span>
           </div>
         </Link>
@@ -83,7 +79,8 @@ export const Navbar: React.FC = () => {
                    </Link>
                    <Link 
                     to="/agent/create" 
-                    className="flex items-center gap-1 text-sm font-bold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors"
+                    className="flex items-center gap-1 text-sm font-bold text-white px-3 py-1.5 rounded-lg transition-colors shadow-sm hover:opacity-90"
+                    style={styles.primaryBg}
                    >
                      <PlusCircle size={16} /> New Quote
                    </Link>
@@ -101,7 +98,10 @@ export const Navbar: React.FC = () => {
               
               <div className="hidden md:flex flex-col items-end mr-2">
                 <span className="text-sm font-bold text-slate-800">{user.name}</span>
-                <span className="text-[10px] uppercase tracking-wider text-brand-600 font-bold px-2 py-0.5 bg-brand-50 rounded-full">
+                <span 
+                    className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-slate-100"
+                    style={!isPlatformDefault ? { color: styles.primaryText.color } : { color: '#0284c7' }}
+                >
                   {user.role.replace('_', ' ')}
                 </span>
               </div>
@@ -123,7 +123,8 @@ export const Navbar: React.FC = () => {
               </Link>
               <Link 
                 to="/login"
-                className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2 rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                className="text-white px-5 py-2 rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                style={isPlatformDefault ? { backgroundColor: '#0f172a' } : styles.primaryBg}
               >
                 Sign In
               </Link>

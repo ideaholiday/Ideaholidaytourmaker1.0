@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { SessionWatcher } from './components/SessionWatcher';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { BrandContext, resolveAgentBranding } from './context/BrandContext';
 
 // Pages
 import { Home } from './pages/Home';
@@ -19,7 +20,7 @@ import { QuoteDetail } from './pages/QuoteDetail';
 import { Terms, Privacy, Support, Faq } from './pages/StaticPages';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UserRole } from './types';
-import { authService } from './services/authService';
+// Removed explicit authService import used for resolveDashboardPath as it's now property based
 
 // Admin CMS Imports
 import { AdminLayout } from './pages/admin/AdminLayout';
@@ -39,7 +40,6 @@ import { PaymentReminderSettings } from './pages/admin/PaymentReminderSettings';
 import { PLReports } from './pages/admin/PLReports'; 
 import { Destinations } from './pages/admin/Destinations';
 import { Hotels } from './pages/admin/Hotels';
-// import { PricingRules } from './pages/admin/PricingRules'; // Removed
 import { Sightseeing } from './pages/admin/Sightseeing';
 import { Transfers } from './pages/admin/Transfers';
 import { VisaPage } from './pages/admin/Visa';
@@ -85,7 +85,8 @@ const DashboardRedirect = () => {
     const { user } = useAuth();
     if (!user) return <Navigate to="/login" replace />;
 
-    const targetPath = authService.resolveDashboardPath(user.role);
+    // Use the backend-provided route directly
+    const targetPath = user.dashboardRoute || '/unauthorized';
     return <Navigate to={targetPath} replace />;
 };
 
@@ -104,18 +105,30 @@ const BookingRouter = () => {
     }
 };
 
-const Layout = () => (
-  <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
-    <Navbar />
-    <SessionWatcher />
-    <div className="flex-1 flex flex-col">
-        <React.Suspense fallback={<div className="p-4">Loading...</div>}>
-            <Outlet />
-        </React.Suspense>
-    </div>
-    <Footer />
-  </div>
-);
+const Layout = () => {
+  const { user } = useAuth();
+  
+  // Resolve Branding for Agents
+  // If user is an Agent, use their branding configuration
+  // Otherwise (Admin/Staff/Operator), use default platform branding (passed as null to resolver)
+  const agentForBranding = user?.role === UserRole.AGENT ? user : null;
+  const branding = useMemo(() => resolveAgentBranding(agentForBranding), [agentForBranding]);
+
+  return (
+    <BrandContext.Provider value={{ branding, isPlatformDefault: !agentForBranding }}>
+      <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
+        <Navbar />
+        <SessionWatcher />
+        <div className="flex-1 flex flex-col">
+            <React.Suspense fallback={<div className="p-4">Loading...</div>}>
+                <Outlet />
+            </React.Suspense>
+        </div>
+        <Footer />
+      </div>
+    </BrandContext.Provider>
+  );
+};
 
 const App: React.FC = () => {
   // REDIRECT HANDLER

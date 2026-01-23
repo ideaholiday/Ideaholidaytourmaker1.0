@@ -54,6 +54,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  dashboardRoute?: string; // Backend-determined entry point
   isVerified: boolean;
   status?: UserStatus;
   companyName?: string;

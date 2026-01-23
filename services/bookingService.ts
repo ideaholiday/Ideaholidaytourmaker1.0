@@ -22,12 +22,24 @@ class BookingService {
     localStorage.setItem(STORAGE_KEY_BOOKINGS, JSON.stringify(this.bookings));
   }
   
+  private isOfflineError(e: any): boolean {
+      const msg = e.message || '';
+      return (
+          e.code === 'permission-denied' || 
+          e.code === 'unavailable' || 
+          e.code === 'not-found' || 
+          msg.includes('permission-denied') || 
+          msg.includes('not-found') ||
+          msg.includes('offline')
+      );
+  }
+  
   private async syncToCloud(booking: Booking) {
       if (this.isOffline) return;
       try {
           await setDoc(doc(db, 'bookings', booking.id), booking, { merge: true });
       } catch (e: any) {
-          if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+          if (this.isOfflineError(e)) {
               this.isOffline = true;
           } else {
               console.error("Cloud save failed for booking", booking.id, e);
@@ -50,9 +62,11 @@ class BookingService {
              this.saveLocal();
           }
       } catch (e: any) { 
-           if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found' || e.message?.includes('permission-denied')) {
-             console.warn("⚠️ Booking Service: Backend unavailable. Switching to Offline Mode.");
-             this.isOffline = true;
+           if (this.isOfflineError(e)) {
+             if (!this.isOffline) {
+                 console.warn("⚠️ Booking Service: Backend unavailable. Switching to Offline Mode.");
+                 this.isOffline = true;
+             }
           } else {
              console.warn("Booking Sync Failed", e); 
           }

@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { ItineraryBuilderProvider, useBuilder } from '../../components/builder/ItineraryBuilderContext';
 import { InventoryModal } from '../../components/builder/InventoryModal';
-import { Plus, Trash2, MapPin, Loader2, Save, Calendar, Hotel, Camera, Car, Info } from 'lucide-react';
+import { Plus, Trash2, MapPin, Loader2, Save, Calendar, Hotel, Camera, Car, Info, Map } from 'lucide-react';
 import { adminService } from '../../services/adminService'; 
+import { inventoryService } from '../../services/inventoryService';
 
 const BuilderContent: React.FC = () => {
   const { state, initDestination, addService, removeService, saveItinerary } = useBuilder();
@@ -21,39 +22,70 @@ const BuilderContent: React.FC = () => {
       setModalConfig({ isOpen: true, dayId, type, destId });
   };
 
+  const getInventoryCounts = (destId: string) => {
+      // Simple count of available items for this destination to help agent choose
+      const hotels = adminService.getHotels().filter(h => h.destinationId === destId).length;
+      const activities = adminService.getActivities().filter(a => a.destinationId === destId).length;
+      return { hotels, activities };
+  };
+
   if (state.days.length === 0) {
       return (
-          <div className="max-w-md mx-auto mt-20 bg-white p-8 rounded-xl shadow-lg border border-slate-200">
-              <h2 className="text-2xl font-bold mb-6 text-center">Start New Itinerary</h2>
-              <div className="space-y-4">
-                  <div>
-                      <label className="block text-sm font-medium mb-1">Destination</label>
-                      <select 
-                        className="w-full border p-2 rounded-lg"
-                        value={setup.destId}
-                        onChange={e => setSetup({...setup, destId: e.target.value})}
+          <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
+              <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
+                  <div className="flex justify-center mb-6">
+                      <div className="bg-brand-50 p-4 rounded-full">
+                          <Map className="w-10 h-10 text-brand-600" />
+                      </div>
+                  </div>
+                  <h2 className="text-2xl font-bold mb-2 text-center text-slate-900">Start New Itinerary</h2>
+                  <p className="text-center text-slate-500 mb-8 text-sm">Select a destination to initialize the builder.</p>
+                  
+                  <div className="space-y-5">
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Destination</label>
+                          <div className="relative">
+                            <select 
+                                className="w-full border border-slate-300 p-3 rounded-xl appearance-none bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none text-sm font-medium"
+                                value={setup.destId}
+                                onChange={e => setSetup({...setup, destId: e.target.value})}
+                            >
+                                <option value="">Select City...</option>
+                                {destinations.map(d => {
+                                    const counts = getInventoryCounts(d.id);
+                                    return (
+                                        <option key={d.id} value={d.id}>
+                                            {d.city}, {d.country} ({counts.hotels + counts.activities} Items)
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                            <MapPin className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={18} />
+                          </div>
+                      </div>
+                      
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Duration (Nights)</label>
+                          <div className="relative">
+                            <input 
+                                type="number" 
+                                className="w-full border border-slate-300 p-3 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none text-sm font-medium" 
+                                value={setup.days}
+                                onChange={e => setSetup({...setup, days: Number(e.target.value)})}
+                                min={1} 
+                            />
+                            <Calendar className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={18} />
+                          </div>
+                      </div>
+                      
+                      <button 
+                        onClick={handleStart}
+                        disabled={!setup.destId}
+                        className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition transform active:scale-95 shadow-lg mt-2"
                       >
-                          <option value="">Select City...</option>
-                          {destinations.map(d => <option key={d.id} value={d.id}>{d.city}</option>)}
-                      </select>
+                          Launch Builder
+                      </button>
                   </div>
-                  <div>
-                      <label className="block text-sm font-medium mb-1">Duration (Nights)</label>
-                      <input 
-                        type="number" 
-                        className="w-full border p-2 rounded-lg" 
-                        value={setup.days}
-                        onChange={e => setSetup({...setup, days: Number(e.target.value)})}
-                        min={1} 
-                      />
-                  </div>
-                  <button 
-                    onClick={handleStart}
-                    disabled={!setup.destId}
-                    className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold hover:bg-brand-700 disabled:opacity-50"
-                  >
-                      Create Itinerary
-                  </button>
               </div>
           </div>
       );
@@ -68,7 +100,7 @@ const BuilderContent: React.FC = () => {
               </div>
               <div className="flex items-center gap-6">
                   {/* NET COST */}
-                  <div className="text-right border-r border-slate-200 pr-6">
+                  <div className="text-right border-r border-slate-200 pr-6 hidden sm:block">
                       <p className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-end gap-1">
                           Net B2B Cost <Info size={10} className="text-slate-300"/>
                       </p>
@@ -111,9 +143,9 @@ const BuilderContent: React.FC = () => {
                               {day.title}
                           </h3>
                           <div className="flex gap-2">
-                              <button onClick={() => handleOpenModal(day.id, 'HOTEL', day.destination_id)} className="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded font-bold hover:bg-indigo-100 transition">+ Hotel</button>
-                              <button onClick={() => handleOpenModal(day.id, 'ACTIVITY', day.destination_id)} className="text-xs bg-pink-50 text-pink-700 px-3 py-1.5 rounded font-bold hover:bg-pink-100 transition">+ Activity</button>
-                              <button onClick={() => handleOpenModal(day.id, 'TRANSFER', day.destination_id)} className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded font-bold hover:bg-blue-100 transition">+ Transfer</button>
+                              <button onClick={() => handleOpenModal(day.id, 'HOTEL', day.destination_id)} className="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded font-bold hover:bg-indigo-100 transition border border-indigo-100">+ Hotel</button>
+                              <button onClick={() => handleOpenModal(day.id, 'ACTIVITY', day.destination_id)} className="text-xs bg-pink-50 text-pink-700 px-3 py-1.5 rounded font-bold hover:bg-pink-100 transition border border-pink-100">+ Activity</button>
+                              <button onClick={() => handleOpenModal(day.id, 'TRANSFER', day.destination_id)} className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded font-bold hover:bg-blue-100 transition border border-blue-100">+ Transfer</button>
                           </div>
                       </div>
                       
@@ -137,6 +169,7 @@ const BuilderContent: React.FC = () => {
                                       </div>
                                   </div>
                                   <div className="flex items-center gap-4">
+                                      <span className="font-mono text-xs font-bold text-slate-600">{state.currency} {svc.estimated_cost?.toLocaleString()}</span>
                                       <button onClick={() => removeService(day.id, svc.id)} className="text-slate-300 hover:text-red-500 transition">
                                           <Trash2 size={16} />
                                       </button>
@@ -156,6 +189,8 @@ const BuilderContent: React.FC = () => {
                   dayId={modalConfig.dayId}
                   type={modalConfig.type}
                   destinationId={modalConfig.destId}
+                  // New Prop for visual feedback
+                  currentServices={state.days.find(d => d.id === modalConfig.dayId)?.services || []}
               />
           )}
       </div>

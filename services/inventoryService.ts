@@ -195,7 +195,13 @@ class InventoryService {
 
     // Cloud Delete
     if (!this.isOffline) {
-        deleteDoc(doc(db, 'products', id)).catch(console.error);
+        deleteDoc(doc(db, 'products', id)).catch((e) => {
+             if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+                  this.isOffline = true;
+            } else {
+                console.error("Cloud inventory delete failed", e);
+            }
+        });
     }
   }
 

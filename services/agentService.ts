@@ -100,7 +100,13 @@ class AgentService {
         if (!this.isOffline) {
             try {
                 await deleteDoc(doc(db, 'quotes', quoteId));
-            } catch (e: any) { console.error("Cloud delete failed", e); }
+            } catch (e: any) { 
+                if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
+                  this.isOffline = true;
+                } else {
+                    console.error("Cloud delete failed", e); 
+                }
+            }
         }
     }
   }

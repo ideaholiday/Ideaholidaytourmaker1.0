@@ -75,8 +75,13 @@ class AdminService {
 
       console.log("🔄 Starting Cloud Sync...");
       try {
+          // Probe with one collection first to fail fast if DB is missing
+          await this.syncCollection('destinations', KEYS.DESTINATIONS);
+          
+          if (this.isOffline) return; // Stop if probe failed
+
+          // If probe succeeded, sync the rest in parallel
           await Promise.all([
-              this.syncCollection('destinations', KEYS.DESTINATIONS),
               this.syncCollection('hotels', KEYS.HOTELS),
               this.syncCollection('activities', KEYS.ACTIVITIES),
               this.syncCollection('transfers', KEYS.TRANSFERS),
@@ -92,15 +97,20 @@ class AdminService {
   }
 
   private handleSyncError(e: any) {
-      if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found' || e.message?.includes('permission-denied') || e.message?.includes('not-found')) {
-          console.warn("⚠️ Backend unavailable (Offline Mode). Using local data.", e.message);
-          this.isOffline = true;
+      const msg = e.message || '';
+      if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found' || msg.includes('permission-denied') || msg.includes('not-found') || msg.includes('offline')) {
+          if (!this.isOffline) {
+              console.warn("⚠️ Backend unavailable (Offline Mode). Using local data.");
+              this.isOffline = true;
+          }
       } else {
           console.warn("Sync Warning:", e);
       }
   }
 
   private async syncCollection(firestoreCol: string, localKey: string) {
+      if (this.isOffline) return;
+
       try {
           const q = query(collection(db, firestoreCol));
           const snapshot = await getDocs(q);
@@ -270,7 +280,7 @@ class AdminService {
             setDoc(doc(db, 'user_roles', userToSave.email.toLowerCase()), {
                 email: userToSave.email.toLowerCase(),
                 role: userToSave.role
-            }, { merge: true }).catch(e => console.warn("Role sync failed (likely offline)", e));
+            }, { merge: true }).catch(e => this.handleSyncError(e));
         }
     }
   }

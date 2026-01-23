@@ -31,13 +31,14 @@ export const Login: React.FC = () => {
       }
   }, [location]);
 
-  // AUTO-REDIRECT
+  // AUTO-REDIRECT using Backend Route
   useEffect(() => {
       if (isAuthenticated && user && !isRedirecting) {
           if (user.isVerified) {
               setIsRedirecting(true);
-              const target = authService.resolveDashboardPath(user.role);
-              console.log(`[Login] Authenticated as ${user.role}. Redirecting to ${target}`);
+              // Use the route provided by the backend, fallback to root if missing
+              const target = user.dashboardRoute || '/';
+              console.log(`[Login] Authenticated. Redirecting to backend-determined route: ${target}`);
               
               // Ensure immediate redirect without leaking previous state
               navigate(target, { replace: true });
@@ -56,8 +57,6 @@ export const Login: React.FC = () => {
       await login(email, password);
       // Redirect handled by useEffect
     } catch (err: any) {
-      // Logic: authService throws clean error messages, we just display them
-      // 'Firebase: ' prefix removal is just cleanup for raw firebase errors if they slip through
       const msg = err.message.replace('Firebase: ', '').replace('auth/', '');
       
       if (msg.includes('not verified') || msg.includes('email-not-verified')) {

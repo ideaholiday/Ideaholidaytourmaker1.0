@@ -3,66 +3,48 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AuthController;
-use App\Http\Controllers\Api\V1\CommonController;
-use App\Http\Controllers\Api\V1\Agent\QuoteController as AgentQuoteController;
-use App\Http\Controllers\Api\V1\Operator\TaskController as OperatorTaskController;
-use App\Http\Controllers\Api\V1\Admin\UserController as AdminUserController;
-use App\Http\Controllers\Api\V1\Admin\InventoryController as AdminInventoryController;
-use App\Http\Controllers\Api\V1\Operator\InventoryController as OperatorInventoryController;
-use App\Http\Controllers\Api\V1\Supplier\InventoryController as SupplierInventoryController;
-// Builder Controllers
-use App\Http\Controllers\Api\V1\Builder\BuilderConfigController;
-use App\Http\Controllers\Api\V1\Builder\ItineraryController;
-use App\Http\Controllers\Api\V1\Builder\DestinationController;
-use App\Http\Controllers\Api\V1\Builder\InventoryController;
-use App\Http\Controllers\Api\V1\Builder\HotelController;
-use App\Http\Controllers\Api\V1\Builder\ItineraryServiceController;
-use App\Http\Controllers\Api\V1\Builder\PricingController;
-use App\Http\Controllers\Api\V1\Builder\ItineraryWorkflowController;
-use App\Http\Controllers\Api\V1\Builder\ItineraryPdfController;
+use App\Http\Controllers\Api\V1\Agent\QuoteController;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+|
+| Version: v1
+| Mobile-Ready: Yes
+| Role-Isolated: Yes
+|
+*/
 
 Route::prefix('v1')->group(function () {
 
-    // ... (Existing Auth Routes) ...
-    Route::post('/auth/{role}/login', [AuthController::class, 'login'])
-        ->whereIn('role', ['admin', 'staff', 'agent', 'operator', 'supplier']);
-    Route::post('/register-partner', [AuthController::class, 'register']);
-    Route::post('/forgot-password', [AuthController::class, 'sendResetLink']);
+    // --- PUBLIC AUTH ---
+    // Universal login endpoint that resolves roles internally
+    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/register', [AuthController::class, 'register']);
+    Route::post('/auth/forgot-password', [AuthController::class, 'sendResetLink']);
 
-    // Authenticated Session Check
-    Route::middleware(['auth:sanctum'])->get('/auth/me', [AuthController::class, 'me']);
-
-    // --- AGENT SPECIFIC ROUTES ---
-    Route::middleware(['auth:sanctum', 'role:AGENT'])->prefix('agent')->group(function () {
-        Route::post('/quotes', [AgentQuoteController::class, 'store']);
-        Route::delete('/quotes/{id}', [AgentQuoteController::class, 'destroy']); // Delete Quote
-        Route::post('/quotes/{id}/book', [AgentQuoteController::class, 'book']); // Book Quote
-        Route::get('/bookings', [AgentQuoteController::class, 'history']); // Booked History
-    });
-    
-    // --- ITINERARY BUILDER (Shared Access) ---
-    Route::middleware(['auth:sanctum'])->prefix('builder')->group(function () {
-        Route::get('/config', [BuilderConfigController::class, 'index']);
-        Route::post('/itineraries', [ItineraryController::class, 'store']);
-        Route::get('/itineraries/{itinerary}', [ItineraryController::class, 'show']);
-        Route::post('/itineraries/{itinerary}/commit', [ItineraryController::class, 'commit']);
-        Route::post('/itineraries/{itinerary}/destinations', [DestinationController::class, 'add']);
-        Route::post('/itineraries/{itinerary}/destinations/reorder', [DestinationController::class, 'reorder']);
+    // --- PROTECTED ROUTES ---
+    Route::middleware('auth:sanctum')->group(function () {
         
-        // General Inventory Search
-        Route::get('/inventory/search', [InventoryController::class, 'search']);
+        // Session Hydration (Frontend calls this on reload)
+        Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::post('/auth/logout', [AuthController::class, 'logout']);
 
-        // HOTEL SPECIFIC
-        Route::get('/hotels/search', [HotelController::class, 'search']);
-        Route::get('/hotels/{hotelId}/rates', [HotelController::class, 'rates']);
-        Route::post('/itineraries/{itinerary}/hotel', [HotelController::class, 'addToItinerary']);
+        // --- AGENT DOMAIN ---
+        Route::middleware('role:AGENT')->prefix('agent')->group(function () {
+            Route::get('/dashboard-stats', [QuoteController::class, 'dashboardStats']);
+            Route::apiResource('quotes', QuoteController::class);
+        });
 
-        // Generic Service Addition
-        Route::post('/itineraries/{itinerary}/services', [ItineraryServiceController::class, 'add']);
-        Route::delete('/itineraries/{itinerary}/services/{service}', [ItineraryServiceController::class, 'remove']);
-        
-        Route::post('/itineraries/{itinerary}/pricing/calculate', [PricingController::class, 'calculate']);
-        Route::get('/itineraries/{itinerary}/pdf', [ItineraryPdfController::class, 'download']);
+        // --- OPERATOR DOMAIN ---
+        Route::middleware('role:OPERATOR')->prefix('operator')->group(function () {
+            // Operator specific routes
+        });
+
+        // --- ADMIN DOMAIN ---
+        Route::middleware('role:ADMIN,STAFF')->prefix('admin')->group(function () {
+            // Admin specific routes
+        });
     });
-    
 });

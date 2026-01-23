@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService'; 
 import { inventoryService } from '../../services/inventoryService';
-import { X, Search, Hotel, Camera, Car, Plus, ShieldCheck, User, MapPin, Globe, PenTool } from 'lucide-react';
+import { X, Search, Hotel, Camera, Car, Plus, ShieldCheck, User, MapPin, Globe, PenTool, CheckCircle } from 'lucide-react';
 import { BuilderService } from './ItineraryBuilderContext';
+import { ItineraryService } from '../../types';
 
 interface Props {
   isOpen: boolean;
@@ -12,9 +13,10 @@ interface Props {
   dayId: string;
   type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER';
   destinationId: string;
+  currentServices?: (BuilderService | ItineraryService)[]; // Accept both types for flexibility
 }
 
-export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, type, destinationId }) => {
+export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, type, destinationId, currentServices = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [items, setItems] = useState<any[]>([]);
   const [allDestinations, setAllDestinations] = useState<any[]>([]);
@@ -102,9 +104,9 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
   );
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl w-full max-w-2xl h-[85vh] flex flex-col shadow-2xl">
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-xl w-full max-w-3xl h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
             <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800">
                 {type === 'HOTEL' && <Hotel size={20} className="text-indigo-600"/>}
                 {type === 'ACTIVITY' && <Camera size={20} className="text-pink-600"/>}
@@ -210,11 +212,19 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                 const isPartner = !!item.operatorId;
                 const cost = item.cost || item.costAdult || item.costPrice || 0;
                 const locationName = getCityName(item.destinationId || item.location_id);
+                
+                // Check if already added to current day
+                const isAdded = currentServices.some((s: any) => s.inventory_id === item.id);
 
                 return (
-                    <div key={item.id} className="bg-white border border-slate-200 rounded-lg p-3 hover:border-brand-300 hover:shadow-md transition flex justify-between items-center group cursor-default">
+                    <div key={item.id} className={`bg-white border rounded-xl p-3 flex justify-between items-center group cursor-default transition-all ${isAdded ? 'border-emerald-200 shadow-none bg-emerald-50/20' : 'border-slate-200 hover:border-brand-300 hover:shadow-md'}`}>
                         <div className="flex-1 pr-4">
-                            <div className="flex items-start justify-between mb-1">
+                            <div className="flex items-center gap-2 mb-1">
+                                {isAdded && (
+                                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                        <CheckCircle size={10} /> Added
+                                    </span>
+                                )}
                                 <h4 className="font-bold text-slate-800 text-sm">{name}</h4>
                             </div>
                             
@@ -252,9 +262,9 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                             <span className="font-mono text-sm font-bold text-slate-700 block">{item.currency || 'INR'} {cost.toLocaleString()}</span>
                             <button 
                                 onClick={() => handleAddItem(item)}
-                                className="bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-brand-600 transition text-xs font-bold flex items-center gap-1 shadow-sm whitespace-nowrap"
+                                className={`${isAdded ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-900 hover:bg-brand-600'} text-white px-4 py-1.5 rounded-lg transition text-xs font-bold flex items-center gap-1 shadow-sm whitespace-nowrap`}
                             >
-                                <Plus size={12} /> Add
+                                {isAdded ? 'Add Again' : <><Plus size={12} /> Add</>}
                             </button>
                         </div>
                     </div>
