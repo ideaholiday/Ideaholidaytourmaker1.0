@@ -4,11 +4,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
 import { adminService } from '../../services/adminService';
+import { bookingService } from '../../services/bookingService';
 import { currencyService } from '../../services/currencyService';
 import { Quote, ItineraryItem, UserRole } from '../../types';
 import { ItineraryView } from '../components/ItineraryView';
 import { PriceSummary } from '../components/PriceSummary';
-import { ArrowLeft, Edit2, Download, Share2, GitBranch, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Edit2, Download, Share2, GitBranch, AlertTriangle, Link as LinkIcon, CheckCircle, Trash2 } from 'lucide-react';
 import { calculatePriceFromNet } from '../utils/pricingEngine';
 import { usePricingEngine } from '../hooks/usePricingEngine';
 import { ItineraryBuilder } from '../components/ItineraryBuilder';
@@ -30,6 +31,7 @@ export const QuoteDetail: React.FC = () => {
 
   const loadQuote = () => {
     if (id && user) {
+        // Try fetching from agent service which handles API/Local sync
         const storedQuotes = localStorage.getItem('iht_agent_quotes');
         const parsedQuotes: Quote[] = storedQuotes ? JSON.parse(storedQuotes) : [];
         const found = parsedQuotes.find(q => q.id === id);
@@ -57,8 +59,44 @@ export const QuoteDetail: React.FC = () => {
   const isAgent = user.role === UserRole.AGENT;
   const pricingRules = adminService.getPricingRule();
   const hasValidPrice = (quote.sellingPrice !== undefined && quote.sellingPrice > 0);
+  const isBooked = quote.status === 'BOOKED' || quote.status === 'CONFIRMED';
 
   // --- ACTIONS ---
+
+  const handleBook = async () => {
+      if (!quote || !user) return;
+      
+      // CONFIRMATION FOR BOOKING
+      if (window.confirm(`Are you sure you want to book Quote #${quote.uniqueRefNo}?\n\nThis will lock the itinerary and generate a booking request for the Operations team.`)) {
+          try {
+              // 1. Create Booking Record (Local System)
+              const newBooking = bookingService.createBookingFromQuote(quote, user);
+              
+              // 2. Sync Status to API (Backend)
+              await agentService.bookQuote(quote.id, user);
+
+              alert("Booking Created Successfully! Redirecting to booking details...");
+              navigate(`/booking/${newBooking.id}`);
+          } catch (e: any) {
+              console.error(e);
+              alert("Booking failed: " + e.message);
+          }
+      }
+  };
+
+  const handleDelete = async () => {
+      if (!quote) return;
+
+      // CONFIRMATION FOR DELETION
+      if (window.confirm(`⚠️ DANGER ZONE ⚠️\n\nAre you sure you want to DELETE Quote #${quote.uniqueRefNo}?\n\nThis action cannot be undone.`)) {
+          try {
+              await agentService.deleteQuote(quote.id);
+              navigate('/agent/quotes');
+          } catch (e: any) {
+              alert("Delete failed: " + e.message);
+          }
+      }
+  };
 
   const handleUpdateItinerary = (newItinerary: ItineraryItem[], financials?: { net: number, selling: number, currency: string }) => {
     
@@ -83,7 +121,6 @@ export const QuoteDetail: React.FC = () => {
     }
 
     // FALLBACK CALCULATION (If saving without builder calculation logic - e.g. legacy)
-    // NOTE: This logic is prone to errors if multipliers are missed.
     let calculatedRawCost = 0;
     const quoteCurrency = quote.currency || 'INR';
 
@@ -104,10 +141,6 @@ export const QuoteDetail: React.FC = () => {
 
     const currentAgentMarkupValue = undefined; 
 
-    // This computes Selling Price based on Supplier Net
-    // Note: 'calculatedRawCost' here acts as the 'Net B2B Cost' (platform margin already in unit cost usually for agents)
-    // Actually, in our mock, unit cost from admin IS supplier cost. 
-    // So we use calculatePriceFromNet which adds Platform Margin.
     const financialsCalc = calculatePriceFromNet(
         calculatedRawCost,
         pricingRules,
@@ -140,6 +173,12 @@ export const QuoteDetail: React.FC = () => {
      const text = formatWhatsAppQuote(quote, mockBreakdown, true);
      const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
      window.open(url, '_blank');
+  };
+
+  const handleCopyLink = () => {
+      const url = `${window.location.origin}/#/view/${quote.id}`;
+      navigator.clipboard.writeText(url);
+      alert("Public Link copied to clipboard!");
   };
 
   const handleCreateRevision = () => {
@@ -179,8 +218,18 @@ export const QuoteDetail: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                     
+                    {/* BOOK BUTTON */}
+                    {!isBooked && hasValidPrice && isAgent && (
+                        <button 
+                            onClick={handleBook} 
+                            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg shadow-sm font-bold transition transform hover:-translate-y-0.5"
+                        >
+                            <CheckCircle size={18} /> Book Now
+                        </button>
+                    )}
+
                     {/* Edit Action */}
                     {!quote.isLocked && isAgent && !isEditingItinerary && (
                          <button onClick={() => setIsEditingItinerary(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium">
@@ -189,7 +238,7 @@ export const QuoteDetail: React.FC = () => {
                     )}
 
                     {/* Versioning if Locked */}
-                    {quote.isLocked && isAgent && (
+                    {quote.isLocked && isAgent && !isBooked && (
                         <button onClick={handleCreateRevision} className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 text-sm font-bold transition">
                             <GitBranch size={16} /> New Version
                         </button>
@@ -198,6 +247,9 @@ export const QuoteDetail: React.FC = () => {
                     {/* Share / PDF */}
                     {hasValidPrice && (
                         <>
+                            <button onClick={handleCopyLink} className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-bold transition">
+                                <LinkIcon size={16} /> Copy Link
+                            </button>
                             <button onClick={handleShareWhatsApp} className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 text-sm font-bold transition">
                                 <Share2 size={16} /> WhatsApp
                             </button>
@@ -205,6 +257,13 @@ export const QuoteDetail: React.FC = () => {
                                 <Download size={16} /> Download PDF
                             </button>
                         </>
+                    )}
+
+                    {/* Delete Action */}
+                    {!isBooked && isAgent && (
+                        <button onClick={handleDelete} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-100 text-sm font-bold transition" title="Delete Quote">
+                            <Trash2 size={16} />
+                        </button>
                     )}
                 </div>
             </div>
@@ -214,7 +273,7 @@ export const QuoteDetail: React.FC = () => {
         {!hasValidPrice && !isEditingItinerary && (
              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex items-center gap-3 text-amber-800 animate-pulse">
                 <AlertTriangle size={20} />
-                <p className="font-bold text-sm">Price not calculated. Please edit the itinerary and save to generate a price before downloading PDF.</p>
+                <p className="font-bold text-sm">Price not calculated. Please edit the itinerary and save to generate a price before booking.</p>
             </div>
         )}
 

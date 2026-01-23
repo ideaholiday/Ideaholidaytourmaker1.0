@@ -1,4 +1,3 @@
-
 import { Quote, User, UserRole, Message } from '../types';
 import { agentService } from './agentService';
 import { auditLogService } from './auditLogService';
@@ -6,8 +5,8 @@ import { auditLogService } from './auditLogService';
 class OperatorAssignmentService {
   
   // Get quotes assigned to a specific operator
-  getAssignedQuotes(operatorId: string): Quote[] {
-    return agentService.getOperatorAssignments(operatorId);
+  async getAssignedQuotes(operatorId: string): Promise<Quote[]> {
+    return await agentService.getOperatorAssignments(operatorId);
   }
 
   // Accept an assignment

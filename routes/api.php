@@ -15,7 +15,7 @@ use App\Http\Controllers\Api\V1\Builder\BuilderConfigController;
 use App\Http\Controllers\Api\V1\Builder\ItineraryController;
 use App\Http\Controllers\Api\V1\Builder\DestinationController;
 use App\Http\Controllers\Api\V1\Builder\InventoryController;
-use App\Http\Controllers\Api\V1\Builder\HotelController; // NEW
+use App\Http\Controllers\Api\V1\Builder\HotelController;
 use App\Http\Controllers\Api\V1\Builder\ItineraryServiceController;
 use App\Http\Controllers\Api\V1\Builder\PricingController;
 use App\Http\Controllers\Api\V1\Builder\ItineraryWorkflowController;
@@ -32,7 +32,13 @@ Route::prefix('v1')->group(function () {
     // Authenticated Session Check
     Route::middleware(['auth:sanctum'])->get('/auth/me', [AuthController::class, 'me']);
 
-    // ... (Existing Role Routes) ...
+    // --- AGENT SPECIFIC ROUTES ---
+    Route::middleware(['auth:sanctum', 'role:AGENT'])->prefix('agent')->group(function () {
+        Route::post('/quotes', [AgentQuoteController::class, 'store']);
+        Route::delete('/quotes/{id}', [AgentQuoteController::class, 'destroy']); // Delete Quote
+        Route::post('/quotes/{id}/book', [AgentQuoteController::class, 'book']); // Book Quote
+        Route::get('/bookings', [AgentQuoteController::class, 'history']); // Booked History
+    });
     
     // --- ITINERARY BUILDER (Shared Access) ---
     Route::middleware(['auth:sanctum'])->prefix('builder')->group(function () {
@@ -46,7 +52,7 @@ Route::prefix('v1')->group(function () {
         // General Inventory Search
         Route::get('/inventory/search', [InventoryController::class, 'search']);
 
-        // HOTEL SPECIFIC (NEW)
+        // HOTEL SPECIFIC
         Route::get('/hotels/search', [HotelController::class, 'search']);
         Route::get('/hotels/{hotelId}/rates', [HotelController::class, 'rates']);
         Route::post('/itineraries/{itinerary}/hotel', [HotelController::class, 'addToItinerary']);
@@ -56,9 +62,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/itineraries/{itinerary}/services/{service}', [ItineraryServiceController::class, 'remove']);
         
         Route::post('/itineraries/{itinerary}/pricing/calculate', [PricingController::class, 'calculate']);
-        // Submit and Approve routes removed
         Route::get('/itineraries/{itinerary}/pdf', [ItineraryPdfController::class, 'download']);
     });
     
-    // ... (Global Resources) ...
 });

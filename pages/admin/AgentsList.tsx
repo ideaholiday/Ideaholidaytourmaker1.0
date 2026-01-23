@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { profileService } from '../../services/profileService';
+import { adminService } from '../../services/adminService';
 import { User, UserStatus } from '../../types';
-import { Search, Eye, Filter } from 'lucide-react';
+import { Search, Eye, Filter, Trash2 } from 'lucide-react';
 
 export const AgentsList: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,13 @@ export const AgentsList: React.FC = () => {
     a.email.toLowerCase().includes(search.toLowerCase()) ||
     a.companyName?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleDelete = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this agent? This action cannot be undone.")) {
+        adminService.deleteUser(id);
+        setAgents(profileService.getAllAgents()); // Refresh list
+    }
+  };
 
   return (
     <div>
@@ -60,15 +68,30 @@ export const AgentsList: React.FC = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button 
-                    onClick={() => navigate(`/admin/agents/${agent.id}`)}
-                    className="text-brand-600 hover:bg-brand-50 p-2 rounded transition"
-                  >
-                    <Eye size={18} />
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                      <button 
+                        onClick={() => navigate(`/admin/agents/${agent.id}`)}
+                        className="text-brand-600 hover:bg-brand-50 p-2 rounded transition"
+                        title="View Profile"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(agent.id)}
+                        className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-2 rounded transition"
+                        title="Delete Agent"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                  </div>
                 </td>
               </tr>
             ))}
+            {filtered.length === 0 && (
+                <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No agents found.</td>
+                </tr>
+            )}
           </tbody>
         </table>
       </div>

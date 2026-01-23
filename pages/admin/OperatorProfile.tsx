@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { profileService } from '../../services/profileService';
@@ -16,9 +15,14 @@ export const OperatorProfile: React.FC = () => {
 
   useEffect(() => {
     if (id) {
-      setOperator(profileService.getUser(id));
-      setStats(profileService.getOperatorStats(id));
-      setAssignments(agentService.getOperatorAssignments(id));
+      const loadProfile = async () => {
+          setOperator(profileService.getUser(id));
+          const statsData = await profileService.getOperatorStats(id);
+          setStats(statsData);
+          const quotesData = await agentService.getOperatorAssignments(id);
+          setAssignments(quotesData);
+      };
+      loadProfile();
     }
   }, [id]);
 

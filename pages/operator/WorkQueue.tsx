@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
@@ -19,8 +18,8 @@ export const WorkQueue: React.FC = () => {
     if (user) {
         setIsLoading(true);
         // Simulate concurrent data fetching
-        setTimeout(() => {
-            const qData = agentService.getOperatorAssignments(user.id);
+        setTimeout(async () => {
+            const qData = await agentService.getOperatorAssignments(user.id);
             const bData = bookingService.getBookingsForOperator(user.id);
             
             // Sort by latest interaction

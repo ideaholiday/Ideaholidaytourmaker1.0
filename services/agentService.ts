@@ -1,12 +1,11 @@
 
-import { Quote, User, UserRole, PricingBreakdown, Message } from '../types';
+import { Quote, User } from '../types';
 import { INITIAL_QUOTES } from '../constants';
-import { calculateQuotePrice } from '../utils/pricingEngine';
-import { adminService } from './adminService';
-import { currencyService } from './currencyService';
+import { apiClient } from './apiClient';
 import { auditLogService } from './auditLogService';
+import { db } from './firebase';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, where } from 'firebase/firestore';
 
-// Mock Storage Key
 const STORAGE_KEY_QUOTES = 'iht_agent_quotes';
 
 class AgentService {
@@ -14,253 +13,176 @@ class AgentService {
 
   constructor() {
     const stored = localStorage.getItem(STORAGE_KEY_QUOTES);
-    
-    if (stored) {
-        const storedQuotes = JSON.parse(stored) as Quote[];
-        // Merge defaults if needed, ensure basic version info exists on legacy items
-        const newDefaults = INITIAL_QUOTES.filter(q => !storedQuotes.some(sq => sq.id === q.id)).map(q => ({
-            ...q,
-            version: 1,
-            isLocked: q.status === 'APPROVED' || q.status === 'CONFIRMED' || q.status === 'BOOKED'
-        }));
-        
-        this.quotes = [...storedQuotes, ...newDefaults].map(q => ({
-            ...q,
-            // Migration: Add version if missing
-            version: q.version || 1,
-            isLocked: q.isLocked !== undefined ? q.isLocked : (q.status === 'APPROVED' || q.status === 'CONFIRMED' || q.status === 'BOOKED')
-        }));
-    } else {
-        this.quotes = INITIAL_QUOTES.map(q => ({
-            ...q,
-            version: 1,
-            isLocked: false
-        }));
-    }
+    this.quotes = stored ? JSON.parse(stored) : INITIAL_QUOTES;
   }
 
-  private save() {
+  private saveLocal() {
     localStorage.setItem(STORAGE_KEY_QUOTES, JSON.stringify(this.quotes));
   }
 
-  // Get all quotes for specific agent
-  getQuotes(agentId: string): Quote[] {
-    return this.quotes.filter(q => q.agentId === agentId).sort((a, b) => 
-      new Date(b.messages[0]?.timestamp || b.travelDate).getTime() - new Date(a.messages[0]?.timestamp || a.travelDate).getTime()
-    );
+  /**
+   * Syncs quotes from Cloud for the specific Agent.
+   */
+  async fetchQuotes(agentId: string): Promise<Quote[]> {
+      try {
+        const q = query(collection(db, 'quotes'), where('agentId', '==', agentId));
+        const snapshot = await getDocs(q);
+        const remoteQuotes = snapshot.docs.map(d => d.data() as Quote);
+        
+        if (remoteQuotes.length > 0) {
+            // Merge with local: Remote wins conflicts
+            const localMap = new Map(this.quotes.map(i => [i.id, i]));
+            remoteQuotes.forEach(rq => localMap.set(rq.id, rq));
+            this.quotes = Array.from(localMap.values());
+            this.saveLocal();
+        }
+        return this.quotes.filter(q => q.agentId === agentId);
+      } catch (e) {
+          console.warn("Cloud Sync Error (Quotes):", e);
+          return this.quotes.filter(q => q.agentId === agentId);
+      }
   }
 
-  // Get Assignments for Operator
-  getOperatorAssignments(operatorId: string): Quote[] {
-    return this.quotes.filter(q => q.operatorId === operatorId).sort((a, b) => 
-      new Date(a.travelDate).getTime() - new Date(b.travelDate).getTime()
-    );
-  }
+  // --- ACTIONS ---
 
-  // Get Agent KPIs
-  getStats(agentId: string) {
-    const myQuotes = this.getQuotes(agentId);
-    const active = myQuotes.filter(q => q.status !== 'CANCELLED');
-    const confirmed = myQuotes.filter(q => q.status === 'CONFIRMED');
-    
-    const totalRevenue = confirmed.reduce((sum, q) => sum + (q.sellingPrice || q.price || 0), 0);
-
-    return {
-      totalQuotes: myQuotes.length,
-      activeQuotes: active.length,
-      confirmedQuotes: confirmed.length,
-      totalRevenue,
-      conversionRate: myQuotes.length > 0 ? Math.round((confirmed.length / myQuotes.length) * 100) : 0
-    };
-  }
-
-  // Create new Quote
   createQuote(agent: User, destination: string, travelDate: string, pax: number, leadGuestName?: string): Quote {
     const newQuote: Quote = {
-      id: `q_${Date.now()}`,
-      uniqueRefNo: `IHT-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
+      id: `q_${Date.now()}_${Math.random().toString(36).substr(2,5)}`,
+      uniqueRefNo: `QT-${Math.floor(Math.random() * 10000)}`,
       version: 1,
       isLocked: false,
       destination,
       travelDate,
       paxCount: pax,
       leadGuestName,
-      serviceDetails: 'Standard B2B Package (Pending Customization)',
+      serviceDetails: 'Draft Itinerary',
       itinerary: [],
-      currency: 'INR', // Default changed to INR
+      currency: 'INR', 
       price: 0,
-      cost: 0, // Hidden from agent view in UI, but exists in DB
+      cost: 0,
       markup: 0,
       agentId: agent.id,
       agentName: agent.name,
-      staffId: 'u2', // Auto-assign default staff
-      staffName: 'Staff Sarah', // Mock
       status: 'DRAFT',
       messages: []
     };
-
+    
     this.quotes.unshift(newQuote);
-    this.save();
+    this.saveLocal();
+    this.syncToCloud(newQuote);
+    
     return newQuote;
   }
-
-  /**
-   * Versioning Support: Clone Quote for Revision
-   * Used when an Agent edits an APPROVED/LOCKED quote.
-   */
-  createRevision(originalId: string, agent: User): Quote | null {
-    const original = this.quotes.find(q => q.id === originalId);
-    if (!original || original.agentId !== agent.id) return null;
-
-    // Only allow creating revision if original is LOCKED/APPROVED
-    if (!original.isLocked) {
-        throw new Error("Cannot create revision of an editable quote. Edit directly.");
-    }
-
-    const newVersion = original.version + 1;
-    const newQuote: Quote = {
-        ...JSON.parse(JSON.stringify(original)), // Deep copy
-        id: `q_${Date.now()}_v${newVersion}`, // New ID for DB
-        // Keep uniqueRefNo SAME to track lineage? Or append suffix?
-        // Usually systems keep RefNo same but track version internally. 
-        // For simple UI here, let's keep refNo but handle uniqueness in list by ID
-        uniqueRefNo: original.uniqueRefNo, 
-        version: newVersion,
-        isLocked: false, // Unlocked for editing
-        status: 'DRAFT', // Reset status
-        previousVersionId: original.id,
-        messages: [] // Clear chat for fresh start? Or keep history? Let's clear.
-    };
-
-    this.quotes.unshift(newQuote);
-    this.save();
-    return newQuote;
-  }
-
-  // Duplicate Quote (Copy as New)
-  duplicateQuote(originalId: string, agentId: string): Quote | null {
-    const original = this.quotes.find(q => q.id === originalId);
-    if (!original || original.agentId !== agentId) return null;
-
-    const newQuote: Quote = {
-      ...JSON.parse(JSON.stringify(original)),
-      id: `q_${Date.now()}`,
-      uniqueRefNo: `IHT-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
-      version: 1,
-      isLocked: false,
-      status: 'DRAFT',
-      travelDate: '', // Reset date
-      messages: [] // Reset chat
-    };
-
-    this.quotes.unshift(newQuote);
-    this.save();
-    return newQuote;
-  }
-
-  // Update Quote status or details
+  
   updateQuote(quote: Quote) {
     const index = this.quotes.findIndex(q => q.id === quote.id);
     if (index !== -1) {
-      if (this.quotes[index].isLocked && quote.status !== 'BOOKED' && quote.status !== 'CANCELLED') {
-           // Prevent editing locked quotes unless changing to terminal state
-           // But here we rely on UI to call createRevision first.
-           console.warn("Attempting to update locked quote directly");
-      }
       this.quotes[index] = quote;
-      this.save();
+      this.saveLocal();
+      this.syncToCloud(quote);
     }
   }
 
-  // --- WORKFLOW TRANSITIONS ---
-
-  submitQuote(quoteId: string, user: User) {
-      const quote = this.quotes.find(q => q.id === quoteId);
-      if (!quote) throw new Error("Quote not found");
-      
-      if (quote.status !== 'DRAFT') throw new Error("Only draft quotes can be submitted.");
-
-      quote.status = 'SUBMITTED';
-      
-      // Add System Message
-      const msg: Message = {
-          id: `sys_${Date.now()}`,
-          senderId: user.id,
-          senderName: 'System',
-          senderRole: user.role,
-          content: `Quote submitted for approval. Version: ${quote.version}`,
-          timestamp: new Date().toISOString(),
-          isSystem: true
-      };
-      quote.messages.push(msg);
-      
-      this.save();
-      
-      auditLogService.logAction({
-          entityType: 'QUOTE',
-          entityId: quote.id,
-          action: 'QUOTE_SUBMITTED',
-          description: `Agent submitted quote ${quote.uniqueRefNo} v${quote.version} for approval.`,
-          user: user,
-          newValue: { status: 'SUBMITTED' }
-      });
+  async deleteQuote(quoteId: string) {
+    const index = this.quotes.findIndex(q => q.id === quoteId);
+    if (index !== -1) {
+        if (this.quotes[index].status === 'BOOKED') throw new Error("Cannot delete booked quote.");
+        this.quotes.splice(index, 1);
+        this.saveLocal();
+        
+        try {
+            await deleteDoc(doc(db, 'quotes', quoteId));
+        } catch (e) { console.error("Cloud delete failed", e); }
+    }
   }
 
-  approveQuote(quoteId: string, user: User) {
-      const quote = this.quotes.find(q => q.id === quoteId);
-      if (!quote) throw new Error("Quote not found");
+  async bookQuote(quoteId: string, user: User) {
+    const quote = this.quotes.find(q => q.id === quoteId);
+    if (!quote) throw new Error("Quote not found");
+    
+    quote.status = 'BOOKED';
+    quote.isLocked = true;
+    this.saveLocal();
+    this.syncToCloud(quote);
 
-      if (quote.status !== 'SUBMITTED') throw new Error("Quote must be submitted before approval.");
-
-      quote.status = 'APPROVED';
-      quote.isLocked = true; // LOCK IT
-      
-      // SNAPSHOT LOGIC: Ensure itinerary items have cost snapshots frozen
-      // (This usually happens during save, but double check here or in backend)
-      // In this frontend mock, we assume the itinerary array already holds the data.
-      
-      const msg: Message = {
-          id: `sys_${Date.now()}`,
-          senderId: user.id,
-          senderName: 'System',
-          senderRole: UserRole.ADMIN,
-          content: `✅ Quote APPROVED by Admin. PDF Generated & Sent via WhatsApp.`,
-          timestamp: new Date().toISOString(),
-          isSystem: true
-      };
-      quote.messages.push(msg);
-
-      this.save();
-
-      // Trigger "WhatsApp" simulation
-      console.log(`[WhatsApp Mock] Sending PDF for Quote ${quote.uniqueRefNo} to Agent ${quote.agentName}`);
-      
-      auditLogService.logAction({
-          entityType: 'QUOTE',
-          entityId: quote.id,
-          action: 'QUOTE_APPROVED',
-          description: `Quote ${quote.uniqueRefNo} v${quote.version} approved and locked.`,
-          user: user,
-          newValue: { status: 'APPROVED', isLocked: true }
-      });
+    auditLogService.logAction({
+        entityType: 'QUOTE',
+        entityId: quote.id,
+        action: 'QUOTE_BOOKED',
+        description: `Agent ${user.name} booked Quote ${quote.uniqueRefNo}`,
+        user: user,
+        newValue: { status: 'BOOKED' }
+    });
   }
 
-  rejectQuote(quoteId: string, reason: string, user: User) {
-      const quote = this.quotes.find(q => q.id === quoteId);
-      if (!quote) return;
-      
-      quote.status = 'DRAFT'; // Send back to Draft
-      const msg: Message = {
-          id: `sys_${Date.now()}`,
-          senderId: user.id,
-          senderName: 'System',
-          senderRole: UserRole.ADMIN,
-          content: `❌ Quote Rejected. Reason: ${reason}. Please revise and resubmit.`,
-          timestamp: new Date().toISOString(),
-          isSystem: true
-      };
-      quote.messages.push(msg);
-      this.save();
+  // --- HELPERS ---
+
+  private async syncToCloud(quote: Quote) {
+      try {
+          await setDoc(doc(db, 'quotes', quote.id), quote, { merge: true });
+      } catch (e) {
+          console.error("Cloud save failed for quote", quote.id, e);
+      }
+  }
+
+  // Fetch all quotes assigned to an operator (Cross-User)
+  async getOperatorAssignments(operatorId: string): Promise<Quote[]> {
+      try {
+        const q = query(collection(db, 'quotes'), where('operatorId', '==', operatorId));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => d.data() as Quote);
+      } catch (e) {
+          return this.quotes.filter(q => q.operatorId === operatorId);
+      }
+  }
+
+  getQuotes(agentId: string): Quote[] {
+    return this.quotes.filter(q => q.agentId === agentId && q.status !== 'BOOKED');
+  }
+
+  getBookedHistory(agentId: string): Quote[] {
+      return this.quotes.filter(q => q.agentId === agentId && (q.status === 'BOOKED' || q.status === 'CONFIRMED'));
+  }
+  
+  // Method to fetch booked history from cloud
+  async fetchHistory(agentId: string): Promise<Quote[]> {
+       // Re-use fetchQuotes as it pulls all for agent, then filter locally
+       await this.fetchQuotes(agentId);
+       return this.getBookedHistory(agentId);
+  }
+
+  getStats(agentId: string) {
+    const myQuotes = this.quotes.filter(q => q.agentId === agentId);
+    const confirmed = myQuotes.filter(q => q.status === 'BOOKED' || q.status === 'CONFIRMED');
+    
+    return {
+      totalQuotes: myQuotes.length,
+      activeQuotes: myQuotes.filter(q => q.status !== 'CANCELLED').length,
+      confirmedQuotes: confirmed.length,
+      totalRevenue: confirmed.reduce((sum, q) => sum + (q.sellingPrice || q.price || 0), 0),
+      conversionRate: myQuotes.length > 0 ? Math.round((confirmed.length / myQuotes.length) * 100) : 0
+    };
+  }
+
+  // Mock methods for compatibility
+  createRevision(originalId: string, agent: User): Quote | null {
+      const original = this.quotes.find(q => q.id === originalId);
+      if (!original) return null;
+      const copy = { ...original, id: `rev_${Date.now()}`, version: original.version + 1, isLocked: false };
+      this.quotes.unshift(copy);
+      this.saveLocal();
+      this.syncToCloud(copy);
+      return copy;
+  }
+  
+  duplicateQuote(originalId: string, agentId: string): Quote | null {
+      const original = this.quotes.find(q => q.id === originalId);
+      if (!original) return null;
+      const copy = { ...original, id: `copy_${Date.now()}`, uniqueRefNo: `COPY-${Date.now()}`, status: 'DRAFT' as const, isLocked: false };
+      this.quotes.unshift(copy);
+      this.saveLocal();
+      this.syncToCloud(copy);
+      return copy;
   }
 }
 

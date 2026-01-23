@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { operatorAssignmentService } from '../../services/operatorAssignmentService';
@@ -16,8 +15,8 @@ export const AssignedQuotes: React.FC = () => {
     if (user) {
       setIsLoading(true);
       // Simulate network delay for realistic feel
-      setTimeout(() => {
-          const data = operatorAssignmentService.getAssignedQuotes(user.id);
+      setTimeout(async () => {
+          const data = await operatorAssignmentService.getAssignedQuotes(user.id);
           setQuotes(data);
           setIsLoading(false);
       }, 400);

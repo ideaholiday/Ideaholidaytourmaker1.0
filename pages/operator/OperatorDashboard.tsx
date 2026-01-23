@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -29,14 +28,14 @@ export const OperatorDashboard: React.FC = () => {
   const loadData = () => {
     if (user) {
         setIsLoading(true);
-        setTimeout(() => {
+        setTimeout(async () => {
             // Load Bookings (Service Orders)
             const bookingData = bookingService.getBookingsForOperator(user.id);
             bookingData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             setBookings(bookingData);
 
             // Load Quotes (Pricing Requests)
-            const quoteData = agentService.getOperatorAssignments(user.id);
+            const quoteData = await agentService.getOperatorAssignments(user.id);
             quoteData.sort((a, b) => new Date(b.travelDate).getTime() - new Date(a.travelDate).getTime());
             setQuotes(quoteData);
 

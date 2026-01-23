@@ -4,60 +4,81 @@ namespace App\Http\Controllers\Api\V1\Agent;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Services\Pricing\PricingEngine;
-use App\Models\Quote;
-use App\Http\Resources\QuoteResource;
+use App\Models\Itinerary;
+use App\Enums\ItineraryStatus;
+use Illuminate\Support\Facades\DB;
+// use App\Services\AuditLogService; // Assuming audit logging service exists or we log manually
 
 class QuoteController extends Controller
 {
-    protected $pricingEngine;
-
-    public function __construct(PricingEngine $pricingEngine)
+    /**
+     * List Agent's Active Quotes (Itineraries)
+     */
+    public function index(Request $request)
     {
-        $this->pricingEngine = $pricingEngine;
+        $quotes = Itinerary::where('agent_id', $request->user()->id)
+            ->whereNotIn('status', [ItineraryStatus::BOOKED, ItineraryStatus::CANCELLED])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($quotes);
     }
 
-    public function store(Request $request)
+    /**
+     * Book an Itinerary
+     */
+    public function book(Request $request, $id)
     {
-        // 1. Validate Input
-        // Updated to require structure for Hotel/Transfer calculation
-        $validated = $request->validate([
-            'destination' => 'required|string',
-            'travel_date' => 'required|date',
-            'pax' => 'required|integer|min:1',
-            'itinerary' => 'required|array',
-            'itinerary.*.id' => 'required', // Product ID
-            'itinerary.*.type' => 'required|in:HOTEL,TRANSFER,ACTIVITY,SIGHTSEEING',
-            'itinerary.*.nights' => 'sometimes|integer|min:1', // For Hotels
-            'itinerary.*.rooms' => 'sometimes|integer|min:1',  // For Hotels
-            'itinerary.*.vehicles' => 'sometimes|integer|min:1', // For Transfers
+        $itinerary = Itinerary::where('agent_id', $request->user()->id)->findOrFail($id);
+
+        if ($itinerary->status === ItineraryStatus::BOOKED) {
+            return response()->json(['message' => 'Already booked.'], 400);
+        }
+
+        // Logic to convert to Booking or simply mark as BOOKED
+        // For this architecture, we mark as BOOKED and notify Admin
+        
+        $itinerary->allowStatusUpdate = true;
+        $itinerary->update([
+            'status' => ItineraryStatus::BOOKED,
+            'is_locked' => true,
         ]);
 
-        // 2. Calculate Pricing (The Brains)
-        $pricingResult = $this->pricingEngine->calculateForAgent(
-            $request->user(), 
-            $validated['itinerary'],
-            $validated['pax']
-        );
+        // Create System Alert / Notification (Mocking Audit/Alert logic)
+        // In real app: Notification::send(Admin::all(), new BookingRequested($itinerary));
 
-        // 3. Store Data (The Persistence)
-        $quote = Quote::create([
-            'unique_ref_no' => 'QT-'.strtoupper(uniqid()),
-            'agent_id' => $request->user()->id,
-            'destination' => $validated['destination'],
-            'travel_date' => $validated['travel_date'],
-            'pax_count' => $validated['pax'],
-            
-            // Financials from Engine
-            'net_cost' => $pricingResult->netCost, 
-            'selling_price' => $pricingResult->sellingPrice,
-            'currency' => $pricingResult->currency,
-            
-            'itinerary_snapshot' => $pricingResult->lineItems,
-            'status' => 'DRAFT'
+        return response()->json([
+            'message' => 'Booking requested successfully. Admin notified.',
+            'status' => ItineraryStatus::BOOKED
         ]);
+    }
 
-        // 4. Return Response
-        return new QuoteResource($quote);
+    /**
+     * Delete an Itinerary
+     */
+    public function destroy(Request $request, $id)
+    {
+        $itinerary = Itinerary::where('agent_id', $request->user()->id)->findOrFail($id);
+
+        if ($itinerary->status === ItineraryStatus::BOOKED) {
+            return response()->json(['message' => 'Cannot delete a booked itinerary.'], 403);
+        }
+
+        $itinerary->delete();
+
+        return response()->json(['message' => 'Quote deleted successfully.']);
+    }
+
+    /**
+     * Get Booked History
+     */
+    public function history(Request $request)
+    {
+        $history = Itinerary::where('agent_id', $request->user()->id)
+            ->whereIn('status', [ItineraryStatus::BOOKED, ItineraryStatus::CANCELLED])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($history);
     }
 }

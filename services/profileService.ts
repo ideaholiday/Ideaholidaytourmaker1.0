@@ -1,4 +1,3 @@
-
 import { User, UserRole, UserStatus } from '../types';
 import { adminService } from './adminService'; // To reuse User CRUD
 import { agentService } from './agentService';
@@ -95,8 +94,8 @@ class ProfileService {
     };
   }
 
-  getOperatorStats(operatorId: string) {
-    const assignments = agentService.getOperatorAssignments(operatorId); // These are Quotes with operatorId
+  async getOperatorStats(operatorId: string) {
+    const assignments = await agentService.getOperatorAssignments(operatorId); // These are Quotes with operatorId
     const bookings = bookingService.getBookingsForOperator(operatorId);
 
     const pending = assignments.filter(q => q.operatorStatus === 'PENDING' || q.operatorStatus === 'ASSIGNED');

@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
 import { authService } from '../services/authService';
+import { adminService } from '../services/adminService';
+import { bookingService } from '../services/bookingService';
 import { auth } from '../services/firebase'; 
 
 interface AuthContextType {
@@ -24,7 +26,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [sessionStart, setSessionStart] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Initialize Session on Mount
+  const performGlobalSync = async () => {
+     // Trigger background sync for all critical data
+     // This ensures new devices get the latest data immediately
+     try {
+         await Promise.all([
+             adminService.syncAllFromCloud(),
+             bookingService.syncAllBookings(),
+             authService.syncDirectory()
+         ]);
+     } catch(e) {
+         console.warn("Global Sync partial failure", e);
+     }
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -32,8 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (currentUser) {
           setUser(currentUser);
           setSessionStart(Date.now()); 
+          // Sync on load
+          performGlobalSync();
         } else {
-          // Explicitly clear if no user found on init
           setUser(null);
           setSessionStart(null);
         }
@@ -47,7 +63,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
-  // 2. Global 401 Listener
   useEffect(() => {
     const handleUnauthorized = () => {
       console.warn("[AuthContext] Received 401 Unauthorized signal. Logging out.");
@@ -59,21 +74,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const login = async (email: string, password: string) => {
-    // RESET STATE BEFORE LOGIN ATTEMPT
     setUser(null);
     setSessionStart(null);
     setIsLoading(true);
     
     try {
       const loggedInUser = await authService.login(email, password);
-      // VALIDATE ROLE EXISTS
-      if (!loggedInUser.role) {
-          throw new Error("User role undefined. Login aborted.");
-      }
+      if (!loggedInUser.role) throw new Error("User role undefined. Login aborted.");
+      
       setUser(loggedInUser);
       setSessionStart(Date.now());
+      await performGlobalSync(); // Sync on login
     } catch (error) {
-      // Error handling is managed by the UI component calling this
       throw error;
     } finally {
       setIsLoading(false);
@@ -90,15 +102,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = (reason: string = "User initiated logout") => {
-    // 1. Call service to clear backend/storage
     authService.logout(user, reason);
-    
-    // 2. Clear Context State Immediately
     setUser(null);
     setSessionStart(null);
-    
-    // 3. Force reload if needed to clear in-memory caches of other components
-    // window.location.reload(); // Optional: Drastic but effective for clearing global state variables
   };
 
   const verifyEmail = async (token: string): Promise<boolean> => {
