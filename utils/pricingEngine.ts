@@ -133,7 +133,7 @@ export const calculatePriceFromNet = (
     netCostBase: number, 
     rules: PricingRule, 
     paxCount: number,
-    agentMarkupOverride?: number, // Flat override in Target Currency
+    markupOverridePercent?: number, // Optional override (0-100)
     targetCurrency: string = 'INR'
 ): PricingBreakdown => {
     
@@ -144,16 +144,19 @@ export const calculatePriceFromNet = (
         };
     }
 
-    // 1. Platform Margin
-    const companyMarkupValueBase = calculateMarkupValue(netCostBase, rules.companyMarkup, rules.markupType, paxCount);
+    // 1. Platform Margin (Backend Logic mirror)
+    // System margin is typically applied on Supplier Net
+    const companyMarkupValueBase = calculateMarkupValue(netCostBase, rules.companyMarkup, 'Percentage', paxCount);
     const platformNetCostBase = netCostBase + companyMarkupValueBase;
     
     // 2. Agent Markup
     let agentMarkupValueBase = 0;
-    if (agentMarkupOverride !== undefined) {
-        // Normalize override to base
-        agentMarkupValueBase = normalizeToBase(agentMarkupOverride, targetCurrency);
+    
+    // If override provided, use it as percentage
+    if (markupOverridePercent !== undefined && markupOverridePercent !== null) {
+        agentMarkupValueBase = platformNetCostBase * (markupOverridePercent / 100);
     } else {
+        // Fallback to rules
         if (rules.markupType === 'Fixed') {
              const fixedInTarget = rules.agentMarkup * paxCount;
              agentMarkupValueBase = normalizeToBase(fixedInTarget, targetCurrency);
@@ -162,7 +165,7 @@ export const calculatePriceFromNet = (
         }
     }
 
-    // 3. Tax
+    // 3. Tax (GST)
     const subtotalBase = platformNetCostBase + agentMarkupValueBase;
     const gstAmountBase = subtotalBase * (rules.gstPercentage / 100);
     const finalPriceBase = subtotalBase + gstAmountBase;

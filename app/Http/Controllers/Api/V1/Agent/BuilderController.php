@@ -25,14 +25,16 @@ class BuilderController extends Controller
         $validated = $request->validate([
             'days' => 'required|array',
             'pax' => 'required|integer|min:1',
-            'currency' => 'sometimes|string|size:3'
+            'currency' => 'sometimes|string|size:3',
+            'markup' => 'sometimes|numeric|min:0'
         ]);
 
         $result = $this->pricingService->calculate(
             $request->user(), 
             $validated['days'],
             $validated['pax'],
-            $request->input('currency', 'INR') // Default to INR if missing
+            $request->input('currency', 'INR'), // Default to INR if missing
+            $request->input('markup')
         );
 
         return response()->json($result);
@@ -47,13 +49,15 @@ class BuilderController extends Controller
             'travel_date' => 'required|date',
             'days' => 'required|array',
             'pax' => 'required|integer|min:1',
-            'currency' => 'sometimes|string|size:3'
+            'currency' => 'sometimes|string|size:3',
+            'markup' => 'sometimes|numeric|min:0'
         ]);
 
         return DB::transaction(function () use ($request, $validated) {
             $agent = $request->user();
             $itinerary = null;
             $requestedCurrency = $request->input('currency', 'INR');
+            $requestedMarkup = $request->input('markup');
 
             // 1. Version Control Strategy
             if (!empty($validated['id'])) {
@@ -84,7 +88,8 @@ class BuilderController extends Controller
                 $agent, 
                 $validated['days'], 
                 $validated['pax'],
-                $requestedCurrency
+                $requestedCurrency,
+                $requestedMarkup
             );
 
             // Update Header Information
@@ -106,7 +111,7 @@ class BuilderController extends Controller
                 'system_margin' => $pricing['breakdown']['margin_base'],
                 'agent_markup' => $pricing['breakdown']['markup_base'],
                 'operator_adjustment' => 0,
-                'tax' => 0,
+                'tax' => $pricing['breakdown']['tax_base'] ?? 0,
                 'rate_timestamp' => now()->toIso8601String()
             ];
             

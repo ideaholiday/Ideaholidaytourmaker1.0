@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Services\Itinerary;
@@ -20,7 +21,7 @@ class BuilderPricingService
      * Calculates price by strictly looking up Inventory IDs.
      * Respects requested currency or defaults to INR.
      */
-    public function calculate(User $agent, array $daysPayload, int $paxCount, ?string $requestedCurrency = null)
+    public function calculate(User $agent, array $daysPayload, int $paxCount, ?string $requestedCurrency = null, ?float $markupPercent = null)
     {
         $baseCurrency = config('pricing.base_currency', 'USD');
         
@@ -58,7 +59,7 @@ class BuilderPricingService
                 $totalSupplierNetBase += $lineTotalBase;
 
                 // Calculate Line Item Selling Price (for display estimation only)
-                // We add a default estimation markup here for the UI, real markup happens at aggregate
+                // Default estimation used for UI line items
                 $lineItemSellingBase = $lineTotalBase * 1.15; 
                 $lineItemSellingDisplay = $this->converter->convert($lineItemSellingBase, $baseCurrency, $displayCurrency);
 
@@ -72,18 +73,28 @@ class BuilderPricingService
         }
 
         // 3. APPLY MARGINS (Backend Rules)
-        $systemMarginPercent = 10; // Platform Fee
+        $systemMarginPercent = config('pricing.system_margin', 0.10) * 100; // 10%
         $systemMargin = $totalSupplierNetBase * ($systemMarginPercent / 100);
+        
+        // B2B Cost (Agent's Buying Price)
         $agentNetBase = $totalSupplierNetBase + $systemMargin;
 
         // Dynamic Agent Markup
-        $agentMarkupPercent = $agent->branding_config['default_markup'] ?? 10;
-        $agentMarkup = $agentNetBase * ($agentMarkupPercent / 100);
+        // Use passed override or default from profile
+        $finalMarkupPercent = $markupPercent ?? ($agent->branding_config['default_markup'] ?? 10);
+        $agentMarkup = $agentNetBase * ($finalMarkupPercent / 100);
 
-        $sellingPriceBase = $agentNetBase + $agentMarkup;
+        // Subtotal before Tax
+        $subtotalBase = $agentNetBase + $agentMarkup;
+
+        // GST/Tax
+        $taxPercent = config('pricing.tax_percent', 0.05) * 100; // 5%
+        $taxAmount = $subtotalBase * ($taxPercent / 100);
+
+        $finalSellingPriceBase = $subtotalBase + $taxAmount;
 
         // 4. CONVERT TO DISPLAY CURRENCY
-        $finalPrice = $this->converter->convert($sellingPriceBase, $baseCurrency, $displayCurrency);
+        $finalPrice = $this->converter->convert($finalSellingPriceBase, $baseCurrency, $displayCurrency);
         $agentNetDisplay = $this->converter->convert($agentNetBase, $baseCurrency, $displayCurrency);
 
         return [
@@ -94,7 +105,8 @@ class BuilderPricingService
             'breakdown' => [
                 'supplier_base' => $totalSupplierNetBase,
                 'margin_base' => $systemMargin,
-                'markup_base' => $agentMarkup
+                'markup_base' => $agentMarkup,
+                'tax_base' => $taxAmount
             ]
         ];
     }

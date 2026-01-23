@@ -5,7 +5,7 @@ import { adminService } from '../services/adminService';
 import { currencyService } from '../services/currencyService';
 import { calculatePriceFromNet } from '../utils/pricingEngine';
 import { InventoryModal } from './builder/InventoryModal';
-import { Save, Plus, Trash2, MapPin, Hotel, Camera, Car, X, Info } from 'lucide-react';
+import { Save, Plus, Trash2, MapPin, Hotel, Camera, Car, X, Info, Settings, ToggleLeft, ToggleRight } from 'lucide-react';
 
 interface Props {
   initialItinerary: ItineraryItem[];
@@ -21,8 +21,12 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'HOTEL' | 'ACTIVITY' | 'TRANSFER'>('HOTEL');
   const [financials, setFinancials] = useState({ net: 0, selling: 0, currency: 'INR' });
+  
+  // Pricing Controls
+  const [markupPercent, setMarkupPercent] = useState<number>(10);
+  const [enableMarkup, setEnableMarkup] = useState<boolean>(true);
 
-  // Recalculate price whenever itinerary changes
+  // Recalculate price whenever itinerary changes or markup settings change
   useEffect(() => {
     let totalNet = 0;
     const rules = adminService.getPricingRule();
@@ -39,13 +43,15 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
         });
     });
 
-    const calc = calculatePriceFromNet(totalNet, rules, pax);
+    const effectiveMarkup = enableMarkup ? markupPercent : 0;
+
+    const calc = calculatePriceFromNet(totalNet, rules, pax, effectiveMarkup);
     setFinancials({
         net: calc.platformNetCost,
         selling: calc.finalPrice,
         currency: 'INR'
     });
-  }, [itinerary, pax]);
+  }, [itinerary, pax, markupPercent, enableMarkup]);
 
   const handleAddService = (item: any) => {
       // Robust cost extraction
@@ -86,8 +92,6 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   };
 
   const activeDay = itinerary[activeDayIndex];
-
-  // Derive the city ID for the active day to pass to the modal
   const activeCityId = activeDay?.cityId || '';
 
   return (
@@ -97,11 +101,36 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                 <h2 className="text-xl font-bold text-slate-900">Itinerary Builder</h2>
                 <p className="text-sm text-slate-500">{destination} • {pax} Pax</p>
             </div>
-            <div className="flex items-center gap-4">
+            
+            <div className="flex items-center gap-6">
+                
+                {/* Pricing Controls */}
+                <div className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                    <div className="flex items-center gap-2 border-r border-slate-200 pr-3">
+                        <span className="text-xs font-bold text-slate-500 uppercase">Markup</span>
+                        <button onClick={() => setEnableMarkup(!enableMarkup)} className="text-brand-600 focus:outline-none">
+                            {enableMarkup ? <ToggleRight size={24} /> : <ToggleLeft size={24} className="text-slate-400" />}
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <input 
+                            type="number" 
+                            min="0" 
+                            max="100" 
+                            value={markupPercent}
+                            onChange={(e) => setMarkupPercent(Number(e.target.value))}
+                            disabled={!enableMarkup}
+                            className="w-12 text-center text-sm font-bold bg-white border border-slate-300 rounded focus:ring-1 focus:ring-brand-500 disabled:opacity-50 disabled:bg-slate-100"
+                        />
+                        <span className="text-xs font-bold text-slate-500">%</span>
+                    </div>
+                </div>
+
                 <div className="text-right hidden md:block">
-                    <p className="text-xs font-bold text-slate-400 uppercase">Estimated Total</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase">Total Selling Price</p>
                     <p className="text-xl font-bold text-slate-900">{financials.currency} {financials.selling.toLocaleString()}</p>
                 </div>
+                
                 <div className="flex gap-2">
                     <button onClick={onCancel} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
                     <button 

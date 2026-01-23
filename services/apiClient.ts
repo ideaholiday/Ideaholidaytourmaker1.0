@@ -80,13 +80,19 @@ class ApiClient {
        // 3. Agent Markup (Agent Profit)
        // Applied on top of the B2B Price
        // Use overridden markup from request if present, else default
-       const agentMarkupPercent = body.markup !== undefined ? Number(body.markup) / 100 : 0.15; 
+       const agentMarkupPercent = body.markup !== undefined ? Number(body.markup) / 100 : 0.10; 
        const agentMarkupValue = platformNetCost * agentMarkupPercent;
 
-       // 4. Final Selling Price (Client Price)
-       const finalSellingPrice = platformNetCost + agentMarkupValue;
+       // 4. Tax (GST)
+       // Applied on Subtotal (Net + Agent Markup)
+       const taxPercent = 0.05; // 5%
+       const subtotal = platformNetCost + agentMarkupValue;
+       const taxAmount = subtotal * taxPercent;
 
-       // 5. Output
+       // 5. Final Selling Price (Client Price)
+       const finalSellingPrice = subtotal + taxAmount;
+
+       // 6. Output
        return Promise.resolve({
            currency: 'INR',
            
@@ -97,12 +103,15 @@ class ApiClient {
            net_cost: Number(platformNetCost.toFixed(2)),              // AGENT B2B PRICE
            
            agent_markup: Number(agentMarkupValue.toFixed(2)),         // Agent Profit
+           tax: Number(taxAmount.toFixed(2)),                         // GST
            selling_price: Math.ceil(finalSellingPrice),               // Final Client Price
            
            breakdown: {
                supplier_base: supplierCostTotal,
                margin_base: platformMarginValue,
-               manual_total: manualCostTotal
+               manual_total: manualCostTotal,
+               markup_base: agentMarkupValue,
+               tax_base: taxAmount
            }
        } as any);
     }
