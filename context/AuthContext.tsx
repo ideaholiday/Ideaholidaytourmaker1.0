@@ -26,28 +26,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [sessionStart, setSessionStart] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Background Sync - Non Blocking
   const performGlobalSync = async () => {
-     // Trigger background sync for all critical data
-     // This ensures new devices get the latest data immediately
+     console.log("🔄 [AuthContext] Starting Background Sync...");
      try {
-         await Promise.all([
-             adminService.syncAllFromCloud(),
-             bookingService.syncAllBookings(),
-             authService.syncDirectory()
-         ]);
+         // Fire and forget - don't await strictly if not needed for initial render
+         Promise.all([
+             adminService.syncAllFromCloud().catch(e => console.warn("Admin sync failed", e)),
+             bookingService.syncAllBookings().catch(e => console.warn("Booking sync failed", e)),
+             authService.syncDirectory().catch(e => console.warn("Dir sync failed", e))
+         ]).then(() => {
+             console.log("✅ [AuthContext] Background Sync Complete");
+         });
      } catch(e) {
          console.warn("Global Sync partial failure", e);
      }
   };
 
   useEffect(() => {
+    let mounted = true;
+
     const initAuth = async () => {
       try {
+        // 1. Fast Identity Resolution with Timeout
         const currentUser = await authService.getCurrentUser();
+        
+        if (!mounted) return;
+
         if (currentUser) {
           setUser(currentUser);
-          setSessionStart(Date.now()); 
-          // Sync on load
+          setSessionStart(Date.now());
+          
+          // 2. Trigger Sync in Background (Do not await)
           performGlobalSync();
         } else {
           setUser(null);
@@ -55,12 +65,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (e) {
         console.error("Session check failed", e);
-        setUser(null);
+        if (mounted) setUser(null);
       } finally {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
     };
+    
     initAuth();
+
+    // FAILSAFE: Force stop loading after 5 seconds if auth logic hangs completely
+    // This protects against network zombies or firebase init hang
+    const failsafeTimer = setTimeout(() => {
+        setIsLoading(current => {
+            if (current) {
+                console.warn("⚠️ Auth initialization took too long. Forcing UI load.");
+                return false; 
+            }
+            return current;
+        });
+    }, 5000);
+
+    return () => {
+        mounted = false;
+        clearTimeout(failsafeTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -74,9 +102,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const login = async (email: string, password: string) => {
+    setIsLoading(true); 
     setUser(null);
     setSessionStart(null);
-    setIsLoading(true);
     
     try {
       const loggedInUser = await authService.login(email, password);
@@ -84,7 +112,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUser(loggedInUser);
       setSessionStart(Date.now());
-      await performGlobalSync(); // Sync on login
+      
+      // Kick off sync
+      performGlobalSync(); 
     } catch (error) {
       throw error;
     } finally {

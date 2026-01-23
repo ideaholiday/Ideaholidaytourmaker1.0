@@ -29,7 +29,11 @@ class AuthService {
   private loadUsers(): User[] {
     const stored = localStorage.getItem(STORAGE_KEY_USERS);
     if (stored) {
-        return JSON.parse(stored);
+        try {
+            return JSON.parse(stored);
+        } catch (e) {
+            return MOCK_USERS;
+        }
     }
     // Initialize with default mocks ONLY if storage is empty
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(MOCK_USERS));
@@ -42,7 +46,7 @@ class AuthService {
 
   /**
    * Syncs the entire user directory from Firestore.
-   * Call this on admin login to ensure the user list is up to date.
+   * Background process to keep local cache updated.
    */
   async syncDirectory() {
       try {
@@ -50,7 +54,6 @@ class AuthService {
           const remoteUsers = snapshot.docs.map(d => d.data() as User);
           
           if (remoteUsers.length > 0) {
-              // Merge Logic: Overwrite local with remote
               this.users = remoteUsers;
               this.saveUsers();
           }
@@ -79,7 +82,7 @@ class AuthService {
     this.resetAuthState();
     await apiClient.request('/auth/login', { method: 'POST' });
 
-    // Mock Login Fallback
+    // Mock Login Fallback (For Development/Offline)
     this.users = this.loadUsers();
     const mockUser = this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (mockUser && password === 'password123') {
@@ -88,6 +91,7 @@ class AuthService {
 
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        // Force sync true to ensure we get latest profile on explicit login
         return this.handleFirebaseUser(userCredential.user, true);
     } catch (error: any) {
         if (error.code === 'auth/invalid-credential') throw new Error("Invalid email or password.");
@@ -103,72 +107,101 @@ class AuthService {
   private resetAuthState() {
     apiClient.clearSession();
     sessionStorage.clear();
-    // Do NOT clear IHT keys to preserve offline data, but refresh memory
     this.users = this.loadUsers();
   }
 
+  /**
+   * Core logic to resolve a Firebase User to an App User.
+   * Now fetches from 'users' collection to ensure Agent Branding/Data is fresh.
+   */
   private async handleFirebaseUser(fbUser: FirebaseUser, forceSync: boolean = false): Promise<User> {
-      this.users = this.loadUsers();
-      
-      let authoritativeRole: UserRole | null = null;
-      let remoteData: any = {};
+      let finalUser: User | null = null;
+      let isNew = false;
 
-      // Priority: Firestore Role
-      if (fbUser.email) {
-          try {
-              const roleRef = doc(db, 'user_roles', fbUser.email.toLowerCase());
-              const roleSnap = await getDoc(roleRef);
-              if (roleSnap.exists()) {
-                  const data = roleSnap.data();
-                  authoritativeRole = data.role as UserRole;
-                  remoteData = data;
-              }
-          } catch (e) { console.warn("Firestore role fetch failed", e); }
-      }
-
-      let user = this.users.find(u => u.id === fbUser.uid);
-      if (!user && fbUser.email) {
-          user = this.users.find(u => u.email.toLowerCase() === fbUser.email!.toLowerCase());
-          if (user) user.id = fbUser.uid; 
-      }
-
-      if (user) {
-          if (authoritativeRole) user.role = authoritativeRole;
-          if (remoteData.assignedDestinations) user.assignedDestinations = remoteData.assignedDestinations;
-          user.isVerified = fbUser.emailVerified;
-          this.saveUsers();
-          this.syncUserToFirestore(user).catch(console.warn);
-      } else {
-          const role = authoritativeRole || UserRole.AGENT; 
-          const uniqueId = idGeneratorService.generateUniqueId(role);
+      // 1. Try to fetch full profile from Firestore 'users' collection
+      // This is the "Truth" for Agent Branding, Permissions, etc.
+      try {
+          const userDocRef = doc(db, 'users', fbUser.uid);
+          const userDoc = await getDoc(userDocRef);
           
-          user = {
+          if (userDoc.exists()) {
+              finalUser = userDoc.data() as User;
+          }
+      } catch (e) {
+          console.warn("Firestore profile fetch failed", e);
+      }
+
+      // 2. If no full profile, check 'user_roles' for basic role mapping (Legacy/Safety)
+      if (!finalUser && fbUser.email) {
+          try {
+              const roleSnap = await getDoc(doc(db, 'user_roles', fbUser.email.toLowerCase()));
+              if (roleSnap.exists()) {
+                  // Construct basic user from role map
+                  const data = roleSnap.data();
+                  finalUser = {
+                      id: fbUser.uid,
+                      uniqueId: idGeneratorService.generateUniqueId(data.role as UserRole),
+                      name: fbUser.displayName || fbUser.email.split('@')[0],
+                      email: fbUser.email,
+                      role: data.role as UserRole,
+                      isVerified: fbUser.emailVerified,
+                      status: 'ACTIVE',
+                      joinedAt: new Date().toISOString()
+                  };
+                  isNew = true;
+              }
+          } catch (e) { console.warn("Role map fetch failed", e); }
+      }
+
+      // 3. Fallback to Local Cache (Offline support)
+      if (!finalUser) {
+          this.users = this.loadUsers();
+          finalUser = this.users.find(u => u.id === fbUser.uid || u.email.toLowerCase() === fbUser.email?.toLowerCase()) || null;
+      }
+
+      // 4. Default: Create New Agent
+      if (!finalUser) {
+          isNew = true;
+          finalUser = {
               id: fbUser.uid,
-              uniqueId,
+              uniqueId: idGeneratorService.generateUniqueId(UserRole.AGENT),
               name: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
               email: fbUser.email || '',
-              role: role,
+              role: UserRole.AGENT,
               isVerified: fbUser.emailVerified,
               status: 'ACTIVE',
-              joinedAt: new Date().toISOString(),
-              companyName: remoteData.companyName || 'New Account'
+              joinedAt: new Date().toISOString()
           };
-          this.users.push(user);
-          this.saveUsers();
-          this.syncUserToFirestore(user).catch(console.warn);
       }
 
-      apiClient.setSession(`sess_${Date.now()}_${user.id}`);
-      return user;
+      // Update Local Cache
+      this.updateLocalUser(finalUser);
+      
+      // If we constructed a user or it's new, sync back to Cloud "users" collection
+      // so next time we hit step #1 successfully
+      if (isNew || forceSync) {
+          this.syncUserToFirestore(finalUser).catch(console.warn);
+      }
+      
+      apiClient.setSession(`sess_${Date.now()}_${finalUser.id}`);
+      return finalUser;
   }
 
   private handleSystemLogin(mockUser: User): User {
       this.users = this.loadUsers();
       const user = this.users.find(u => u.id === mockUser.id) || mockUser;
-      user.role = mockUser.role;
+      user.role = mockUser.role; // Enforce role from mock constant
       this.saveUsers();
       apiClient.setSession(`sess_mock_${Date.now()}_${user.id}`);
       return user;
+  }
+
+  private updateLocalUser(user: User) {
+      this.users = this.loadUsers();
+      const idx = this.users.findIndex(u => u.id === user.id);
+      if (idx >= 0) this.users[idx] = user;
+      else this.users.push(user);
+      this.saveUsers();
   }
 
   async register(email: string, password: string, name: string, role: UserRole, companyName: string, phone: string, city: string): Promise<User> {
@@ -187,32 +220,60 @@ class AuthService {
             companyName,
             phone,
             city,
-            isVerified: false,
-            status: 'PENDING_VERIFICATION',
+            isVerified: false, // Must verify email
+            status: 'PENDING_VERIFICATION', // Strict status
             joinedAt: new Date().toISOString()
         };
 
-        this.users.push(newUser);
-        this.saveUsers();
-        this.syncUserToFirestore(newUser).catch(console.warn);
+        // Save immediately to Cloud and Local
+        await this.syncUserToFirestore(newUser);
+        this.updateLocalUser(newUser);
+        
         return newUser;
     } catch (error: any) {
         throw new Error(error.message);
     }
   }
 
+  /**
+   * Safe Identity Resolution
+   * Includes 4s timeout to prevent infinite hanging on slow networks.
+   */
   async getCurrentUser(): Promise<User | null> {
-      return new Promise((resolve) => {
+      // Optimization: If auth object is already ready (hot reload)
+      if (auth.currentUser) {
+          return this.handleFirebaseUser(auth.currentUser);
+      }
+
+      const authPromise = new Promise<User | null>((resolve) => {
           const unsubscribe = auth.onAuthStateChanged(async (fbUser) => {
               unsubscribe();
               if (fbUser) {
-                  const user = await this.handleFirebaseUser(fbUser, true);
-                  resolve(user);
+                  try {
+                      const user = await this.handleFirebaseUser(fbUser);
+                      resolve(user);
+                  } catch (e) {
+                      console.warn("Profile resolution error", e);
+                      resolve(null);
+                  }
               } else {
                   resolve(null);
               }
+          }, (err) => {
+              console.error("Auth Observer Error", err);
+              resolve(null);
           });
       });
+
+      // Timeout Failsafe (4 seconds)
+      const timeoutPromise = new Promise<null>((resolve) => 
+          setTimeout(() => {
+              console.warn("Auth check timed out.");
+              resolve(null);
+          }, 4000)
+      );
+
+      return Promise.race([authPromise, timeoutPromise]);
   }
 
   async requestPasswordReset(email: string): Promise<void> {
@@ -222,7 +283,14 @@ class AuthService {
   async handleActionCode(code: string, mode: 'verifyEmail' | 'resetPassword', newPassword?: string): Promise<void> {
       if (mode === 'verifyEmail') {
           await applyActionCode(auth, code);
-          if (auth.currentUser) await updateDoc(doc(db, 'users', auth.currentUser.uid), { emailVerified: true });
+          // Update verification status in DB
+          if (auth.currentUser) {
+             const user = await this.handleFirebaseUser(auth.currentUser);
+             user.isVerified = true;
+             user.status = 'ACTIVE';
+             await this.syncUserToFirestore(user);
+             this.updateLocalUser(user);
+          }
       } else if (mode === 'resetPassword') {
           if (!newPassword) throw new Error("New password required.");
           await confirmPasswordReset(auth, code, newPassword);
@@ -236,8 +304,8 @@ class AuthService {
           if (user) {
               user.isVerified = true;
               user.status = 'ACTIVE';
-              this.saveUsers();
               this.syncUserToFirestore(user).catch(console.warn);
+              this.updateLocalUser(user);
               emailVerificationService.invalidateToken(token);
               return true;
           }
@@ -252,20 +320,16 @@ class AuthService {
   private async syncUserToFirestore(user: User) {
       try {
           const userRef = doc(db, 'users', user.id);
-          await setDoc(userRef, {
-              uid: user.id,
-              uniqueId: user.uniqueId,
-              email: user.email,
-              displayName: user.name,
-              role: user.role,
-              emailVerified: user.isVerified,
-              companyName: user.companyName || '',
-              permissions: user.permissions || [],
-              assignedDestinations: user.assignedDestinations || [],
-              linkedInventoryIds: user.linkedInventoryIds || [],
-              partnerType: user.partnerType || null,
-              updatedAt: new Date().toISOString()
-          }, { merge: true });
+          // Merge to avoid overwriting existing fields like createdAt
+          await setDoc(userRef, user, { merge: true });
+          
+          // Also sync user_roles for fast lookups if needed
+          if (user.email) {
+              await setDoc(doc(db, 'user_roles', user.email.toLowerCase()), {
+                  email: user.email.toLowerCase(),
+                  role: user.role
+              }, { merge: true });
+          }
       } catch (e) { console.error("Firestore Sync Error:", e); }
   }
 }

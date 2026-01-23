@@ -1,6 +1,6 @@
 
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // ------------------------------------------------------------------
@@ -20,6 +20,13 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
+// Enable persistence (Local Storage)
+// This ensures the user stays logged in even after refreshing the page
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.warn("Firebase Persistence Error:", error);
+});
+
 const db = getFirestore(app);
 
 // Configure language to match device language

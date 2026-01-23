@@ -1,42 +1,6 @@
 
+# Auto-deploy configuration has been removed.
+# This placeholder ensures that if a Cloud Build trigger runs, it consumes minimal resources and performs no action.
 steps:
-  # 1. Build the Docker image
-  - name: 'gcr.io/cloud-builders/docker'
-    args: 
-      - 'build'
-      - '-t'
-      - 'gcr.io/$PROJECT_ID/idea-holiday-tour-maker:$COMMIT_SHA'
-      - '-t'
-      - 'gcr.io/$PROJECT_ID/idea-holiday-tour-maker:latest'
-      - '.'
-
-  # 2. Push the image to Container Registry (Artifact Registry)
-  - name: 'gcr.io/cloud-builders/docker'
-    args: 
-      - 'push'
-      - 'gcr.io/$PROJECT_ID/idea-holiday-tour-maker'
-
-  # 3. Deploy to Cloud Run (Safe Rolling Update)
-  # Uses the existing service configuration to preserve environment variables
-  - name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: gcloud
-    args:
-      - 'run'
-      - 'deploy'
-      - 'idea-tour-maker-1-0'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/idea-holiday-tour-maker:$COMMIT_SHA'
-      - '--region'
-      - 'us-west1'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated' # Public frontend access
-      - '--port'
-      - '8080'
-
-# Store images for rollback capability
-images:
-  - 'gcr.io/$PROJECT_ID/idea-holiday-tour-maker:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/idea-holiday-tour-maker:latest'
-
-timeout: '1200s'
+  - name: 'ubuntu'
+    args: ['echo', 'Build skipped: Auto-deploy configuration has been removed from this repository.']
