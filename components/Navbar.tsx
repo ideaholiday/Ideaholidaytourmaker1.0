@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { bookingService } from '../services/bookingService';
-import { LogOut, LayoutDashboard, FileText, PlusCircle, Store, UserPlus, Globe, Bell } from 'lucide-react';
+import { LogOut, LayoutDashboard, FileText, PlusCircle, Store, UserPlus, Globe, Bell, Package, Layout } from 'lucide-react';
 import { UserRole } from '../types';
 import { useClientBranding } from '../hooks/useClientBranding';
 
@@ -112,6 +112,20 @@ export const Navbar: React.FC = () => {
                     className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-brand-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
                    >
                      <FileText size={16} /> My Quotes
+                   </Link>
+                   <Link 
+                    to="/agent/packages" 
+                    className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-brand-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+                    title="Fixed Departure Packages"
+                   >
+                     <Package size={16} /> Packages
+                   </Link>
+                   <Link 
+                    to="/agent/templates" 
+                    className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-brand-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+                    title="Itinerary Templates"
+                   >
+                     <Layout size={16} /> Templates
                    </Link>
                    <Link 
                     to="/agent/create" 

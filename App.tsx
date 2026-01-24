@@ -61,12 +61,14 @@ import { BookingDetail } from './pages/agent/BookingDetail';
 import { Branding } from './pages/agent/Branding';
 import { AgentPLReport } from './pages/agent/PLReport'; 
 import { GuideBook } from './pages/agent/GuideBook'; 
+import { AgentPackages } from './pages/agent/AgentPackages';
+import { AgentTemplates } from './pages/agent/AgentTemplates';
 
 // Operator Panel Imports
 import { OperatorDashboard } from './pages/operator/OperatorDashboard';
 import { OperatorBookingView } from './pages/operator/OperatorBookingView';
-import { AssignedQuotes } from '../pages/operator/AssignedQuotes';
-import { AssignedBookings } from '../pages/operator/AssignedBookings';
+import { AssignedQuotes } from './pages/operator/AssignedQuotes';
+import { AssignedBookings } from './pages/operator/AssignedBookings';
 import { WorkQueue } from './pages/operator/WorkQueue'; 
 import { OperatorGuideBook } from './pages/operator/OperatorGuideBook'; 
 import { InventoryManager } from './pages/operator/InventoryManager'; 
@@ -239,6 +241,8 @@ const App: React.FC = () => {
                       <Route path="/agent/branding" element={<Branding />} />
                       <Route path="/agent/reports" element={<AgentPLReport />} />
                       <Route path="/agent/guidebook" element={<GuideBook />} />
+                      <Route path="/agent/packages" element={<AgentPackages />} />
+                      <Route path="/agent/templates" element={<AgentTemplates />} />
                   </Route>
 
                   {/* Operator Specific */}
