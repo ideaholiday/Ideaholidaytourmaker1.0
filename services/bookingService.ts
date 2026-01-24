@@ -40,7 +40,8 @@ class BookingService {
 
   async getBookingsForOperator(operatorId: string): Promise<Booking[]> {
     const all = await this.getAllBookings();
-    return all.filter(b => b.operatorId === operatorId && b.status !== 'REQUESTED' && b.status !== 'REJECTED');
+    // FIX: Allow REQUESTED bookings to be seen if assigned to this operator
+    return all.filter(b => b.operatorId === operatorId && b.status !== 'REJECTED');
   }
 
   async createBookingFromQuote(quote: Quote, user: User, travelers?: Traveler[]): Promise<Booking> {

@@ -1,5 +1,5 @@
 
-import { Quote, User } from '../types';
+import { Quote, User, UserRole, Message } from '../types';
 import { dbHelper } from './firestoreHelper';
 import { auditLogService } from './auditLogService';
 
@@ -67,6 +67,57 @@ class AgentService {
     });
   }
 
+  async assignOperator(
+      quoteId: string, 
+      operatorId: string, 
+      operatorName: string, 
+      options: { priceMode: 'NET_COST' | 'FIXED_PRICE'; price?: number; instructions?: string },
+      adminUser: User
+  ) {
+      const quote = await dbHelper.getById<Quote>(COLLECTION, quoteId);
+      if (!quote) throw new Error("Quote not found");
+
+      const updates: Partial<Quote> = {
+          operatorId,
+          operatorName,
+          operatorStatus: 'ASSIGNED',
+          operatorDeclineReason: undefined // Clear any previous decline
+      };
+
+      if (options.priceMode === 'FIXED_PRICE') {
+          updates.operatorPrice = options.price;
+          updates.netCostVisibleToOperator = false;
+      } else {
+          updates.operatorPrice = undefined;
+          updates.netCostVisibleToOperator = true;
+      }
+
+      // Add System Notification Message
+      const msg: Message = {
+          id: `sys_${Date.now()}`,
+          senderId: adminUser.id,
+          senderName: 'System',
+          senderRole: UserRole.ADMIN,
+          content: `Operator Assigned: ${operatorName}. Mode: ${options.priceMode}`,
+          timestamp: new Date().toISOString(),
+          isSystem: true
+      };
+
+      const messages = quote.messages || [];
+      messages.push(msg);
+      updates.messages = messages;
+
+      await dbHelper.save(COLLECTION, { id: quoteId, ...updates });
+
+      auditLogService.logAction({
+          entityType: 'OPERATOR_ASSIGNMENT',
+          entityId: quoteId,
+          action: 'OPERATOR_ASSIGNED_TO_QUOTE',
+          description: `Quote assigned to ${operatorName} by ${adminUser.name}`,
+          user: adminUser
+      });
+  }
+
   async getOperatorAssignments(operatorId: string): Promise<Quote[]> {
       return await dbHelper.getWhere<Quote>(COLLECTION, 'operatorId', '==', operatorId);
   }
@@ -107,11 +158,7 @@ class AgentService {
       return copy;
   }
 
-  /**
-   * Directly update agent profile fields (Branding, Contact info)
-   */
   async updateAgentProfile(agentId: string, updates: Partial<User>) {
-      // Security check: Ideally backend rules prevent this, but here we ensure ID matches
       await dbHelper.save('users', { id: agentId, ...updates });
   }
 }

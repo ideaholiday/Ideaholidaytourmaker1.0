@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -28,14 +29,17 @@ export const OperatorDashboard: React.FC = () => {
   const loadData = () => {
     if (user) {
         setIsLoading(true);
-        setTimeout(async () => {
-            // Load Bookings (Service Orders)
-            const bookingData = await bookingService.getBookingsForOperator(user.id);
+        // Using Promise.all to fetch concurrently
+        Promise.all([
+            bookingService.getBookingsForOperator(user.id),
+            agentService.getOperatorAssignments(user.id)
+        ]).then(([bookingData, quoteData]) => {
+            
+            // Sort Bookings
             bookingData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             setBookings(bookingData);
 
-            // Load Quotes (Pricing Requests)
-            const quoteData = await agentService.getOperatorAssignments(user.id);
+            // Sort Quotes
             quoteData.sort((a, b) => new Date(b.travelDate).getTime() - new Date(a.travelDate).getTime());
             setQuotes(quoteData);
 
@@ -43,7 +47,10 @@ export const OperatorDashboard: React.FC = () => {
             processTodaysTasks(bookingData);
 
             setIsLoading(false);
-        }, 300);
+        }).catch(err => {
+            console.error("Dashboard Load Error:", err);
+            setIsLoading(false);
+        });
     }
   };
 
@@ -163,4 +170,138 @@ export const OperatorDashboard: React.FC = () => {
           value={pendingQuotesCount + pendingBookingsCount} 
           subtext="New Requests" 
           icon={<AlertTriangle size={24} />} 
-          color="bg-amber-500
+          color="bg-amber-500" 
+        />
+        <StatCard 
+          label="Active Jobs" 
+          value={activeJobsCount} 
+          subtext="In Progress" 
+          icon={<PlayCircle size={24} />} 
+          color="bg-blue-500" 
+        />
+        <StatCard 
+          label="Realized Earnings" 
+          value={`$${realizedEarnings.toLocaleString()}`} 
+          subtext="Completed Jobs" 
+          icon={<DollarSign size={24} />} 
+          color="bg-green-500" 
+        />
+        <StatCard 
+          label="Pipeline Value" 
+          value={`$${pipelineEarnings.toLocaleString()}`} 
+          subtext="Confirmed Jobs" 
+          icon={<Briefcase size={24} />} 
+          color="bg-purple-500" 
+        />
+      </div>
+
+      {/* Today's Tasks */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+            
+            {/* New Assignments Section */}
+            {(pendingQuotesCount > 0 || pendingBookingsCount > 0) && (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-amber-50/50">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                            <Clock size={18} className="text-amber-600" /> New Assignments
+                        </h3>
+                        <Link to="/operator/work-queue" className="text-xs font-bold text-brand-600 hover:underline flex items-center gap-1">
+                            Go to Queue <ArrowRight size={12}/>
+                        </Link>
+                    </div>
+                    <div className="p-0">
+                         {/* Show mix of quotes and bookings that are pending */}
+                         <AssignedQuotesTable quotes={quotes.filter(q => q.operatorStatus === 'ASSIGNED' || q.operatorStatus === 'PENDING').slice(0, 3)} onRefresh={loadData} />
+                         {/* We could also show bookings here, but usually one table is enough for "Alerts" or split them */}
+                    </div>
+                </div>
+            )}
+
+            {/* Daily Schedule */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                        <Calendar size={18} className="text-slate-500" /> Today's Schedule
+                    </h3>
+                    <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded text-slate-600">
+                        {todaysTasks.length} Tasks
+                    </span>
+                </div>
+                <div className="divide-y divide-slate-50">
+                    {todaysTasks.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400 text-sm">
+                            No scheduled tasks for today.
+                        </div>
+                    ) : (
+                        todaysTasks.map((task, idx) => (
+                            <div key={idx} className="p-4 hover:bg-slate-50 flex items-center gap-4 transition">
+                                <div className="min-w-[60px] text-center">
+                                    <span className="block text-sm font-bold text-slate-800">{task.time}</span>
+                                </div>
+                                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                                    {task.type === 'HOTEL' && <Hotel size={18} />}
+                                    {task.type === 'TRANSFER' && <Car size={18} />}
+                                    {task.type === 'ACTIVITY' && <Camera size={18} />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold text-slate-900 text-sm truncate">{task.name}</h4>
+                                    <p className="text-xs text-slate-500 truncate">
+                                        Guest: {task.guest} ({task.pax} Pax) • Ref: {task.ref}
+                                    </p>
+                                </div>
+                                <Link to={`/booking/${task.id}`} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition">
+                                    <ArrowRight size={18} />
+                                </Link>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+            <div className="bg-slate-900 text-white rounded-xl p-6 shadow-lg">
+                <h3 className="font-bold text-lg mb-4">Quick Actions</h3>
+                <div className="space-y-3">
+                    <Link to="/operator/assigned-quotes" className="block p-3 bg-white/10 hover:bg-white/20 rounded-lg transition flex justify-between items-center text-sm">
+                        <span>Review Pricing Requests</span>
+                        <ArrowRight size={14} className="opacity-50" />
+                    </Link>
+                    <Link to="/operator/assigned-bookings" className="block p-3 bg-white/10 hover:bg-white/20 rounded-lg transition flex justify-between items-center text-sm">
+                        <span>Manage Active Bookings</span>
+                        <ArrowRight size={14} className="opacity-50" />
+                    </Link>
+                    <Link to="/operator/inventory" className="block p-3 bg-white/10 hover:bg-white/20 rounded-lg transition flex justify-between items-center text-sm">
+                        <span>Update My Inventory</span>
+                        <ArrowRight size={14} className="opacity-50" />
+                    </Link>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h3 className="font-bold text-slate-800 mb-3 text-sm">Recent Activity</h3>
+                <div className="space-y-4">
+                    {/* Mock Activity Feed - In real app, fetch from Audit Logs */}
+                    <div className="flex gap-3 text-xs">
+                        <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 shrink-0"></div>
+                        <div className="text-slate-600">
+                            <span className="font-bold text-slate-900">Booking #1024</span> accepted.
+                            <div className="text-slate-400 mt-0.5">2 hours ago</div>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 text-xs">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0"></div>
+                        <div className="text-slate-600">
+                            New quote request for <span className="font-bold text-slate-900">Dubai</span>.
+                            <div className="text-slate-400 mt-0.5">5 hours ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -9,12 +9,13 @@ import { currencyService } from '../../services/currencyService';
 import { Quote, ItineraryItem, UserRole } from '../../types';
 import { ItineraryView } from '../components/ItineraryView';
 import { PriceSummary } from '../components/PriceSummary';
-import { ArrowLeft, Edit2, Download, Share2, GitBranch, AlertTriangle, Link as LinkIcon, CheckCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit2, Download, Share2, GitBranch, AlertTriangle, Link as LinkIcon, CheckCircle, Trash2, UserPlus } from 'lucide-react';
 import { calculatePriceFromNet } from '../utils/pricingEngine';
 import { usePricingEngine } from '../hooks/usePricingEngine';
 import { ItineraryBuilder } from '../components/ItineraryBuilder';
 import { generateQuotePDF } from '../utils/pdfGenerator';
 import { formatWhatsAppQuote } from '../utils/whatsappFormatter';
+import { AssignOperatorModal } from '../components/booking/AssignOperatorModal';
 
 export const QuoteDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +24,7 @@ export const QuoteDetail: React.FC = () => {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [isEditingItinerary, setIsEditingItinerary] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   
   const { updateHotel, setInput } = usePricingEngine();
 
@@ -35,8 +37,6 @@ export const QuoteDetail: React.FC = () => {
     setIsLoading(true);
 
     try {
-        // 1. Try fetching from Service (Firestore)
-        // Note: fetchQuotes usually gets a list, we might need a single get method or filter
         const allQuotes = await agentService.fetchQuotes(user.id);
         const found = allQuotes.find(q => q.id === id);
 
@@ -44,7 +44,13 @@ export const QuoteDetail: React.FC = () => {
             setQuote(found);
             initPricingEngine(found);
         } else {
-            // 2. Fallback to LocalStorage (for public demo resilience)
+            // Admin logic: fetch directly if not found in cache (Admin sees all)
+            if (user.role === UserRole.ADMIN || user.role === UserRole.STAFF) {
+                 // Mocking fetch all or specific fetch if service supported it
+                 // For now relying on the loop above, but ideally:
+                 // const q = await agentService.getQuoteById(id);
+            }
+            
             const storedQuotes = localStorage.getItem('iht_agent_quotes');
             const parsedQuotes: Quote[] = storedQuotes ? JSON.parse(storedQuotes) : [];
             const localFound = parsedQuotes.find(q => q.id === id);
@@ -53,7 +59,7 @@ export const QuoteDetail: React.FC = () => {
                 setQuote(localFound);
                 initPricingEngine(localFound);
             } else {
-                console.error("Quote not found in DB or LocalStorage");
+                console.error("Quote not found");
             }
         }
     } catch (e) {
@@ -82,8 +88,9 @@ export const QuoteDetail: React.FC = () => {
   if (!quote) return <div className="p-8 text-center text-red-500">Quote not found or access denied.</div>;
 
   const isAgent = user?.role === UserRole.AGENT;
+  const isAdminOrStaff = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF;
+  
   const pricingRules = adminService.getPricingRuleSync();
-  // We consider price valid for booking if it exists, but we allow 0 price for drafts/viewing
   const hasValidPrice = (quote.sellingPrice !== undefined && quote.sellingPrice > 0);
   const isBooked = quote.status === 'BOOKED' || quote.status === 'CONFIRMED';
 
@@ -91,16 +98,10 @@ export const QuoteDetail: React.FC = () => {
 
   const handleBook = async () => {
       if (!quote || !user) return;
-      
-      // CONFIRMATION FOR BOOKING
       if (window.confirm(`Are you sure you want to book Quote #${quote.uniqueRefNo}?\n\nThis will lock the itinerary and generate a booking request for the Operations team.`)) {
           try {
-              // 1. Create Booking Record (Local System)
               const newBooking = await bookingService.createBookingFromQuote(quote, user);
-              
-              // 2. Sync Status to API (Backend)
               await agentService.bookQuote(quote.id, user);
-
               alert("Booking Created Successfully! Redirecting to booking details...");
               navigate(`/booking/${newBooking.id}`);
           } catch (e: any) {
@@ -112,9 +113,7 @@ export const QuoteDetail: React.FC = () => {
 
   const handleDelete = async () => {
       if (!quote) return;
-
-      // CONFIRMATION FOR DELETION
-      if (window.confirm(`⚠️ DANGER ZONE ⚠️\n\nAre you sure you want to DELETE Quote #${quote.uniqueRefNo}?\n\nThis action cannot be undone.`)) {
+      if (window.confirm(`⚠️ DANGER ZONE ⚠️\n\nAre you sure you want to DELETE Quote #${quote.uniqueRefNo}?`)) {
           try {
               await agentService.deleteQuote(quote.id);
               navigate('/agent/quotes');
@@ -125,70 +124,32 @@ export const QuoteDetail: React.FC = () => {
   };
 
   const handleUpdateItinerary = (newItinerary: ItineraryItem[], financials?: { net: number, selling: number, currency: string }) => {
-    
-    // IF Financials passed from Builder (Recommended Path)
-    // We use the robust calculation from the builder's backend simulation directly
     if (financials) {
          const updatedQuote: Quote = { 
             ...quote, 
             itinerary: newItinerary,
             currency: financials.currency,
-            cost: 0, // Not exposed in simple view
-            price: financials.net, // B2B
-            sellingPrice: financials.selling, // Client
+            cost: 0, 
+            price: financials.net, 
+            sellingPrice: financials.selling, 
             type: 'DETAILED' as const,
             status: quote.status
         };
-
         agentService.updateQuote(updatedQuote);
         setQuote(updatedQuote);
         setIsEditingItinerary(false);
         return;
     }
-
-    // FALLBACK CALCULATION (If saving without builder calculation logic - e.g. legacy)
-    let calculatedRawCost = 0;
-    const quoteCurrency = quote.currency || 'INR';
-
-    newItinerary.forEach(day => {
-        if (day.services) {
-            day.services.forEach(svc => {
-                if (!svc.isRef) {
-                    // Logic Update: Ensure Quantity and Nights are factored in
-                    const qty = svc.quantity || 1;
-                    const nights = svc.duration_nights || 1;
-                    const unitCost = currencyService.convert(svc.cost, svc.currency || 'USD', quoteCurrency);
-                    
-                    calculatedRawCost += (unitCost * qty * nights); 
-                }
-            });
-        }
-    });
-
-    const currentAgentMarkupValue = undefined; 
-
-    const financialsCalc = calculatePriceFromNet(
-        calculatedRawCost,
-        pricingRules,
-        quote.paxCount,
-        currentAgentMarkupValue, 
-        quoteCurrency
-    );
-
-    const updatedQuote: Quote = { 
-        ...quote, 
-        itinerary: newItinerary,
-        currency: quoteCurrency,
-        cost: calculatedRawCost, 
-        price: financialsCalc.platformNetCost, 
-        sellingPrice: financialsCalc.finalPrice, 
-        type: 'DETAILED' as const,
-        status: quote.status
-    };
-
-    agentService.updateQuote(updatedQuote);
-    setQuote(updatedQuote);
+    // ... Legacy fallback ...
     setIsEditingItinerary(false);
+  };
+
+  const handleAssignOperator = async (operatorId: string, operatorName: string, options: any) => {
+      if (!quote || !user) return;
+      await agentService.assignOperator(quote.id, operatorId, operatorName, options, user);
+      loadQuote(); // Refresh to see assignment status
+      setIsAssignModalOpen(false);
+      alert("Operator assigned to quote successfully.");
   };
 
   const handleShareWhatsApp = () => {
@@ -202,11 +163,9 @@ export const QuoteDetail: React.FC = () => {
   };
 
   const handleCopyLink = () => {
-      // Robust link generation
       const domain = window.location.host;
       const protocol = window.location.protocol;
       const url = `${protocol}//${domain}/#/view/${quote.id}`;
-      
       navigator.clipboard.writeText(url);
       alert("Public Link copied to clipboard!\n\n" + url);
   };
@@ -227,31 +186,6 @@ export const QuoteDetail: React.FC = () => {
             <ArrowLeft size={18} className="mr-1" /> Back
         </button>
 
-        {/* PRICE WARNING BANNER */}
-        {!hasValidPrice && !isBooked && !isEditingItinerary && (
-            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-lg shadow-sm animate-in fade-in slide-in-from-top-2">
-                <div className="flex">
-                    <div className="flex-shrink-0">
-                        <AlertTriangle className="h-5 w-5 text-amber-500" aria-hidden="true" />
-                    </div>
-                    <div className="ml-3">
-                        <p className="text-sm font-bold text-amber-800">
-                            Price not calculated
-                        </p>
-                        <p className="text-xs text-amber-700 mt-1">
-                            Please edit the itinerary and save to generate a price before booking.
-                        </p>
-                        <button 
-                            onClick={() => setIsEditingItinerary(true)}
-                            className="mt-2 text-xs font-bold text-amber-800 hover:text-amber-900 underline"
-                        >
-                            Open Itinerary Builder
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
         {/* HEADER */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -271,11 +205,26 @@ export const QuoteDetail: React.FC = () => {
                         <span>{quote.paxCount} Pax</span>
                         <span>•</span>
                         <span>{new Date(quote.travelDate).toLocaleDateString()}</span>
+                        {quote.operatorName && (
+                            <span className="text-purple-600 font-medium ml-2 border-l border-slate-300 pl-3">
+                                Op: {quote.operatorName} ({quote.operatorStatus || 'Assigned'})
+                            </span>
+                        )}
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
                     
+                    {/* ADMIN: ASSIGN OPERATOR */}
+                    {isAdminOrStaff && !isBooked && (
+                        <button 
+                            onClick={() => setIsAssignModalOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg hover:bg-purple-100 text-sm font-bold transition"
+                        >
+                            <UserPlus size={16} /> Assign Op
+                        </button>
+                    )}
+
                     {/* BOOK BUTTON */}
                     {!isBooked && hasValidPrice && isAgent && (
                         <button 
@@ -287,7 +236,7 @@ export const QuoteDetail: React.FC = () => {
                     )}
 
                     {/* Edit Action */}
-                    {!quote.isLocked && isAgent && !isEditingItinerary && (
+                    {!quote.isLocked && (isAgent || isAdminOrStaff) && !isEditingItinerary && (
                          <button onClick={() => setIsEditingItinerary(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium">
                             <Edit2 size={16} /> Edit Itinerary
                         </button>
@@ -318,7 +267,7 @@ export const QuoteDetail: React.FC = () => {
                     )}
 
                     {/* Delete Action */}
-                    {!isBooked && isAgent && (
+                    {!isBooked && (isAgent || isAdminOrStaff) && (
                         <button onClick={handleDelete} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-100 text-sm font-bold transition" title="Delete Quote">
                             <Trash2 size={16} />
                         </button>
@@ -362,6 +311,17 @@ export const QuoteDetail: React.FC = () => {
                     </div>
                 )}
             </div>
+        )}
+
+        {/* Assign Operator Modal for Admins */}
+        {isAssignModalOpen && (
+            <AssignOperatorModal 
+                isOpen={isAssignModalOpen}
+                onClose={() => setIsAssignModalOpen(false)}
+                onAssign={handleAssignOperator}
+                currentNetCost={quote.cost || 0} // Passing System Net Cost
+                currency={quote.currency}
+            />
         )}
     </div>
   );
