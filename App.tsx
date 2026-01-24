@@ -65,8 +65,8 @@ import { GuideBook } from './pages/agent/GuideBook';
 // Operator Panel Imports
 import { OperatorDashboard } from './pages/operator/OperatorDashboard';
 import { OperatorBookingView } from './pages/operator/OperatorBookingView';
-import { AssignedQuotes } from './pages/operator/AssignedQuotes';
-import { AssignedBookings } from './pages/operator/AssignedBookings';
+import { AssignedQuotes } from '../pages/operator/AssignedQuotes';
+import { AssignedBookings } from '../pages/operator/AssignedBookings';
 import { WorkQueue } from './pages/operator/WorkQueue'; 
 import { OperatorGuideBook } from './pages/operator/OperatorGuideBook'; 
 import { InventoryManager } from './pages/operator/InventoryManager'; 
@@ -90,7 +90,10 @@ interface ErrorBoundaryState {
 
 // --- ERROR BOUNDARY ---
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false };
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
@@ -151,7 +154,8 @@ const BookingRouter = () => {
         case UserRole.OPERATOR: return <OperatorBookingView />;
         case UserRole.ADMIN:
         case UserRole.STAFF: 
-            return <Navigate to="/admin/bookings" replace />;
+            // Allow Admins/Staff to view the detailed booking page
+            return <BookingDetail />;
         default: return <Navigate to="/dashboard" replace />;
     }
 };

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -33,6 +34,10 @@ export const BookingDetail: React.FC = () => {
   }, [id]);
 
   if (!booking || !user) return <div className="p-8 text-center">Loading Booking...</div>;
+
+  const isAdminOrStaff = user.role === UserRole.ADMIN || user.role === UserRole.STAFF;
+  const backLink = isAdminOrStaff ? '/admin/bookings' : '/agent/dashboard';
+  const backLabel = isAdminOrStaff ? 'Back to Booking Manager' : 'Back to Dashboard';
 
   const handleDownloadPDF = () => {
       const mockQuote: any = {
@@ -86,8 +91,8 @@ export const BookingDetail: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <button onClick={() => navigate('/agent/dashboard')} className="flex items-center text-slate-500 hover:text-slate-800 mb-6">
-        <ArrowLeft size={18} className="mr-1" /> Back to Dashboard
+      <button onClick={() => navigate(backLink)} className="flex items-center text-slate-500 hover:text-slate-800 mb-6">
+        <ArrowLeft size={18} className="mr-1" /> {backLabel}
       </button>
 
       <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden mb-8">
@@ -101,6 +106,11 @@ export const BookingDetail: React.FC = () => {
                     <span className="flex items-center gap-1"><MapPin size={14}/> {booking.destination}</span>
                     <span className="flex items-center gap-1"><Calendar size={14}/> {booking.travelDate}</span>
                     <span className="flex items-center gap-1"><Users size={14}/> {booking.paxCount} Pax</span>
+                    {isAdminOrStaff && (
+                        <span className="flex items-center gap-1 text-yellow-400 font-bold ml-2">
+                             Operator: {booking.operatorName || 'Unassigned'}
+                        </span>
+                    )}
                 </div>
             </div>
             <div className="mt-4 md:mt-0 flex gap-2">
@@ -158,10 +168,12 @@ export const BookingDetail: React.FC = () => {
         )}
 
         {/* Privacy Note for Agent */}
-        <div className="bg-blue-50 px-6 py-2 border-b border-blue-100 flex items-center gap-2 text-xs text-blue-700">
-            <ShieldCheck size={14} />
-            <span><strong>Privacy Active:</strong> The generated Client Link hides Idea Holiday branding and uses your agency details.</span>
-        </div>
+        {!isAdminOrStaff && (
+            <div className="bg-blue-50 px-6 py-2 border-b border-blue-100 flex items-center gap-2 text-xs text-blue-700">
+                <ShieldCheck size={14} />
+                <span><strong>Privacy Active:</strong> The generated Client Link hides Idea Holiday branding and uses your agency details.</span>
+            </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3">
             <div className="lg:col-span-2 p-6 border-r border-slate-200">

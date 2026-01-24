@@ -1,6 +1,10 @@
+
 import { Booking, User, UserRole, Message, DriverDetails } from '../types';
 import { bookingService } from './bookingService';
 import { auditLogService } from './auditLogService';
+import { dbHelper } from './firestoreHelper';
+
+const COLLECTION = 'bookings';
 
 class BookingOperatorService {
 
@@ -21,7 +25,7 @@ class BookingOperatorService {
 
     const previousOperator = booking.operatorName || 'None';
 
-    // Update fields
+    // Update fields locally
     booking.operatorId = operatorId;
     booking.operatorName = operatorName;
     booking.operatorStatus = 'ASSIGNED';
@@ -51,8 +55,8 @@ class BookingOperatorService {
     booking.comments.push(msg);
     booking.updatedAt = new Date().toISOString();
 
-    // Persist via BookingService (it saves the array ref)
-    await bookingService.updateStatus(booking.id, booking.status, adminUser, 'Operator Assigned');
+    // Persist DIRECTLY to avoid re-fetch overwrite race condition
+    await dbHelper.save(COLLECTION, booking);
 
     // Audit Log
     auditLogService.logAction({
@@ -89,8 +93,10 @@ class BookingOperatorService {
         isSystem: true
     };
     booking.comments.push(msg);
+    booking.updatedAt = new Date().toISOString();
     
-    await bookingService.updateStatus(booking.id, booking.status, operatorUser, 'Operator Accepted');
+    // Persist directly
+    await dbHelper.save(COLLECTION, booking);
 
     auditLogService.logAction({
         entityType: 'OPERATOR_ASSIGNMENT',
@@ -121,9 +127,10 @@ class BookingOperatorService {
         isSystem: true
     };
     booking.comments.push(msg);
+    booking.updatedAt = new Date().toISOString();
 
-    // Persist
-    await bookingService.updateStatus(booking.id, booking.status, operatorUser, 'Operator Declined');
+    // Persist directly
+    await dbHelper.save(COLLECTION, booking);
 
     auditLogService.logAction({
         entityType: 'OPERATOR_ASSIGNMENT',
@@ -152,9 +159,11 @@ class BookingOperatorService {
         timestamp: new Date().toISOString(),
         isSystem: true
     };
+    booking.comments.push(msg);
+    booking.updatedAt = new Date().toISOString();
     
-    // Saving via comment addition to ensure persistence
-    await bookingService.addComment(bookingId, msg);
+    // Saving directly ensures persistence
+    await dbHelper.save(COLLECTION, booking);
 
     auditLogService.logAction({
         entityType: 'BOOKING',
