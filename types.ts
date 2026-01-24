@@ -413,7 +413,7 @@ export interface Visa {
   
   // Enhanced Fields
   validity?: string; // e.g. "60 Days"
-  entryType?: 'Single' | 'Multiple';
+  entryType?: 'Single' | 'Double' | 'Multiple';
   description?: string;
 }
 

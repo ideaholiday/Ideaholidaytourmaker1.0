@@ -202,6 +202,7 @@ export const VisaPage: React.FC = () => {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Entry Type</label>
                 <select value={formData.entryType} onChange={e => setFormData({...formData, entryType: e.target.value as any})} className="w-full border p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none">
                     <option value="Single">Single Entry</option>
+                    <option value="Double">Double Entry</option>
                     <option value="Multiple">Multiple Entry</option>
                 </select>
               </div>

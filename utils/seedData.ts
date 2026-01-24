@@ -1,9 +1,10 @@
 
 import { adminService } from '../services/adminService';
-import { Destination, Activity, Transfer } from '../types';
+import { quickQuoteTemplateService } from '../services/quickQuoteTemplateService';
+import { Destination, Activity, Transfer, Visa, FixedPackage, ItineraryTemplate, QuickQuoteTemplate } from '../types';
 
 const DESTINATIONS_DATA = [
-  // --- EXISTING (India & Short Haul) ---
+  // --- INDIA DOMESTIC ---
   { country: 'India', city: 'Goa', currency: 'INR', timezone: 'GMT+5:30' },
   { country: 'India', city: 'Munnar', currency: 'INR', timezone: 'GMT+5:30' },
   { country: 'India', city: 'Manali', currency: 'INR', timezone: 'GMT+5:30' },
@@ -11,114 +12,155 @@ const DESTINATIONS_DATA = [
   { country: 'India', city: 'Srinagar', currency: 'INR', timezone: 'GMT+5:30' },
   { country: 'India', city: 'Jaipur', currency: 'INR', timezone: 'GMT+5:30' },
   { country: 'India', city: 'Port Blair', currency: 'INR', timezone: 'GMT+5:30' },
-  { country: 'United Arab Emirates', city: 'Dubai', currency: 'AED', timezone: 'GMT+4' },
-  { country: 'Thailand', city: 'Bangkok', currency: 'THB', timezone: 'GMT+7' },
-  { country: 'Thailand', city: 'Phuket', currency: 'THB', timezone: 'GMT+7' },
-  { country: 'Singapore', city: 'Singapore', currency: 'SGD', timezone: 'GMT+8' },
-  { country: 'Maldives', city: 'Male', currency: 'MVR', timezone: 'GMT+5' },
-
-  // --- NEW INTERNATIONAL (Europe) ---
-  { country: 'France', city: 'Paris', currency: 'EUR', timezone: 'GMT+1' },
-  { country: 'United Kingdom', city: 'London', currency: 'GBP', timezone: 'GMT+0' },
-  { country: 'Switzerland', city: 'Zurich', currency: 'CHF', timezone: 'GMT+1' },
-  { country: 'Switzerland', city: 'Lucerne', currency: 'CHF', timezone: 'GMT+1' },
-  { country: 'Italy', city: 'Rome', currency: 'EUR', timezone: 'GMT+1' },
-  { country: 'Italy', city: 'Venice', currency: 'EUR', timezone: 'GMT+1' },
-  { country: 'Spain', city: 'Barcelona', currency: 'EUR', timezone: 'GMT+1' },
-  { country: 'Netherlands', city: 'Amsterdam', currency: 'EUR', timezone: 'GMT+1' },
-  { country: 'Turkey', city: 'Istanbul', currency: 'TRY', timezone: 'GMT+3' },
-  { country: 'Turkey', city: 'Cappadocia', currency: 'TRY', timezone: 'GMT+3' },
-
-  // --- NEW INTERNATIONAL (Asia Extended) ---
-  { country: 'Indonesia', city: 'Bali', currency: 'IDR', timezone: 'GMT+8' },
+  
+  // --- VIETNAM ---
   { country: 'Vietnam', city: 'Hanoi', currency: 'VND', timezone: 'GMT+7' },
+  { country: 'Vietnam', city: 'Ha Long Bay', currency: 'VND', timezone: 'GMT+7' },
+  { country: 'Vietnam', city: 'Phu Quoc', currency: 'VND', timezone: 'GMT+7' },
   { country: 'Vietnam', city: 'Ho Chi Minh', currency: 'VND', timezone: 'GMT+7' },
+
+  // --- THAILAND ---
+  { country: 'Thailand', city: 'Bangkok', currency: 'THB', timezone: 'GMT+7' },
+  { country: 'Thailand', city: 'Pattaya', currency: 'THB', timezone: 'GMT+7' },
+  { country: 'Thailand', city: 'Phuket', currency: 'THB', timezone: 'GMT+7' },
+  { country: 'Thailand', city: 'Krabi', currency: 'THB', timezone: 'GMT+7' },
+
+  // --- INDONESIA ---
+  { country: 'Indonesia', city: 'Bali', currency: 'IDR', timezone: 'GMT+8' },
+  { country: 'Indonesia', city: 'Jakarta', currency: 'IDR', timezone: 'GMT+7' },
+
+  // --- MALAYSIA ---
   { country: 'Malaysia', city: 'Kuala Lumpur', currency: 'MYR', timezone: 'GMT+8' },
+  { country: 'Malaysia', city: 'Langkawi', currency: 'MYR', timezone: 'GMT+8' },
+
+  // --- SINGAPORE ---
+  { country: 'Singapore', city: 'Singapore', currency: 'SGD', timezone: 'GMT+8' },
+
+  // --- UAE ---
+  { country: 'United Arab Emirates', city: 'Dubai', currency: 'AED', timezone: 'GMT+4' },
+  { country: 'United Arab Emirates', city: 'Abu Dhabi', currency: 'AED', timezone: 'GMT+4' },
+
+  // --- JAPAN ---
   { country: 'Japan', city: 'Tokyo', currency: 'JPY', timezone: 'GMT+9' },
   { country: 'Japan', city: 'Osaka', currency: 'JPY', timezone: 'GMT+9' },
+
+  // --- HONG KONG ---
+  { country: 'Hong Kong', city: 'Hong Kong', currency: 'HKD', timezone: 'GMT+8' },
+
+  // --- SRI LANKA ---
   { country: 'Sri Lanka', city: 'Colombo', currency: 'LKR', timezone: 'GMT+5:30' },
   { country: 'Sri Lanka', city: 'Kandy', currency: 'LKR', timezone: 'GMT+5:30' },
+  { country: 'Sri Lanka', city: 'Bentota', currency: 'LKR', timezone: 'GMT+5:30' },
 
-  // --- NEW INTERNATIONAL (Rest of World) ---
-  { country: 'United States', city: 'New York', currency: 'USD', timezone: 'GMT-5' },
-  { country: 'United States', city: 'Las Vegas', currency: 'USD', timezone: 'GMT-8' },
+  // --- BHUTAN ---
+  { country: 'Bhutan', city: 'Thimphu', currency: 'BTN', timezone: 'GMT+6' },
+  { country: 'Bhutan', city: 'Paro', currency: 'BTN', timezone: 'GMT+6' },
+
+  // --- AUSTRALIA ---
   { country: 'Australia', city: 'Sydney', currency: 'AUD', timezone: 'GMT+11' },
   { country: 'Australia', city: 'Melbourne', currency: 'AUD', timezone: 'GMT+11' },
-  { country: 'Egypt', city: 'Cairo', currency: 'EGP', timezone: 'GMT+2' },
-  { country: 'South Africa', city: 'Cape Town', currency: 'ZAR', timezone: 'GMT+2' },
+  { country: 'Australia', city: 'Gold Coast', currency: 'AUD', timezone: 'GMT+11' },
+  
+  // --- MALDIVES ---
+  { country: 'Maldives', city: 'Male', currency: 'MVR', timezone: 'GMT+5' },
 ];
 
 const ACTIVITIES_DATA = [
-  // ... Previous India/Dubai/Thai items ...
-  { city: 'Goa', name: 'North Goa Sightseeing (SIC)', type: 'City Tour', cost: 400, desc: 'Visit Fort Aguada, Calangute Beach, Baga Beach and Anjuna by shared coach.', img: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2' },
-  { city: 'Dubai', name: 'Burj Khalifa 124th Floor', type: 'City Tour', cost: 4500, desc: 'Non-prime hours entry ticket to At The Top.', img: 'https://images.unsplash.com/photo-1512453979798-5ea90b792d50' },
-  { city: 'Phuket', name: 'Phi Phi Island by Big Boat', type: 'Cruise', cost: 3800, desc: 'Full day tour with lunch included.', img: 'https://images.unsplash.com/photo-1537956965359-7573183d1f57' },
+  // Vietnam
+  { city: 'Hanoi', name: 'Hanoi City Tour', type: 'City Tour', cost: 2500, desc: 'Visit Ho Chi Minh Mausoleum and Old Quarter.', img: 'https://images.unsplash.com/photo-1528127269322-539801943592' },
+  { city: 'Ha Long Bay', name: 'Full Day Cruise', type: 'Cruise', cost: 4500, desc: 'Cruise through limestone karsts with lunch.', img: 'https://images.unsplash.com/photo-1506530663162-818f9df8811d' },
+  { city: 'Phu Quoc', name: '4 Islands Speedboat Tour', type: 'Adventure', cost: 3500, desc: 'Snorkeling and island hopping.', img: 'https://images.unsplash.com/photo-1540202404-a2f29016b523' },
+  
+  // Thailand
+  { city: 'Pattaya', name: 'Coral Island Tour with Lunch', type: 'Adventure', cost: 1200, desc: 'Speedboat to Koh Larn with Indian lunch.', img: 'https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b' },
+  { city: 'Pattaya', name: 'Alcazar Cabaret Show', type: 'Show', cost: 1800, desc: 'Famous ladyboy cabaret show.', img: 'https://images.unsplash.com/photo-1563492065599-3520f775eeed' },
+  { city: 'Krabi', name: '4 Island Tour by Longtail Boat', type: 'Adventure', cost: 2000, desc: 'Visit Chicken Island, Poda Island, Tup Island.', img: 'https://images.unsplash.com/photo-1552465011-b4e21bf6e79a' },
+  { city: 'Bangkok', name: 'Safari World & Marine Park', type: 'Theme Park', cost: 2900, desc: 'Full day pass with buffet lunch.', img: 'https://images.unsplash.com/photo-1534125861183-7c39050d24cb' },
+  
+  // Indonesia
+  { city: 'Bali', name: 'Uluwatu Temple & Kecak Dance', type: 'Show', cost: 2500, desc: 'Sunset temple tour with traditional dance.', img: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4' },
+  { city: 'Bali', name: 'Nusa Penida West Tour', type: 'Adventure', cost: 5500, desc: 'Kelingking Beach, Broken Beach, Angel Billabong.', img: 'https://images.unsplash.com/photo-1587595431973-160d0d94add1' },
+  
+  // Malaysia
+  { city: 'Kuala Lumpur', name: 'Petronas Twin Towers', type: 'City Tour', cost: 2800, desc: 'Observation deck ticket.', img: 'https://images.unsplash.com/photo-1596422846543-75c6fc197f07' },
+  { city: 'Kuala Lumpur', name: 'Batu Caves & Genting Highlands', type: 'City Tour', cost: 3500, desc: 'Day trip to caves and casino resort.', img: 'https://images.unsplash.com/photo-1584346133934-a3afd2a5d996' },
+  
+  // Singapore
+  { city: 'Singapore', name: 'Universal Studios Singapore', type: 'Theme Park', cost: 6500, desc: 'One day pass to USS.', img: 'https://images.unsplash.com/photo-1537240939023-5e6022ce8779' },
+  { city: 'Singapore', name: 'Gardens by the Bay', type: 'City Tour', cost: 2200, desc: 'Cloud Forest and Flower Dome.', img: 'https://images.unsplash.com/photo-1525625293386-3f8f99389edd' },
+  
+  // UAE
+  { city: 'Dubai', name: 'Desert Safari with BBQ', type: 'Adventure', cost: 3200, desc: 'Dune bashing, camel ride, dinner.', img: 'https://images.unsplash.com/photo-1451337516015-6b6fcd1c9125' },
+  { city: 'Abu Dhabi', name: 'Ferrari World', type: 'Theme Park', cost: 6800, desc: 'Standard entry ticket.', img: 'https://images.unsplash.com/photo-1569421060938-1647ba780287' },
+  { city: 'Abu Dhabi', name: 'Sheikh Zayed Mosque', type: 'City Tour', cost: 0, desc: 'Grand Mosque visit (Free entry, transfer cost applies).', img: 'https://images.unsplash.com/photo-1549144511-30852b392a99' },
 
-  // --- EUROPE ---
-  { city: 'Paris', name: 'Eiffel Tower Summit Priority', type: 'City Tour', cost: 8500, desc: 'Skip-the-line access to the summit with host.', img: 'https://images.unsplash.com/photo-1511739001486-6bfe10ce7859' },
-  { city: 'Paris', name: 'Louvre Museum Guided Tour', type: 'City Tour', cost: 6200, desc: 'See the Mona Lisa and other masterpieces with an expert guide.', img: 'https://images.unsplash.com/photo-1499856871940-a09627c6d7db' },
-  { city: 'Paris', name: 'Seine River Cruise', type: 'Cruise', cost: 1500, desc: '1-hour illumination cruise along the Seine.', img: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1' },
-  { city: 'London', name: 'London Eye Standard Ticket', type: 'City Tour', cost: 3800, desc: 'Panoramic views of London from the cantilevered wheel.', img: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad' },
-  { city: 'London', name: 'Madame Tussauds London', type: 'Theme Park', cost: 4200, desc: 'Famous wax museum entrance ticket.', img: 'https://images.unsplash.com/photo-1526129318478-62ed807ebdf9' },
-  { city: 'Zurich', name: 'Mt. Titlis Day Tour', type: 'Adventure', cost: 14500, desc: 'Eternal snow and glaciers. Includes rotating cable car ride.', img: 'https://images.unsplash.com/photo-1533105079780-92b9be482077' },
-  { city: 'Lucerne', name: 'Mt. Pilatus Golden Round Trip', type: 'Adventure', cost: 11000, desc: 'Boat, cogwheel railway, and cable car experience.', img: 'https://images.unsplash.com/photo-1578328652230-0585f1c9c4c7' },
-  { city: 'Rome', name: 'Colosseum & Roman Forum', type: 'City Tour', cost: 6500, desc: 'Skip-the-line walking tour of ancient Rome.', img: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5' },
-  { city: 'Venice', name: 'Gondola Ride (Shared)', type: 'Cruise', cost: 3500, desc: 'Classic 30-minute gondola ride through the canals.', img: 'https://images.unsplash.com/photo-1514890547357-a9ee288728e0' },
-  { city: 'Barcelona', name: 'Sagrada Familia Fast Track', type: 'City Tour', cost: 4200, desc: 'Entry to Gaudi\'s unfinished masterpiece.', img: 'https://images.unsplash.com/photo-1583422409516-2895a77efded' },
-  { city: 'Amsterdam', name: 'Heineken Experience', type: 'City Tour', cost: 2800, desc: 'Interactive tour through the historic brewery.', img: 'https://images.unsplash.com/photo-1582236873916-04285b5b2938' },
-  { city: 'Istanbul', name: 'Bosphorus Dinner Cruise', type: 'Cruise', cost: 4500, desc: 'Evening cruise with dinner, unlimited drinks and show.', img: 'https://images.unsplash.com/photo-1527838832700-50592524d78c' },
-  { city: 'Cappadocia', name: 'Hot Air Balloon Ride', type: 'Adventure', cost: 22000, desc: 'Sunrise balloon flight over fairy chimneys.', img: 'https://images.unsplash.com/photo-1565619543799-a417537b0373' },
+  // Japan
+  { city: 'Tokyo', name: 'Tokyo Disneyland', type: 'Theme Park', cost: 7500, desc: '1 Day Passport.', img: 'https://images.unsplash.com/photo-1535496465427-4632057d0793' },
+  { city: 'Osaka', name: 'Universal Studios Japan', type: 'Theme Park', cost: 8000, desc: 'Entry ticket.', img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e' },
 
-  // --- ASIA EXTENDED ---
-  { city: 'Bali', name: 'Uluwatu Sunset & Kecak Dance', type: 'Show', cost: 2500, desc: 'Temple tour followed by traditional fire dance at sunset.', img: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4' },
-  { city: 'Bali', name: 'Nusa Penida Day Trip', type: 'Adventure', cost: 5500, desc: 'West island tour including Kelingking Beach and Broken Beach.', img: 'https://images.unsplash.com/photo-1587595431973-160d0d94add1' },
-  { city: 'Hanoi', name: 'Ha Long Bay Day Cruise', type: 'Cruise', cost: 5200, desc: 'Full day cruise with lunch, kayaking, and cave visits.', img: 'https://images.unsplash.com/photo-1528127269322-539801943592' },
-  { city: 'Kuala Lumpur', name: 'Petronas Twin Towers', type: 'City Tour', cost: 2800, desc: 'Observation deck and skybridge access.', img: 'https://images.unsplash.com/photo-1596422846543-75c6fc197f07' },
-  { city: 'Tokyo', name: 'Tokyo Skytree Admission', type: 'City Tour', cost: 2400, desc: 'Views from the tallest tower in Japan.', img: 'https://images.unsplash.com/photo-1536098561742-ca998e48cbcc' },
-  { city: 'Tokyo', name: 'TeamLab Planets', type: 'Show', cost: 3200, desc: 'Immersive digital art museum experience.', img: 'https://images.unsplash.com/photo-1570459027562-4a916cc6113f' },
-  { city: 'Colombo', name: 'Colombo City Tour', type: 'City Tour', cost: 2200, desc: 'Shopping and sightseeing in the capital.', img: 'https://images.unsplash.com/photo-1578509422030-22c7104b2079' },
+  // Hong Kong
+  { city: 'Hong Kong', name: 'Disney Land Hong Kong', type: 'Theme Park', cost: 7000, desc: 'Entry pass.', img: 'https://images.unsplash.com/photo-1588782012019-354366eb7d55' },
+  { city: 'Hong Kong', name: 'Victoria Peak Tram', type: 'City Tour', cost: 1500, desc: 'Return tram with Sky Terrace.', img: 'https://images.unsplash.com/photo-1536764506864-4e4b77d612ce' },
 
-  // --- REST OF WORLD ---
-  { city: 'New York', name: 'Statue of Liberty & Ellis Island', type: 'City Tour', cost: 3500, desc: 'Ferry access to both islands and museums.', img: 'https://images.unsplash.com/photo-1485738422979-f5c462d49f74' },
-  { city: 'New York', name: 'Summit One Vanderbilt', type: 'City Tour', cost: 4800, desc: 'Immersive observation deck experience.', img: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9' },
-  { city: 'Las Vegas', name: 'Grand Canyon West Rim Bus Tour', type: 'Adventure', cost: 12000, desc: 'Day trip to Grand Canyon with Skywalk option.', img: 'https://images.unsplash.com/photo-1491466424936-e304919aada7' },
-  { city: 'Sydney', name: 'Sydney Opera House Tour', type: 'City Tour', cost: 2800, desc: 'Behind the scenes at the iconic venue.', img: 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9' },
-  { city: 'Sydney', name: 'Blue Mountains Day Trip', type: 'Adventure', cost: 9500, desc: 'Scenic world rides and wildlife park visit.', img: 'https://images.unsplash.com/photo-1624823183404-583b28b7463f' },
-  { city: 'Cairo', name: 'Pyramids of Giza & Sphinx', type: 'City Tour', cost: 5500, desc: 'Private tour to the Great Pyramids.', img: 'https://images.unsplash.com/photo-1539650116455-25111b8b809a' },
-  { city: 'Cape Town', name: 'Table Mountain & City Tour', type: 'City Tour', cost: 6000, desc: 'Cable car ride and city orientation.', img: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99' },
+  // Sri Lanka
+  { city: 'Kandy', name: 'Temple of the Tooth Relic', type: 'City Tour', cost: 1200, desc: 'Sacred Buddhist temple visit.', img: 'https://images.unsplash.com/photo-1588258524675-c61d5f3089d3' },
+  { city: 'Bentota', name: 'Madu River Boat Safari', type: 'Adventure', cost: 1000, desc: 'River safari through mangroves.', img: 'https://images.unsplash.com/photo-1548325983-7f9a21b34360' },
+
+  // Australia
+  { city: 'Sydney', name: 'Sydney Opera House Tour', type: 'City Tour', cost: 2800, desc: 'Guided tour.', img: 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9' },
+  { city: 'Gold Coast', name: 'Movie World', type: 'Theme Park', cost: 6500, desc: 'Warner Bros Movie World ticket.', img: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809' },
 ];
 
 const TRANSFERS_DATA = [
-  // ... Previous India/Dubai/Thai items ...
-  { city: 'Dubai', name: 'DXB Airport to City Hotel', type: 'PVT', vehicle: 'Sienna/Previa', pax: 6, cost: 2800, desc: 'Private van transfer.', img: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7' },
-  
-  // --- EUROPE TRANSFERS ---
-  { city: 'Paris', name: 'CDG Airport to Paris Hotel', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 6500, desc: 'Private transfer from Charles de Gaulle.', img: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2' },
-  { city: 'Paris', name: 'CDG Airport to Paris Hotel', type: 'PVT', vehicle: 'Van', pax: 7, cost: 8500, desc: 'Group transfer for families.', img: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7' },
-  { city: 'London', name: 'Heathrow to Central London', type: 'PVT', vehicle: 'Executive Sedan', pax: 3, cost: 8500, desc: 'Meet & Greet at LHR.', img: 'https://images.unsplash.com/photo-1566275529824-cca4d0093727' },
-  { city: 'Zurich', name: 'Zurich Airport to City', type: 'PVT', vehicle: 'Mercedes E Class', pax: 3, cost: 9800, desc: 'Luxury arrival transfer.', img: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d' },
-  { city: 'Rome', name: 'FCO Airport to Rome City', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 5200, desc: 'Private transfer from Fiumicino.', img: 'https://images.unsplash.com/photo-1559416523-140ddc3d238c' },
-  { city: 'Venice', name: 'VCE Airport to Piazzale Roma', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 4800, desc: 'Land transfer to Venice gateway.', img: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2' },
-  { city: 'Venice', name: 'VCE Airport to Hotel (Water Taxi)', type: 'PVT', vehicle: 'Private Boat', pax: 4, cost: 14000, desc: 'Direct water taxi to hotel dock.', img: 'https://images.unsplash.com/photo-1514890547357-a9ee288728e0' },
-  { city: 'Barcelona', name: 'BCN Airport to Hotel', type: 'PVT', vehicle: 'Standard Van', pax: 6, cost: 6800, desc: 'Group arrival transfer.', img: 'https://images.unsplash.com/photo-1562887189-e5d07068537b' },
-  { city: 'Amsterdam', name: 'AMS Airport to City Centre', type: 'PVT', vehicle: 'Tesla Sedan', pax: 3, cost: 5500, desc: 'Eco-friendly private transfer.', img: 'https://images.unsplash.com/photo-1560958089-b8a1929cea89' },
-  { city: 'Istanbul', name: 'IST Airport to Sultanahmet', type: 'PVT', vehicle: 'Mercedes Vito', pax: 5, cost: 4200, desc: 'Comfortable van for small groups.', img: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7' },
-  
-  // --- ASIA TRANSFERS ---
-  { city: 'Bali', name: 'Denpasar Airport to Kuta/Seminyak', type: 'PVT', vehicle: 'MPV', pax: 4, cost: 1800, desc: 'Private car with driver.', img: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2' },
-  { city: 'Bali', name: 'Denpasar Airport to Ubud', type: 'PVT', vehicle: 'MPV', pax: 4, cost: 2500, desc: 'Private car with driver.', img: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2' },
-  { city: 'Hanoi', name: 'Noi Bai Airport to Old Quarter', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 1800, desc: 'Arrival transfer.', img: 'https://images.unsplash.com/photo-1550133730-695473e544be' },
-  { city: 'Kuala Lumpur', name: 'KLIA to City Centre', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 2200, desc: 'Standard private transfer.', img: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2' },
-  { city: 'Tokyo', name: 'Narita Airport to Tokyo City', type: 'SIC', vehicle: 'Limousine Bus', pax: 1, cost: 2800, desc: 'Shared airport shuttle ticket.', img: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e' },
-  { city: 'Tokyo', name: 'Haneda Airport to Tokyo City', type: 'PVT', vehicle: 'Alphard', pax: 5, cost: 12500, desc: 'Luxury MPV transfer.', img: 'https://images.unsplash.com/photo-1633511090164-b43840ea1607' },
-  { city: 'Colombo', name: 'CMB Airport to Colombo Hotel', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 2600, desc: 'Private arrival transfer.', img: 'https://images.unsplash.com/photo-1550133730-695473e544be' },
+  { city: 'Hanoi', name: 'Noi Bai Airport to Hotel', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 1800, desc: 'Private arrival transfer.' },
+  { city: 'Phu Quoc', name: 'PQC Airport to Hotel', type: 'PVT', vehicle: 'Van', pax: 6, cost: 2200, desc: 'Group arrival transfer.' },
+  { city: 'Pattaya', name: 'BKK Airport to Pattaya Hotel', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 2800, desc: 'Intercity airport transfer.' },
+  { city: 'Krabi', name: 'KBV Airport to Ao Nang', type: 'PVT', vehicle: 'Van', pax: 8, cost: 2000, desc: 'Minivan transfer.' },
+  { city: 'Bali', name: 'DPS Airport to Kuta', type: 'PVT', vehicle: 'MPV', pax: 4, cost: 1500, desc: 'Standard MPV.' },
+  { city: 'Kuala Lumpur', name: 'KLIA to City Centre', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 2200, desc: 'Airport transfer.' },
+  { city: 'Singapore', name: 'Changi Airport to Hotel', type: 'PVT', vehicle: 'Combi', pax: 6, cost: 3500, desc: 'Family transfer.' },
+  { city: 'Dubai', name: 'DXB Airport to Hotel', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 2400, desc: 'Standard arrival.' },
+  { city: 'Abu Dhabi', name: 'AUH Airport to Hotel', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 3000, desc: 'Arrival transfer.' },
+  { city: 'Tokyo', name: 'Narita to Tokyo City', type: 'SIC', vehicle: 'Limousine Bus', pax: 1, cost: 2500, desc: 'Shared bus ticket.' },
+  { city: 'Hong Kong', name: 'HKG Airport to Hotel', type: 'PVT', vehicle: 'MPV', pax: 5, cost: 5500, desc: 'Private MPV.' },
+  { city: 'Colombo', name: 'CMB Airport to Colombo', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 2600, desc: 'Private car.' },
+  { city: 'Paro', name: 'Paro Airport to Thimphu', type: 'PVT', vehicle: 'SUV', pax: 4, cost: 3500, desc: 'Scenic drive.' },
+  { city: 'Sydney', name: 'SYD Airport to CBD', type: 'PVT', vehicle: 'Shuttle', pax: 1, cost: 1800, desc: 'Shared shuttle.' },
+];
 
-  // --- REST OF WORLD TRANSFERS ---
-  { city: 'New York', name: 'JFK to Manhattan', type: 'PVT', vehicle: 'SUV', pax: 5, cost: 11000, desc: 'Luxury SUV transfer.', img: 'https://images.unsplash.com/photo-1633511090164-b43840ea1607' },
-  { city: 'Las Vegas', name: 'LAS Airport to Strip', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 5500, desc: 'Private arrival transfer.', img: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2' },
-  { city: 'Sydney', name: 'SYD Airport to CBD', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 6500, desc: 'Private arrival transfer.', img: 'https://images.unsplash.com/photo-1550133730-695473e544be' },
-  { city: 'Cairo', name: 'Cairo Airport to Hotel', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 3200, desc: 'Meet and assist.', img: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2' },
-  { city: 'Cape Town', name: 'CPT Airport to City Bowl', type: 'PVT', vehicle: 'Sedan', pax: 3, cost: 3500, desc: 'Private transfer.', img: 'https://images.unsplash.com/photo-1550133730-695473e544be' },
+const VISAS_DATA: Visa[] = [
+  { id: '', country: 'Vietnam', visaType: 'E-Visa', processingTime: '3-4 Days', cost: 2500, validity: '30 Days', entryType: 'Single', documentsRequired: ['Passport Scan', 'Photo'], isActive: true },
+  { id: '', country: 'Thailand', visaType: 'Visa on Arrival', processingTime: 'Instant', cost: 0, validity: '15 Days', entryType: 'Single', documentsRequired: ['Passport', 'Return Ticket', 'Hotel Voucher'], isActive: true },
+  { id: '', country: 'Indonesia', visaType: 'Visa on Arrival', processingTime: 'Instant', cost: 2800, validity: '30 Days', entryType: 'Single', documentsRequired: ['Passport'], isActive: true },
+  { id: '', country: 'Malaysia', visaType: 'E-Visa (Tourist)', processingTime: '2-3 Days', cost: 3200, validity: '30 Days', entryType: 'Single', documentsRequired: ['Passport', 'Photo', 'Ticket'], isActive: true },
+  { id: '', country: 'Singapore', visaType: 'Tourist Visa', processingTime: '4-5 Days', cost: 2800, validity: '30 Days', entryType: 'Multiple', documentsRequired: ['Form 14A', 'Passport', 'Photo', 'Cover Letter'], isActive: true },
+  { id: '', country: 'United Arab Emirates', visaType: 'Tourist Visa', processingTime: '2-3 Days', cost: 6500, validity: '30 Days', entryType: 'Single', documentsRequired: ['Passport', 'Photo'], isActive: true },
+  { id: '', country: 'Japan', visaType: 'Tourist Visa', processingTime: '5-7 Days', cost: 1500, validity: '15 Days', entryType: 'Single', documentsRequired: ['Passport', 'Photo', 'Bank Statement', 'Itinerary'], isActive: true },
+  { id: '', country: 'Hong Kong', visaType: 'Pre-Arrival Reg.', processingTime: 'Instant', cost: 500, validity: '14 Days', entryType: 'Single', documentsRequired: ['Passport'], isActive: true },
+  { id: '', country: 'Sri Lanka', visaType: 'ETA', processingTime: '24 Hours', cost: 1800, validity: '30 Days', entryType: 'Double', documentsRequired: ['Passport'], isActive: true },
+  { id: '', country: 'Australia', visaType: 'Visitor Visa (600)', processingTime: '15-20 Days', cost: 12000, validity: '3 Months', entryType: 'Multiple', documentsRequired: ['Passport', 'Bank Statement', 'Employment Proof', 'Itinerary'], isActive: true },
+];
+
+const PACKAGES_DATA: FixedPackage[] = [
+  { id: '', packageName: 'Vietnam Essentials', destinationId: '', category: 'Budget', nights: 5, fixedPrice: 25000, inclusions: ['3 Star Hotel', 'Halong Cruise', 'Breakfast'], exclusions: ['Flights', 'Visa'], validDates: ['2024-10-01', '2024-11-01'], isActive: true, imageUrl: '', createdBy: 'admin' },
+  { id: '', packageName: 'Best of Bali', destinationId: '', category: 'Honeymoon', nights: 6, fixedPrice: 35000, inclusions: ['4 Star Hotel', 'Private Pool Villa (2N)', 'Sunset Dinner'], exclusions: ['Flights', 'Lunch'], validDates: ['2024-09-15', '2024-10-15'], isActive: true, imageUrl: '', createdBy: 'admin' },
+  { id: '', packageName: 'Dubai & Abu Dhabi', destinationId: '', category: 'Family', nights: 5, fixedPrice: 42000, inclusions: ['4 Star Hotel', 'Desert Safari', 'Burj Khalifa', 'Ferrari World'], exclusions: ['Tourism Dirham'], validDates: ['2024-11-10', '2024-12-05'], isActive: true, imageUrl: '', createdBy: 'admin' },
+  { id: '', packageName: 'Singapore & Malaysia', destinationId: '', category: 'Best Seller', nights: 6, fixedPrice: 55000, inclusions: ['3 Star Hotel', 'Universal Studios', 'Genting Highlands', 'Transfers'], exclusions: ['Flights', 'Visa'], validDates: ['2024-10-20'], isActive: true, imageUrl: '', createdBy: 'admin' },
+  { id: '', packageName: 'Phuket & Krabi', destinationId: '', category: 'Beach', nights: 5, fixedPrice: 28000, inclusions: ['4 Star Hotel', 'Phi Phi Tour', '4 Island Tour'], exclusions: ['National Park Fees'], validDates: ['2024-11-01'], isActive: true, imageUrl: '', createdBy: 'admin' },
+];
+
+const SYSTEM_TEMPLATES_DATA = [
+  { name: 'Vietnam 6N (Hanoi + Halong + Saigon)', dest: 'Vietnam', nights: 6, tags: ['Culture', 'History'] },
+  { name: 'Bali 5N (Kuta + Ubud)', dest: 'Indonesia', nights: 5, tags: ['Leisure', 'Nature'] },
+  { name: 'Dubai 4N Family Saver', dest: 'Dubai', nights: 4, tags: ['Family', 'Shopping'] },
+  { name: 'Thailand 5N (BKK + PTY)', dest: 'Thailand', nights: 5, tags: ['Budget', 'Nightlife'] },
+];
+
+const QUICK_QUOTES_DATA = [
+    { name: 'Vietnam Standard', dest: 'Vietnam', nights: 5, price: 35000 },
+    { name: 'Dubai Budget', dest: 'Dubai', nights: 4, price: 28000 },
+    { name: 'Bali Honeymoon', dest: 'Bali', nights: 6, price: 45000 },
+    { name: 'Thailand Group', dest: 'Thailand', nights: 5, price: 22000 },
 ];
 
 export const seedInternationalInventory = async () => {
@@ -126,20 +168,20 @@ export const seedInternationalInventory = async () => {
     let addedDests = 0;
     let updatedActivities = 0;
     let updatedTransfers = 0;
+    let addedVisas = 0;
+    let addedPackages = 0;
+    let addedTemplates = 0;
 
-    // 1. Get Existing Destinations
+    // 1. Destinations
     const existingDestinations = await adminService.getDestinations();
-    const destMap: Record<string, string> = {}; // Name -> ID
+    const destMap: Record<string, string> = {}; 
 
-    existingDestinations.forEach(d => {
-        destMap[d.city] = d.id;
-    });
+    existingDestinations.forEach(d => { destMap[d.city] = d.id; });
 
-    // 2. Add Missing Destinations
     for (const d of DESTINATIONS_DATA) {
         if (!destMap[d.city]) {
             const newDest: Destination = {
-                id: '', // Service generates ID
+                id: '',
                 city: d.city,
                 country: d.country,
                 currency: d.currency,
@@ -151,29 +193,25 @@ export const seedInternationalInventory = async () => {
         }
     }
 
-    // Refresh Map after adds
+    // Refresh Map
     if (addedDests > 0) {
         const refreshed = await adminService.getDestinations();
         refreshed.forEach(d => destMap[d.city] = d.id);
     }
 
-    // 3. Upsert Activities
+    // 2. Activities
     const existingActivities = await adminService.getActivities();
-    
     for (const a of ACTIVITIES_DATA) {
         const destId = destMap[a.city];
         if (!destId) continue; 
-
-        // Check duplicates by name
         const existingItem = existingActivities.find(ea => ea.activityName === a.name && ea.destinationId === destId);
-        
         const activityPayload: Activity = {
             id: existingItem ? existingItem.id : '',
             activityName: a.name,
             destinationId: destId,
             activityType: a.type as any,
             costAdult: a.cost,
-            costChild: Math.round(a.cost * 0.75), // Child cost 75%
+            costChild: Math.round(a.cost * 0.75),
             currency: 'INR',
             ticketIncluded: true,
             transferIncluded: false,
@@ -190,15 +228,12 @@ export const seedInternationalInventory = async () => {
         updatedActivities++;
     }
 
-    // 4. Upsert Transfers
+    // 3. Transfers
     const existingTransfers = await adminService.getTransfers();
-
     for (const t of TRANSFERS_DATA) {
         const destId = destMap[t.city];
         if (!destId) continue;
-
         const existingItem = existingTransfers.find(et => et.transferName === t.name && et.destinationId === destId);
-        
         const transferPayload: Transfer = {
             id: existingItem ? existingItem.id : '',
             transferName: t.name,
@@ -213,16 +248,97 @@ export const seedInternationalInventory = async () => {
             nightSurcharge: 0,
             isActive: true,
             description: t.desc,
-            imageUrl: t.img,
             season: 'All Year',
             validFrom: new Date().toISOString().split('T')[0],
             validTo: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
-            meetingPoint: 'Arrival Hall / Hotel Lobby'
+            meetingPoint: 'Arrival Hall / Hotel Lobby',
+            imageUrl: ''
         };
         await adminService.saveTransfer(transferPayload);
         updatedTransfers++;
     }
 
-    alert(`Inventory Updated!\nAdded/Updated:\n- ${addedDests} Global Destinations\n- ${updatedActivities} Sightseeing\n- ${updatedTransfers} Transfers`);
+    // 4. Visas
+    const existingVisas = await adminService.getVisas();
+    for (const v of VISAS_DATA) {
+        if (!existingVisas.find(ev => ev.country === v.country && ev.visaType === v.visaType)) {
+            await adminService.saveVisa({ ...v, id: '' });
+            addedVisas++;
+        }
+    }
+
+    // 5. Fixed Packages
+    const existingPackages = await adminService.getFixedPackages();
+    for (const p of PACKAGES_DATA) {
+        // Resolve a destination ID for the package (e.g. first city in that country found in map)
+        // Simple heuristic: find a city that matches name or assume user manually fixes.
+        // For Seed, let's pick a known city ID if available, or skip destination link.
+        // Better: We added destinations above. Let's try to map by package name context.
+        let destId = '';
+        if (p.packageName.includes('Vietnam')) destId = destMap['Hanoi'];
+        else if (p.packageName.includes('Bali')) destId = destMap['Bali'];
+        else if (p.packageName.includes('Dubai')) destId = destMap['Dubai'];
+        else if (p.packageName.includes('Singapore')) destId = destMap['Singapore'];
+        else if (p.packageName.includes('Phuket')) destId = destMap['Phuket'];
+
+        if (destId && !existingPackages.find(ep => ep.packageName === p.packageName)) {
+            await adminService.saveFixedPackage({ ...p, destinationId: destId, id: '' });
+            addedPackages++;
+        }
+    }
+
+    // 6. System Templates
+    const existingTemplates = await adminService.getSystemTemplates();
+    for (const t of SYSTEM_TEMPLATES_DATA) {
+        if (!existingTemplates.find(et => et.name === t.name)) {
+             const tpl: ItineraryTemplate = {
+                 id: '',
+                 name: t.name,
+                 destinationKeyword: t.dest,
+                 nights: t.nights,
+                 tags: t.tags,
+                 days: Array.from({length: t.nights + 1}, (_, i) => ({
+                     day: i+1,
+                     title: i===0 ? 'Arrival' : (i === t.nights ? 'Departure' : 'Sightseeing'),
+                     description: 'Day at leisure or tour.',
+                     slots: []
+                 }))
+             };
+             await adminService.saveSystemTemplate(tpl);
+             addedTemplates++;
+        }
+    }
+
+    // 7. Quick Quote Templates
+    // Note: requires QuickQuoteTemplateService access
+    const existingQuick = await quickQuoteTemplateService.getSystemTemplates();
+    for (const q of QUICK_QUOTES_DATA) {
+        if (!existingQuick.find(eq => eq.name === q.name)) {
+            const qq: QuickQuoteTemplate = {
+                id: '',
+                name: q.name,
+                destination: q.dest,
+                nights: q.nights,
+                defaultPax: { adults: 2, children: 0 },
+                inputs: { hotelCategory: '4 Star', mealPlan: 'BB', transfersIncluded: true, sightseeingIntensity: 'Standard', rooms: 1 },
+                tags: ['System', 'Best Seller'],
+                isSystem: true,
+                createdBy: 'admin',
+                createdAt: new Date().toISOString(),
+                basePriceEstimate: q.price
+            };
+            await quickQuoteTemplateService.saveTemplate(qq);
+            addedTemplates++;
+        }
+    }
+
+    alert(`Global Inventory Updated!\n
+    - ${addedDests} Destinations
+    - ${updatedActivities} Sightseeing
+    - ${updatedTransfers} Transfers
+    - ${addedVisas} Visas
+    - ${addedPackages} Packages
+    - ${addedTemplates} Templates
+    `);
     window.location.reload();
 };
