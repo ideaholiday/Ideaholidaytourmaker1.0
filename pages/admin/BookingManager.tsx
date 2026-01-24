@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { bookingService } from '../../services/bookingService';
 import { bookingOperatorService } from '../../services/bookingOperatorService';
@@ -46,9 +47,9 @@ export const BookingManager: React.FC = () => {
   };
 
   const filteredBookings = bookings.filter(b => 
-      b.uniqueRefNo.toLowerCase().includes(search.toLowerCase()) || 
-      b.agentName.toLowerCase().includes(search.toLowerCase()) ||
-      b.destination.toLowerCase().includes(search.toLowerCase())
+      (b.uniqueRefNo || '').toLowerCase().includes(search.toLowerCase()) || 
+      (b.agentName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (b.destination || '').toLowerCase().includes(search.toLowerCase())
   );
 
   if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.STAFF)) return <div>Unauthorized</div>;
@@ -87,9 +88,9 @@ export const BookingManager: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                   {filteredBookings.map(b => (
                       <tr key={b.id} className="hover:bg-slate-50">
-                          <td className="px-6 py-4 font-mono font-medium text-brand-600">{b.uniqueRefNo}</td>
-                          <td className="px-6 py-4">{b.destination}</td>
-                          <td className="px-6 py-4">{b.agentName}</td>
+                          <td className="px-6 py-4 font-mono font-medium text-brand-600">{b.uniqueRefNo || 'N/A'}</td>
+                          <td className="px-6 py-4">{b.destination || '-'}</td>
+                          <td className="px-6 py-4">{b.agentName || '-'}</td>
                           <td className="px-6 py-4">
                               {b.operatorName ? (
                                   <span className="text-slate-900 font-medium">{b.operatorName}</span>
@@ -120,6 +121,13 @@ export const BookingManager: React.FC = () => {
                           </td>
                       </tr>
                   ))}
+                  {filteredBookings.length === 0 && (
+                      <tr>
+                          <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                              No bookings found matching search.
+                          </td>
+                      </tr>
+                  )}
               </tbody>
           </table>
       </div>
