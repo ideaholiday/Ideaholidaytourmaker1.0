@@ -12,7 +12,7 @@ const BuilderContent: React.FC = () => {
   
   // Initial Setup State
   const [setup, setSetup] = useState({ destId: '', days: 3 });
-  const destinations = adminService.getDestinations();
+  const destinations = adminService.getDestinationsSync();
 
   const handleStart = () => {
       if (setup.destId) initDestination(setup.days, setup.destId);

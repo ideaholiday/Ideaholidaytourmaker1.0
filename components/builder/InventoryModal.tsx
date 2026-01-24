@@ -33,7 +33,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
   }, [isOpen, type, destinationId, showAllLocations]);
 
   const loadItems = () => {
-    setAllDestinations(adminService.getDestinations());
+    setAllDestinations(adminService.getDestinationsSync());
 
     let mergedItems: any[] = [];
 

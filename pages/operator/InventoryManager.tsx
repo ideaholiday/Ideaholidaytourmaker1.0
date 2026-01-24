@@ -14,7 +14,7 @@ export const InventoryManager: React.FC = () => {
   const [formData, setFormData] = useState<Partial<OperatorInventoryItem>>({});
   
   // Destination options for dropdown
-  const destinations = adminService.getDestinations().filter(d => d.isActive);
+  const destinations = adminService.getDestinationsSync().filter(d => d.isActive);
 
   useEffect(() => {
     loadItems();
@@ -207,7 +207,7 @@ export const InventoryManager: React.FC = () => {
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                     <textarea 
-                        className="w-full border p-2 rounded-lg h-24 resize-none"
+                        className="w-full border p-2 rounded-lg h-24 resize-none text-sm focus:ring-2 focus:ring-brand-500 outline-none"
                         placeholder="Details about the service..."
                         value={formData.description || ''}
                         onChange={e => setFormData({...formData, description: e.target.value})}
@@ -215,7 +215,7 @@ export const InventoryManager: React.FC = () => {
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium">Cancel</button>
                     <button type="submit" className="bg-brand-600 text-white px-6 py-2 rounded-lg hover:bg-brand-700 font-bold shadow-sm flex items-center gap-2">
                         <Save size={18} /> Submit
                     </button>

@@ -1,17 +1,49 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
-import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book, Loader2 } from 'lucide-react';
+import { Quote } from '../../types';
 
 export const AgentDashboard: React.FC = () => {
   const { user } = useAuth();
+  const [stats, setStats] = useState({
+      totalQuotes: 0,
+      activeQuotes: 0,
+      confirmedQuotes: 0,
+      totalRevenue: 0,
+      conversionRate: 0
+  });
+  const [recentQuotes, setRecentQuotes] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
   
+  useEffect(() => {
+      if (user) {
+          const loadData = async () => {
+              try {
+                  const s = await agentService.getStats(user.id);
+                  setStats(s);
+                  const q = await agentService.fetchQuotes(user.id);
+                  // Sort by date desc if not sorted
+                  // q.sort... (assuming backend or service handles it, or sort here)
+                  setRecentQuotes(q.slice(0, 5));
+              } finally {
+                  setLoading(false);
+              }
+          };
+          loadData();
+      }
+  }, [user]);
+
   if (!user) return null;
 
-  const stats = agentService.getStats(user.id);
-  const recentQuotes = agentService.getQuotes(user.id).slice(0, 5); // Last 5
+  if (loading) {
+      return (
+          <div className="flex h-screen items-center justify-center">
+              <Loader2 className="animate-spin text-brand-600" size={32} />
+          </div>
+      );
+  }
 
   const StatCard = ({ label, value, subtext, icon, color }: any) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-start justify-between">

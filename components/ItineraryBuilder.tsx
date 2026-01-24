@@ -319,7 +319,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                     {activeDay.cityId ? (
                                        <div className="flex items-center gap-2 text-sm text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                                            <MapPin size={16} className="text-brand-500" />
-                                           <strong>{adminService.getDestinations().find(d => d.id === activeDay.cityId)?.city || 'Unknown City'}</strong>
+                                           <strong>{adminService.getDestinationsSync().find(d => d.id === activeDay.cityId)?.city || 'Unknown City'}</strong>
                                            <span className="text-xs text-slate-400 ml-auto">Inventory Filter</span>
                                        </div>
                                     ) : (

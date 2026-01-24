@@ -27,7 +27,7 @@ export const Contracts: React.FC = () => {
     // Load Suppliers
     const allUsers = adminService.getUsers();
     setSuppliers(allUsers.filter(u => u.role === UserRole.HOTEL_PARTNER && u.status === 'ACTIVE'));
-    setDestinations(adminService.getDestinations().filter(d => d.isActive));
+    setDestinations(adminService.getDestinationsSync().filter(d => d.isActive));
 
     // Load Contracts
     if (user?.role === UserRole.HOTEL_PARTNER) {

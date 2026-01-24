@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
@@ -8,7 +7,7 @@ import { InventoryImportExport } from '../../components/admin/InventoryImportExp
 
 export const Sightseeing: React.FC = () => {
   const { user } = useAuth();
-  const allDestinations = adminService.getDestinations();
+  const allDestinations = adminService.getDestinationsSync();
   const allActivities = adminService.getActivities();
   
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;

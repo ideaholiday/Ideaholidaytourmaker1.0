@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -71,7 +70,7 @@ export const QuoteDetail: React.FC = () => {
       if (window.confirm(`Are you sure you want to book Quote #${quote.uniqueRefNo}?\n\nThis will lock the itinerary and generate a booking request for the Operations team.`)) {
           try {
               // 1. Create Booking Record (Local System)
-              const newBooking = bookingService.createBookingFromQuote(quote, user);
+              const newBooking = await bookingService.createBookingFromQuote(quote, user);
               
               // 2. Sync Status to API (Backend)
               await agentService.bookQuote(quote.id, user);
@@ -182,9 +181,9 @@ export const QuoteDetail: React.FC = () => {
       alert("Public Link copied to clipboard!");
   };
 
-  const handleCreateRevision = () => {
+  const handleCreateRevision = async () => {
       if (confirm("Create a new version to edit? The current version will remain locked as history.")) {
-          const newQuote = agentService.createRevision(quote.id, user);
+          const newQuote = await agentService.createRevision(quote.id, user);
           if (newQuote) {
               navigate(`/quote/${newQuote.id}`);
           }

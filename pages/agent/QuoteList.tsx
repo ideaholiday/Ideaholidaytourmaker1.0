@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -30,11 +29,11 @@ export const QuoteList: React.FC = () => {
           // Parallel fetch simulation
           Promise.all([
              agentService.fetchQuotes(user.id),
-             agentService.fetchHistory(user.id)
+             agentService.getBookedHistory(user.id)
           ]).then(([q, h]) => {
              // If API fails or returns undefined, fallback to local service getters
              setQuotes(q || agentService.getQuotes(user.id));
-             setHistory(h || agentService.getBookedHistory(user.id));
+             setHistory(h || []);
              setLoading(false);
           });
       }
@@ -100,7 +99,7 @@ export const QuoteList: React.FC = () => {
       if (window.confirm(`Confirm Booking for ${quote.uniqueRefNo}?\n\nThis will create a booking record and notify operations.`)) {
           try {
               // 1. Create Booking Record (Local DB Sync)
-              bookingService.createBookingFromQuote(quote, user);
+              await bookingService.createBookingFromQuote(quote, user);
               
               // 2. Sync Status to API (Backend)
               await agentService.bookQuote(quote.id, user);
@@ -121,9 +120,9 @@ export const QuoteList: React.FC = () => {
       alert("Public Link copied to clipboard!");
   };
 
-  const handleDuplicate = (e: React.MouseEvent, quoteId: string) => {
+  const handleDuplicate = async (e: React.MouseEvent, quoteId: string) => {
       e.stopPropagation();
-      const newQuote = agentService.duplicateQuote(quoteId, user.id);
+      const newQuote = await agentService.duplicateQuote(quoteId, user.id);
       if (newQuote) {
         navigate(`/quote/${newQuote.id}`);
       }

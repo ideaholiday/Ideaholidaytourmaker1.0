@@ -32,7 +32,7 @@ export const OperatorProfilePage: React.FC = () => {
       });
 
       // Resolve City Names
-      const allDestinations = adminService.getDestinations();
+      const allDestinations = adminService.getDestinationsSync();
       const names = (user.assignedDestinations || []).map(id => {
         const dest = allDestinations.find(d => d.id === id);
         return dest ? `${dest.city}, ${dest.country}` : id;

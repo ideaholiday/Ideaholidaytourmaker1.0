@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { profileService } from '../../services/profileService';
@@ -26,7 +25,7 @@ export const AdminDashboard: React.FC = () => {
 
   // --- ADMIN VIEW ---
   const stats = profileService.getAdminDashboardStats();
-  const destinations = adminService.getDestinations().length;
+  const destinations = adminService.getDestinationsSync().length;
   const hotels = adminService.getHotels().length;
 
   const StatCard = ({ title, value, subtext, icon, color }: any) => (

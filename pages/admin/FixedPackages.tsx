@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
@@ -7,7 +6,7 @@ import { Edit2, Trash2, Plus, X, Package, Calendar, Image as ImageIcon, Tag } fr
 
 export const FixedPackages: React.FC = () => {
   const { user } = useAuth();
-  const allDestinations = adminService.getDestinations();
+  const allDestinations = adminService.getDestinationsSync();
   const allPackages = adminService.getFixedPackages();
   
   // Operators now have full access

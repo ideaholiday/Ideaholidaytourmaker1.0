@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
@@ -43,7 +42,7 @@ export const UserManagement: React.FC = () => {
 
   const loadData = () => {
     setUsers(adminService.getUsers());
-    setDestinations(adminService.getDestinations());
+    setDestinations(adminService.getDestinationsSync());
     setAllHotels(adminService.getHotels());
     setAllTransfers(adminService.getTransfers());
   };

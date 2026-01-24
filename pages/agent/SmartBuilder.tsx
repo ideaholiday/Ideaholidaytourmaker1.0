@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -7,7 +6,7 @@ import { adminService } from '../../services/adminService';
 import { ItineraryBuilder } from '../../components/ItineraryBuilder';
 import { CityNightSelector } from '../../components/CityNightSelector';
 import { CitySequencePreview } from '../../components/CitySequencePreview';
-import { ItineraryItem, CityVisit } from '../../types';
+import { ItineraryItem, CityVisit, Quote } from '../../types';
 import { Map, Save, ArrowRight, Play, Calendar, User, Layout } from 'lucide-react';
 import { calculatePriceFromNet } from '../../utils/pricingEngine';
 import { currencyService } from '../../services/currencyService';
@@ -29,7 +28,7 @@ export const SmartBuilder: React.FC = () => {
   
   // Route State
   const [selectedCities, setSelectedCities] = useState<CityVisit[]>([]);
-  const destinations = adminService.getDestinations().filter(d => d.isActive);
+  const destinations = adminService.getDestinationsSync().filter(d => d.isActive);
 
   // Result Itinerary
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
@@ -132,7 +131,7 @@ export const SmartBuilder: React.FC = () => {
       );
   };
 
-  const handleSaveQuote = (finalItinerary: ItineraryItem[]) => {
+  const handleSaveQuote = async (finalItinerary: ItineraryItem[]) => {
       setItinerary(finalItinerary); // Update state with final edits
       
       const financials = calculateFinancials();
@@ -141,7 +140,7 @@ export const SmartBuilder: React.FC = () => {
       const destinationName = selectedCities.map(c => c.cityName).join(', ');
       const totalNights = selectedCities.reduce((sum, c) => sum + c.nights, 0);
 
-      const newQuote = agentService.createQuote(
+      const newQuote = await agentService.createQuote(
           user!, 
           destinationName, 
           basics.travelDate, 
@@ -149,7 +148,7 @@ export const SmartBuilder: React.FC = () => {
           fullGuestName
       );
       
-      const updatedQuote = {
+      const updatedQuote: Quote = {
           ...newQuote,
           childCount: basics.children,
           childAges: basics.childAges,
@@ -164,7 +163,7 @@ export const SmartBuilder: React.FC = () => {
           cityVisits: selectedCities
       };
 
-      agentService.updateQuote(updatedQuote);
+      await agentService.updateQuote(updatedQuote);
       showToast("Quote Saved!", 'success');
       setTimeout(() => navigate(`/quote/${newQuote.id}`), 500);
   };

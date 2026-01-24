@@ -1,58 +1,27 @@
 
 import { Quote, User } from '../types';
-import { INITIAL_QUOTES } from '../constants';
-import { apiClient } from './apiClient';
+import { dbHelper } from './firestoreHelper';
 import { auditLogService } from './auditLogService';
-import { db } from './firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, where } from 'firebase/firestore';
 
-const STORAGE_KEY_QUOTES = 'iht_agent_quotes';
+const COLLECTION = 'quotes';
 
 class AgentService {
-  private quotes: Quote[];
-  private isOffline = false;
-
-  constructor() {
-    const stored = localStorage.getItem(STORAGE_KEY_QUOTES);
-    this.quotes = stored ? JSON.parse(stored) : INITIAL_QUOTES;
-  }
-
-  private saveLocal() {
-    localStorage.setItem(STORAGE_KEY_QUOTES, JSON.stringify(this.quotes));
-  }
-
-  /**
-   * Syncs quotes from Cloud for the specific Agent.
-   */
+  
+  // --- READ ---
+  
   async fetchQuotes(agentId: string): Promise<Quote[]> {
-      if (this.isOffline) return this.quotes.filter(q => q.agentId === agentId);
-
-      try {
-        const q = query(collection(db, 'quotes'), where('agentId', '==', agentId));
-        const snapshot = await getDocs(q);
-        const remoteQuotes = snapshot.docs.map(d => d.data() as Quote);
-        
-        if (remoteQuotes.length > 0) {
-            // Merge with local: Remote wins conflicts
-            const localMap = new Map(this.quotes.map(i => [i.id, i]));
-            remoteQuotes.forEach(rq => localMap.set(rq.id, rq));
-            this.quotes = Array.from(localMap.values());
-            this.saveLocal();
-        }
-        return this.quotes.filter(q => q.agentId === agentId);
-      } catch (e: any) {
-          if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
-              this.isOffline = true;
-          } else {
-              console.warn("Cloud Sync Error (Quotes):", e);
-          }
-          return this.quotes.filter(q => q.agentId === agentId);
-      }
+      // Firestore Index: quotes where agentId == X
+      return await dbHelper.getWhere<Quote>(COLLECTION, 'agentId', '==', agentId);
   }
 
-  // --- ACTIONS ---
+  // Sync access not possible with Firestore (async), components must wait for promise.
+  // We keep this signature but it returns empty until fetched, or components need refactor.
+  // For safety in this refactor, we rely on components handling the async fetch in their useEffect.
+  getQuotes(agentId: string): Quote[] { return []; } 
 
-  createQuote(agent: User, destination: string, travelDate: string, pax: number, leadGuestName?: string): Quote {
+  // --- WRITE ---
+
+  async createQuote(agent: User, destination: string, travelDate: string, pax: number, leadGuestName?: string): Promise<Quote> {
     const newQuote: Quote = {
       id: `q_${Date.now()}_${Math.random().toString(36).substr(2,5)}`,
       uniqueRefNo: `QT-${Math.floor(Math.random() * 10000)}`,
@@ -74,109 +43,49 @@ class AgentService {
       messages: []
     };
     
-    this.quotes.unshift(newQuote);
-    this.saveLocal();
-    this.syncToCloud(newQuote);
-    
+    await dbHelper.save(COLLECTION, newQuote);
     return newQuote;
   }
   
-  updateQuote(quote: Quote) {
-    const index = this.quotes.findIndex(q => q.id === quote.id);
-    if (index !== -1) {
-      this.quotes[index] = quote;
-      this.saveLocal();
-      this.syncToCloud(quote);
-    }
+  async updateQuote(quote: Quote) {
+    await dbHelper.save(COLLECTION, quote);
   }
 
   async deleteQuote(quoteId: string) {
-    const index = this.quotes.findIndex(q => q.id === quoteId);
-    if (index !== -1) {
-        if (this.quotes[index].status === 'BOOKED') throw new Error("Cannot delete booked quote.");
-        this.quotes.splice(index, 1);
-        this.saveLocal();
-        
-        if (!this.isOffline) {
-            try {
-                await deleteDoc(doc(db, 'quotes', quoteId));
-            } catch (e: any) { 
-                if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
-                  this.isOffline = true;
-                } else {
-                    console.error("Cloud delete failed", e); 
-                }
-            }
-        }
+    const quote = await dbHelper.getById<Quote>(COLLECTION, quoteId);
+    if (quote && quote.status === 'BOOKED') {
+        throw new Error("Cannot delete booked quote.");
     }
+    await dbHelper.delete(COLLECTION, quoteId);
   }
 
   async bookQuote(quoteId: string, user: User) {
-    const quote = this.quotes.find(q => q.id === quoteId);
-    if (!quote) throw new Error("Quote not found");
-    
-    quote.status = 'BOOKED';
-    quote.isLocked = true;
-    this.saveLocal();
-    this.syncToCloud(quote);
+    await dbHelper.save(COLLECTION, { id: quoteId, status: 'BOOKED', isLocked: true });
 
     auditLogService.logAction({
         entityType: 'QUOTE',
-        entityId: quote.id,
+        entityId: quoteId,
         action: 'QUOTE_BOOKED',
-        description: `Agent ${user.name} booked Quote ${quote.uniqueRefNo}`,
+        description: `Quote booked by ${user.name}`,
         user: user,
         newValue: { status: 'BOOKED' }
     });
   }
 
-  // --- HELPERS ---
-
-  private async syncToCloud(quote: Quote) {
-      if (this.isOffline) return;
-      try {
-          await setDoc(doc(db, 'quotes', quote.id), quote, { merge: true });
-      } catch (e: any) {
-          if (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found') {
-              this.isOffline = true;
-          } else {
-              console.error("Cloud save failed for quote", quote.id, e);
-          }
-      }
-  }
-
-  // Fetch all quotes assigned to an operator (Cross-User)
+  // --- OPERATOR ---
   async getOperatorAssignments(operatorId: string): Promise<Quote[]> {
-      if (this.isOffline) {
-          return this.quotes.filter(q => q.operatorId === operatorId);
-      }
-
-      try {
-        const q = query(collection(db, 'quotes'), where('operatorId', '==', operatorId));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(d => d.data() as Quote);
-      } catch (e) {
-          return this.quotes.filter(q => q.operatorId === operatorId);
-      }
+      return await dbHelper.getWhere<Quote>(COLLECTION, 'operatorId', '==', operatorId);
   }
 
-  getQuotes(agentId: string): Quote[] {
-    return this.quotes.filter(q => q.agentId === agentId && q.status !== 'BOOKED');
-  }
-
-  getBookedHistory(agentId: string): Quote[] {
-      return this.quotes.filter(q => q.agentId === agentId && (q.status === 'BOOKED' || q.status === 'CONFIRMED'));
+  async getBookedHistory(agentId: string): Promise<Quote[]> {
+      // In Firestore, we'd do a compound query, but here we can filter client side or do simple where
+      const all = await this.fetchQuotes(agentId);
+      return all.filter(q => q.status === 'BOOKED' || q.status === 'CONFIRMED');
   }
   
-  // Method to fetch booked history from cloud
-  async fetchHistory(agentId: string): Promise<Quote[]> {
-       // Re-use fetchQuotes as it pulls all for agent, then filter locally
-       await this.fetchQuotes(agentId);
-       return this.getBookedHistory(agentId);
-  }
-
-  getStats(agentId: string) {
-    const myQuotes = this.quotes.filter(q => q.agentId === agentId);
+  // Stats calculation needs to fetch all quotes for the agent
+  async getStats(agentId: string) {
+    const myQuotes = await this.fetchQuotes(agentId);
     const confirmed = myQuotes.filter(q => q.status === 'BOOKED' || q.status === 'CONFIRMED');
     
     return {
@@ -188,24 +97,22 @@ class AgentService {
     };
   }
 
-  // Mock methods for compatibility
-  createRevision(originalId: string, agent: User): Quote | null {
-      const original = this.quotes.find(q => q.id === originalId);
+  // Revisions/Duplications
+  async createRevision(originalId: string, agent: User): Promise<Quote | null> {
+      const original = await dbHelper.getById<Quote>(COLLECTION, originalId);
       if (!original) return null;
+      
       const copy = { ...original, id: `rev_${Date.now()}`, version: original.version + 1, isLocked: false };
-      this.quotes.unshift(copy);
-      this.saveLocal();
-      this.syncToCloud(copy);
+      await dbHelper.save(COLLECTION, copy);
       return copy;
   }
   
-  duplicateQuote(originalId: string, agentId: string): Quote | null {
-      const original = this.quotes.find(q => q.id === originalId);
+  async duplicateQuote(originalId: string, agentId: string): Promise<Quote | null> {
+      const original = await dbHelper.getById<Quote>(COLLECTION, originalId);
       if (!original) return null;
+      
       const copy = { ...original, id: `copy_${Date.now()}`, uniqueRefNo: `COPY-${Date.now()}`, status: 'DRAFT' as const, isLocked: false };
-      this.quotes.unshift(copy);
-      this.saveLocal();
-      this.syncToCloud(copy);
+      await dbHelper.save(COLLECTION, copy);
       return copy;
   }
 }

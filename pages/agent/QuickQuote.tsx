@@ -14,7 +14,7 @@ import { TemplateSelector } from '../../components/quickQuote/TemplateSelector';
 export const QuickQuote: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const destinations = adminService.getDestinations().filter(d => d.isActive);
+  const destinations = adminService.getDestinationsSync().filter(d => d.isActive);
 
   // --- FORM STATE ---
   const [destination, setDestination] = useState('');
@@ -178,7 +178,7 @@ export const QuickQuote: React.FC = () => {
           const fullGuestName = `${guestSalutation}. ${guestName}`;
 
           // 1. Create Quote Object
-          const newQuote = agentService.createQuote(user, destination, travelDate, pax.adults + pax.children, fullGuestName);
+          const newQuote = await agentService.createQuote(user, destination, travelDate, pax.adults + pax.children, fullGuestName);
           
           // 2. Generate Skeleton Itinerary for PDF Support
           const skeletonItinerary = generateSkeletonItinerary();
@@ -196,7 +196,7 @@ export const QuickQuote: React.FC = () => {
               serviceDetails: `${nights}N Trip to ${destination}. ${inputs.hotelCategory} Hotel (${inputs.mealPlan}). ${inputs.sightseeingIntensity} Sightseeing.`
           };
 
-          agentService.updateQuote(quickDetails);
+          await agentService.updateQuote(quickDetails);
           navigate(`/quote/${newQuote.id}`);
 
       } catch (error) {

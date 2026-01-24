@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
@@ -8,7 +7,7 @@ import { InventoryImportExport } from '../../components/admin/InventoryImportExp
 
 export const Destinations: React.FC = () => {
   const { user } = useAuth();
-  const [destinations, setDestinations] = useState<Destination[]>(adminService.getDestinations());
+  const [destinations, setDestinations] = useState<Destination[]>(adminService.getDestinationsSync());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDest, setEditingDest] = useState<Destination | null>(null);
   const [formData, setFormData] = useState<Partial<Destination>>({});
@@ -51,14 +50,14 @@ export const Destinations: React.FC = () => {
       createdBy: editingDest?.createdBy || user?.id
     });
 
-    setDestinations(adminService.getDestinations());
+    setDestinations(adminService.getDestinationsSync());
     setIsModalOpen(false);
   };
 
   const handleDelete = (id: string) => {
     if (window.confirm('Delete this destination?')) {
       adminService.deleteDestination(id);
-      setDestinations(adminService.getDestinations());
+      setDestinations(adminService.getDestinationsSync());
     }
   };
 
@@ -78,7 +77,7 @@ export const Destinations: React.FC = () => {
                     onImport={(data) => {
                          // Mock Re-import logic
                          alert("Import processed");
-                         setDestinations(adminService.getDestinations());
+                         setDestinations(adminService.getDestinationsSync());
                     }}
                 />
                 <button 

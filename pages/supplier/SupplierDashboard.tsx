@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { adminService } from '../../services/adminService';
@@ -53,7 +52,7 @@ export const SupplierDashboard: React.FC = () => {
   useEffect(() => {
     if (user) {
         loadData();
-        setDestinations(adminService.getDestinations().filter(d => d.isActive));
+        setDestinations(adminService.getDestinationsSync().filter(d => d.isActive));
         setCurrencies(currencyService.getCurrencies().map(c => c.code));
     }
   }, [user]);

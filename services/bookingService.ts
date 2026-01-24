@@ -1,89 +1,40 @@
 
-import { Booking, BookingStatus, Quote, User, Message, UserRole, PaymentEntry, PaymentMode, CancellationType, RefundStatus, Traveler } from '../types';
+import { Booking, BookingStatus, Quote, User, Message, UserRole, PaymentEntry, PaymentMode, Traveler } from '../types';
 import { agentService } from './agentService';
-import { auditLogService } from './auditLogService';
-import { gstService } from './gstService';
+import { dbHelper } from './firestoreHelper';
 import { companyService } from './companyService';
-import { db } from './firebase';
-import { collection, getDocs, doc, setDoc, query, where } from 'firebase/firestore';
 
-const STORAGE_KEY_BOOKINGS = 'iht_bookings_db';
+const COLLECTION = 'bookings';
 
 class BookingService {
-  private bookings: Booking[];
-  private isOffline = false;
+  private cache: Booking[] = [];
 
-  constructor() {
-    const stored = localStorage.getItem(STORAGE_KEY_BOOKINGS);
-    this.bookings = stored ? JSON.parse(stored) : [];
-  }
-
-  private saveLocal() {
-    localStorage.setItem(STORAGE_KEY_BOOKINGS, JSON.stringify(this.bookings));
-  }
-  
-  private isOfflineError(e: any): boolean {
-      const msg = e.message || '';
-      return (
-          e.code === 'permission-denied' || 
-          e.code === 'unavailable' || 
-          e.code === 'not-found' || 
-          msg.includes('permission-denied') || 
-          msg.includes('not-found') ||
-          msg.includes('offline')
-      );
-  }
-  
-  private async syncToCloud(booking: Booking) {
-      if (this.isOffline) return;
-      try {
-          await setDoc(doc(db, 'bookings', booking.id), booking, { merge: true });
-      } catch (e: any) {
-          if (this.isOfflineError(e)) {
-              this.isOffline = true;
-          } else {
-              console.error("Cloud save failed for booking", booking.id, e);
-          }
-      }
-  }
-
-  /**
-   * Syncs bookings from Cloud.
-   * Call this on dashboard load.
-   */
+  // Used by AuthContext to preload data
   async syncAllBookings() {
-      if (this.isOffline) return;
-      try {
-          const snapshot = await getDocs(collection(db, 'bookings'));
-          const remoteBookings = snapshot.docs.map(d => d.data() as Booking);
-          
-          if (remoteBookings.length > 0) {
-             this.bookings = remoteBookings; // Replace local with authoritative cloud data
-             this.saveLocal();
-          }
-      } catch (e: any) { 
-           if (this.isOfflineError(e)) {
-             if (!this.isOffline) {
-                 console.warn("⚠️ Booking Service: Backend unavailable. Switching to Offline Mode.");
-                 this.isOffline = true;
-             }
-          } else {
-             console.warn("Booking Sync Failed", e); 
-          }
-      }
+      this.cache = await dbHelper.getAll<Booking>(COLLECTION);
+  }
+
+  // Sync access for UI components (Relies on syncAllBookings being called)
+  getAllBookings(): Booking[] { return this.cache; }
+  
+  getBooking(id: string): Booking | undefined {
+    return this.cache.find(b => b.id === id);
+  }
+
+  getBookingsForAgent(agentId: string): Booking[] {
+    return this.cache.filter(b => b.agentId === agentId);
+  }
+
+  getBookingsForOperator(operatorId: string): Booking[] {
+    return this.cache.filter(b => b.operatorId === operatorId && b.status !== 'REQUESTED' && b.status !== 'REJECTED');
   }
 
   // --- CRUD ---
 
-  createBookingFromQuote(quote: Quote, user: User, travelers?: Traveler[]): Booking {
+  async createBookingFromQuote(quote: Quote, user: User, travelers?: Traveler[]): Promise<Booking> {
     const totalAmount = quote.sellingPrice || quote.price || 0;
     const advanceAmount = Math.ceil(totalAmount * 0.30);
     const defaultCompany = companyService.getDefaultCompany();
-
-    const itinerarySnapshot = JSON.parse(JSON.stringify(quote.itinerary || []));
-    const travelersSnapshot = travelers 
-        ? JSON.parse(JSON.stringify(travelers)) 
-        : JSON.parse(JSON.stringify(quote.travelers || []));
 
     const newBooking: Booking = {
       id: `bk_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
@@ -94,8 +45,8 @@ class BookingService {
       destination: quote.destination,
       travelDate: quote.travelDate,
       paxCount: quote.paxCount,
-      travelers: travelersSnapshot,
-      itinerary: itinerarySnapshot, 
+      travelers: travelers || quote.travelers || [],
+      itinerary: quote.itinerary, 
       
       netCost: quote.price || 0,
       sellingPrice: totalAmount,
@@ -112,14 +63,12 @@ class BookingService {
       agentName: quote.agentName,
       staffId: quote.staffId,
       
-      operatorId: undefined, 
-      operatorName: undefined,
       companyId: defaultCompany.id,
 
       comments: [{
           id: `msg_${Date.now()}`,
           senderId: user.id,
-          senderName: user.name === 'Client' ? 'Client (Public)' : 'System',
+          senderName: user.name === 'Client' ? 'Client' : 'System',
           senderRole: user.role === UserRole.AGENT ? UserRole.AGENT : UserRole.ADMIN,
           content: `Booking Created.`,
           timestamp: new Date().toISOString(),
@@ -129,64 +78,48 @@ class BookingService {
       updatedAt: new Date().toISOString()
     };
 
-    this.bookings.unshift(newBooking);
-    this.saveLocal();
-    this.syncToCloud(newBooking);
+    await dbHelper.save(COLLECTION, newBooking);
     
-    quote.status = 'BOOKED';
-    agentService.updateQuote(quote);
+    // Update Quote status
+    await agentService.updateQuote({ ...quote, status: 'BOOKED' });
 
+    // Refresh cache
+    await this.syncAllBookings();
+    
     return newBooking;
   }
 
-  requestPublicBooking(quote: Quote, travelers: Traveler[]): Booking {
+  async requestPublicBooking(quote: Quote, travelers: Traveler[]): Promise<Booking> {
       const clientUser: User = { id: 'public_client', name: 'Client', email: 'client@web.com', role: UserRole.AGENT, isVerified: true };
       return this.createBookingFromQuote(quote, clientUser, travelers);
   }
 
-  getBooking(id: string): Booking | undefined {
-    return this.bookings.find(b => b.id === id);
-  }
+  // --- UPDATES ---
 
-  getBookingsForAgent(agentId: string): Booking[] {
-    return this.bookings.filter(b => b.agentId === agentId);
-  }
-
-  getBookingsForOperator(operatorId: string): Booking[] {
-    // Also try to fetch fresh from cloud if list is empty locally
-    return this.bookings.filter(b => b.operatorId === operatorId && b.status !== 'REQUESTED' && b.status !== 'REJECTED');
-  }
-
-  getAllBookings(): Booking[] {
-    return this.bookings;
-  }
-
-  // --- STATUS MANAGEMENT ---
-
-  updateStatus(bookingId: string, status: BookingStatus, user: User, reason?: string) {
+  async updateStatus(bookingId: string, status: BookingStatus, user: User, reason?: string) {
     const booking = this.getBooking(bookingId);
     if (!booking) return;
 
-    booking.status = status;
-    booking.updatedAt = new Date().toISOString();
+    const updated = {
+        ...booking,
+        status,
+        updatedAt: new Date().toISOString(),
+        comments: [...booking.comments, {
+            id: `sys_${Date.now()}`,
+            senderId: user.id,
+            senderName: 'System',
+            senderRole: UserRole.ADMIN,
+            content: `Status updated to ${status}. ${reason || ''}`,
+            timestamp: new Date().toISOString(),
+            isSystem: true
+        }]
+    };
 
-    this.addComment(bookingId, {
-      id: `sys_${Date.now()}`,
-      senderId: user.id,
-      senderName: 'System',
-      senderRole: UserRole.ADMIN,
-      content: `Status updated to ${status}. ${reason || ''}`,
-      timestamp: new Date().toISOString(),
-      isSystem: true
-    });
-
-    this.saveLocal();
-    this.syncToCloud(booking);
+    await dbHelper.save(COLLECTION, updated);
+    await this.syncAllBookings();
   }
 
-  // --- PAYMENT ---
-
-  recordPayment(bookingId: string, amount: number, mode: PaymentMode, reference: string, user: User) {
+  async recordPayment(bookingId: string, amount: number, mode: PaymentMode, reference: string, user: User) {
       const booking = this.getBooking(bookingId);
       if (!booking) return;
 
@@ -206,42 +139,51 @@ class BookingService {
           companyId
       };
 
-      booking.payments.push(entry);
-      booking.paidAmount += amount;
-      booking.balanceAmount = booking.totalAmount - booking.paidAmount;
+      const newPaid = booking.paidAmount + amount;
+      let newStatus = booking.paymentStatus;
       
-      if (booking.paidAmount >= booking.totalAmount) booking.paymentStatus = 'PAID_IN_FULL';
-      else if (booking.paidAmount > 0) booking.paymentStatus = 'PARTIALLY_PAID';
+      if (newPaid >= booking.totalAmount) newStatus = 'PAID_IN_FULL';
+      else if (newPaid > 0) newStatus = 'PARTIALLY_PAID';
 
-      this.saveLocal();
-      this.syncToCloud(booking);
+      const updated = {
+          ...booking,
+          payments: [...booking.payments, entry],
+          paidAmount: newPaid,
+          balanceAmount: booking.totalAmount - newPaid,
+          paymentStatus: newStatus
+      };
+
+      await dbHelper.save(COLLECTION, updated);
+      await this.syncAllBookings();
   }
 
-  // --- CANCELLATION ---
-
-  requestCancellation(bookingId: string, reason: string, user: User) {
+  async requestCancellation(bookingId: string, reason: string, user: User) {
     const booking = this.getBooking(bookingId);
     if (!booking) return;
 
-    booking.status = 'CANCELLATION_REQUESTED';
-    booking.cancellation = {
-      requestedBy: user.id,
-      requestedAt: new Date().toISOString(),
-      reason: reason,
-      refundStatus: 'PENDING'
+    const updated = {
+        ...booking,
+        status: 'CANCELLATION_REQUESTED' as BookingStatus,
+        updatedAt: new Date().toISOString(),
+        cancellation: {
+            requestedBy: user.id,
+            requestedAt: new Date().toISOString(),
+            reason: reason,
+            refundStatus: 'PENDING' as any
+        }
     };
-    booking.updatedAt = new Date().toISOString();
 
-    this.saveLocal();
-    this.syncToCloud(booking);
+    await dbHelper.save(COLLECTION, updated);
+    await this.syncAllBookings();
   }
 
-  addComment(bookingId: string, message: Message) {
+  async addComment(bookingId: string, message: Message) {
     const booking = this.getBooking(bookingId);
     if (!booking) return;
-    booking.comments.push(message);
-    this.saveLocal();
-    this.syncToCloud(booking);
+    
+    const updated = { ...booking, comments: [...booking.comments, message] };
+    await dbHelper.save(COLLECTION, updated);
+    await this.syncAllBookings();
   }
 }
 

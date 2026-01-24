@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -10,7 +9,7 @@ import { MapPin, Calendar, Users, ArrowRight, Sparkles, Moon, Briefcase, Loader2
 export const CreateQuote: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const destinations = adminService.getDestinations().filter(d => d.isActive);
+  const destinations = adminService.getDestinationsSync().filter(d => d.isActive);
   
   const [formData, setFormData] = useState({
     destination: '',
@@ -36,7 +35,7 @@ export const CreateQuote: React.FC = () => {
         const fullGuestName = `${formData.guestSalutation}. ${formData.guestName}`;
 
         // 1. Create Base Quote
-        const newQuote = agentService.createQuote(
+        const newQuote = await agentService.createQuote(
             user, 
             formData.destination, 
             formData.travelDate, 
@@ -63,7 +62,7 @@ export const CreateQuote: React.FC = () => {
             // Store rough structure in metadata if needed, for now serviceDetails text is fine
         };
         
-        agentService.updateQuote(updatedQuote);
+        await agentService.updateQuote(updatedQuote);
 
         // 4. Redirect
         navigate(`/quote/${newQuote.id}`);

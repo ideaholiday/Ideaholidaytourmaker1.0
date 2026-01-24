@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
@@ -8,7 +7,7 @@ import { InventoryImportExport } from '../../components/admin/InventoryImportExp
 
 export const Transfers: React.FC = () => {
   const { user } = useAuth();
-  const allDestinations = adminService.getDestinations();
+  const allDestinations = adminService.getDestinationsSync();
   const allTransfers = adminService.getTransfers();
   
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.HOTEL_PARTNER;
@@ -170,7 +169,7 @@ export const Transfers: React.FC = () => {
                className="px-4 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm cursor-pointer hover:border-brand-300 transition min-w-[160px]"
              >
                 <option value="ALL">All Destinations</option>
-                {allDestinations.map(d => <option key={d.id} value={d.id}>{d.city}</option>)}
+                {allDestinations.map(d => <option key={d.id} value={d.id}>{d.city}, {d.country}</option>)}
              </select>
 
              <select 
