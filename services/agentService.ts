@@ -1,5 +1,5 @@
 
-import { Quote, User, UserRole, Message } from '../types';
+import { Quote, User, UserRole, Message, OperationalDetails } from '../types';
 import { dbHelper } from './firestoreHelper';
 import { auditLogService } from './auditLogService';
 
@@ -116,6 +116,19 @@ class AgentService {
           description: `Quote assigned to ${operatorName} by ${adminUser.name}`,
           user: adminUser
       });
+  }
+  
+  async updateOperationalDetails(quoteId: string, details: OperationalDetails) {
+      // Merging existing details with new updates
+      const quote = await dbHelper.getById<Quote>(COLLECTION, quoteId);
+      if (!quote) throw new Error("Quote not found");
+      
+      const updatedDetails = {
+          ...quote.operationalDetails,
+          ...details
+      };
+      
+      await dbHelper.save(COLLECTION, { id: quoteId, operationalDetails: updatedDetails });
   }
 
   async getOperatorAssignments(operatorId: string): Promise<Quote[]> {

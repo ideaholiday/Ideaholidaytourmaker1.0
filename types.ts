@@ -141,6 +141,19 @@ export interface QuickQuoteInputs {
   budgetPerPerson?: number;
 }
 
+export interface OperationalDetails {
+  tripManagerName?: string;
+  tripManagerPhone?: string;
+  driverName?: string;
+  driverPhone?: string;
+  vehicleModel?: string;
+  vehicleNumber?: string;
+  whatsappGroupLink?: string;
+  // Payment from Admin to Operator
+  paymentStatus?: 'PENDING' | 'PARTIAL' | 'CLEARED'; 
+  paymentNotes?: string;
+}
+
 export interface Quote {
   id: string;
   uniqueRefNo: string;
@@ -173,6 +186,9 @@ export interface Quote {
   operatorPrice?: number;
   operatorDeclineReason?: string;
   netCostVisibleToOperator?: boolean;
+  
+  // New Operational Data
+  operationalDetails?: OperationalDetails;
   
   status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'PENDING' | 'CONFIRMED' | 'BOOKED' | 'CANCELLED' | 'IN_PROGRESS' | 'COMPLETED' | 'ESTIMATE';
   

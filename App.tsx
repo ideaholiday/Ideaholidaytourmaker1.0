@@ -63,6 +63,7 @@ import { AgentPLReport } from './pages/agent/PLReport';
 import { GuideBook } from './pages/agent/GuideBook'; 
 import { AgentPackages } from './pages/agent/AgentPackages';
 import { AgentTemplates } from './pages/agent/AgentTemplates';
+import { AgentVisa } from './pages/agent/AgentVisa';
 
 // Operator Panel Imports
 import { OperatorDashboard } from './pages/operator/OperatorDashboard';
@@ -243,6 +244,7 @@ const App: React.FC = () => {
                       <Route path="/agent/guidebook" element={<GuideBook />} />
                       <Route path="/agent/packages" element={<AgentPackages />} />
                       <Route path="/agent/templates" element={<AgentTemplates />} />
+                      <Route path="/agent/visa" element={<AgentVisa />} />
                   </Route>
 
                   {/* Operator Specific */}

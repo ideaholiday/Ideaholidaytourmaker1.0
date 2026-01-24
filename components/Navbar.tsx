@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { bookingService } from '../services/bookingService';
-import { LogOut, LayoutDashboard, FileText, PlusCircle, Store, UserPlus, Globe, Bell, Package, Layout } from 'lucide-react';
+import { LogOut, LayoutDashboard, FileText, PlusCircle, Store, UserPlus, Globe, Bell, Package, Layout, FileCheck } from 'lucide-react';
 import { UserRole } from '../types';
 import { useClientBranding } from '../hooks/useClientBranding';
 
@@ -126,6 +126,13 @@ export const Navbar: React.FC = () => {
                     title="Itinerary Templates"
                    >
                      <Layout size={16} /> Templates
+                   </Link>
+                   <Link 
+                    to="/agent/visa" 
+                    className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-brand-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+                    title="Visa Requirements"
+                   >
+                     <FileCheck size={16} /> Visa
                    </Link>
                    <Link 
                     to="/agent/create" 

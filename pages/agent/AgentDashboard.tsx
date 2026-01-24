@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
 import { adminService } from '../../services/adminService';
-import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book, Loader2, Package, Layout } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book, Loader2, Package, Layout, FileCheck } from 'lucide-react';
 import { Quote, FixedPackage } from '../../types';
 
 export const AgentDashboard: React.FC = () => {
@@ -216,6 +216,12 @@ export const AgentDashboard: React.FC = () => {
                       <Link to="/agent/packages" className="flex items-center justify-between p-3 bg-white/10 rounded-lg hover:bg-white/20 transition">
                           <span className="flex items-center gap-3">
                               <Package size={18} /> Fixed Packages
+                          </span>
+                          <ChevronRight size={16} className="opacity-50" />
+                      </Link>
+                      <Link to="/agent/visa" className="flex items-center justify-between p-3 bg-white/10 rounded-lg hover:bg-white/20 transition">
+                          <span className="flex items-center gap-3">
+                              <FileCheck size={18} /> Check Visa Req.
                           </span>
                           <ChevronRight size={16} className="opacity-50" />
                       </Link>

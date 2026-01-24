@@ -9,7 +9,7 @@ import { currencyService } from '../../services/currencyService';
 import { Quote, ItineraryItem, UserRole } from '../../types';
 import { ItineraryView } from '../components/ItineraryView';
 import { PriceSummary } from '../components/PriceSummary';
-import { ArrowLeft, Edit2, Download, Share2, GitBranch, AlertTriangle, Link as LinkIcon, CheckCircle, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Edit2, Download, Share2, GitBranch, AlertTriangle, Link as LinkIcon, CheckCircle, Trash2, UserPlus, Truck, Phone, MessageCircle, CreditCard, Save } from 'lucide-react';
 import { calculatePriceFromNet } from '../utils/pricingEngine';
 import { usePricingEngine } from '../hooks/usePricingEngine';
 import { ItineraryBuilder } from '../components/ItineraryBuilder';
@@ -26,6 +26,10 @@ export const QuoteDetail: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   
+  // Admin Payment Control State
+  const [adminPaymentStatus, setAdminPaymentStatus] = useState<'PENDING' | 'PARTIAL' | 'CLEARED'>('PENDING');
+  const [adminPaymentNote, setAdminPaymentNote] = useState('');
+
   const { updateHotel, setInput } = usePricingEngine();
 
   useEffect(() => {
@@ -43,6 +47,10 @@ export const QuoteDetail: React.FC = () => {
         if (found) {
             setQuote(found);
             initPricingEngine(found);
+            if (found.operationalDetails) {
+                setAdminPaymentStatus(found.operationalDetails.paymentStatus || 'PENDING');
+                setAdminPaymentNote(found.operationalDetails.paymentNotes || '');
+            }
         } else {
             // Admin logic: fetch directly if not found in cache (Admin sees all)
             if (user.role === UserRole.ADMIN || user.role === UserRole.STAFF) {
@@ -58,6 +66,10 @@ export const QuoteDetail: React.FC = () => {
             if (localFound) {
                 setQuote(localFound);
                 initPricingEngine(localFound);
+                if (localFound.operationalDetails) {
+                    setAdminPaymentStatus(localFound.operationalDetails.paymentStatus || 'PENDING');
+                    setAdminPaymentNote(localFound.operationalDetails.paymentNotes || '');
+                }
             } else {
                 console.error("Quote not found");
             }
@@ -93,6 +105,7 @@ export const QuoteDetail: React.FC = () => {
   const pricingRules = adminService.getPricingRuleSync();
   const hasValidPrice = (quote.sellingPrice !== undefined && quote.sellingPrice > 0);
   const isBooked = quote.status === 'BOOKED' || quote.status === 'CONFIRMED';
+  const opDetails = quote.operationalDetails || {};
 
   // --- ACTIONS ---
 
@@ -140,16 +153,26 @@ export const QuoteDetail: React.FC = () => {
         setIsEditingItinerary(false);
         return;
     }
-    // ... Legacy fallback ...
     setIsEditingItinerary(false);
   };
 
   const handleAssignOperator = async (operatorId: string, operatorName: string, options: any) => {
       if (!quote || !user) return;
       await agentService.assignOperator(quote.id, operatorId, operatorName, options, user);
-      loadQuote(); // Refresh to see assignment status
+      loadQuote(); 
       setIsAssignModalOpen(false);
       alert("Operator assigned to quote successfully.");
+  };
+
+  const handleUpdateOperatorPayment = async () => {
+      if (!quote || !user) return;
+      const updatedDetails = {
+          paymentStatus: adminPaymentStatus,
+          paymentNotes: adminPaymentNote
+      };
+      await agentService.updateOperationalDetails(quote.id, updatedDetails);
+      alert("Operator Payment Status updated.");
+      loadQuote();
   };
 
   const handleShareWhatsApp = () => {
@@ -287,6 +310,80 @@ export const QuoteDetail: React.FC = () => {
         ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
+                    {/* GROUND OPERATIONS INFO (ADMIN ONLY) */}
+                    {isAdminOrStaff && quote.operatorId && (
+                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-indigo-500">
+                             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                 <Truck size={20} className="text-indigo-600" /> Ground Operations Info (Shared by Operator)
+                             </h3>
+                             
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                                 <div className="bg-slate-50 p-4 rounded-lg">
+                                     <p className="text-xs font-bold text-slate-400 uppercase mb-2">Trip Manager</p>
+                                     <div className="space-y-1 text-sm">
+                                         <p className="font-medium text-slate-800">{opDetails.tripManagerName || 'Not Assigned'}</p>
+                                         <p className="text-slate-500 flex items-center gap-1"><Phone size={12}/> {opDetails.tripManagerPhone || '-'}</p>
+                                     </div>
+                                 </div>
+                                 <div className="bg-slate-50 p-4 rounded-lg">
+                                     <p className="text-xs font-bold text-slate-400 uppercase mb-2">Driver Details</p>
+                                     <div className="space-y-1 text-sm">
+                                         <p className="font-medium text-slate-800">{opDetails.driverName || 'Not Assigned'}</p>
+                                         <p className="text-slate-500 flex items-center gap-1"><Phone size={12}/> {opDetails.driverPhone || '-'}</p>
+                                         <p className="text-slate-500 text-xs mt-1 bg-white inline-block px-1 rounded border border-slate-200">
+                                            {opDetails.vehicleModel || 'Vehicle'} • {opDetails.vehicleNumber || 'No Plate'}
+                                         </p>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             {opDetails.whatsappGroupLink && (
+                                 <div className="bg-green-50 p-3 rounded-lg border border-green-200 flex justify-between items-center text-sm text-green-800">
+                                     <div className="flex items-center gap-2">
+                                         <MessageCircle size={18} />
+                                         <strong>Ops WhatsApp Group</strong>
+                                     </div>
+                                     <a href={opDetails.whatsappGroupLink} target="_blank" rel="noreferrer" className="text-green-700 underline font-medium">Join Group</a>
+                                 </div>
+                             )}
+
+                             {/* Admin Payment Controls */}
+                             <div className="mt-6 pt-4 border-t border-slate-100">
+                                 <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><CreditCard size={16}/> Operator Payment Status</h4>
+                                 <div className="flex gap-4 items-end">
+                                     <div className="flex-1">
+                                         <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
+                                         <select 
+                                            value={adminPaymentStatus} 
+                                            onChange={(e) => setAdminPaymentStatus(e.target.value as any)}
+                                            className="w-full border border-slate-300 rounded p-2 text-sm"
+                                         >
+                                             <option value="PENDING">Pending</option>
+                                             <option value="PARTIAL">Partial Paid</option>
+                                             <option value="CLEARED">Cleared</option>
+                                         </select>
+                                     </div>
+                                     <div className="flex-[2]">
+                                         <label className="block text-xs font-medium text-slate-500 mb-1">Notes</label>
+                                         <input 
+                                            type="text" 
+                                            value={adminPaymentNote} 
+                                            onChange={(e) => setAdminPaymentNote(e.target.value)}
+                                            className="w-full border border-slate-300 rounded p-2 text-sm"
+                                            placeholder="UTR / Transaction Ref..."
+                                         />
+                                     </div>
+                                     <button 
+                                        onClick={handleUpdateOperatorPayment}
+                                        className="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-indigo-700 flex items-center gap-1"
+                                     >
+                                         <Save size={14}/> Update
+                                     </button>
+                                 </div>
+                             </div>
+                         </div>
+                    )}
+
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h2 className="text-lg font-bold mb-4">Itinerary</h2>
                         <ItineraryView itinerary={quote.itinerary} />
