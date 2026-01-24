@@ -21,8 +21,22 @@ interface BrandingOptions {
 
 // Helper: Resolve Branding
 const resolveBranding = (role: UserRole, agentProfile?: User | null): BrandingOptions => {
-    // Default Platform Branding
-    let branding: BrandingOptions = {
+    // 1. If Agent Profile is provided (Public View or Agent Context), use STRICTLY Agent Branding
+    if (agentProfile && (role === UserRole.AGENT || role === UserRole.ADMIN || role === UserRole.STAFF)) {
+        const ab = agentProfile.agentBranding;
+        return {
+            companyName: ab?.agencyName || agentProfile.companyName || agentProfile.name,
+            address: ab?.officeAddress || agentProfile.city || '', 
+            email: agentProfile.email, // Use registered email
+            phone: ab?.contactPhone || agentProfile.phone || "",
+            website: ab?.website || "",
+            logoUrl: ab?.logoUrl || agentProfile.logoUrl,
+            primaryColorHex: ab?.primaryColor || '#0ea5e9'
+        };
+    }
+
+    // 2. Default Platform Branding (Only if no agent is involved/visible)
+    return {
         companyName: BRANDING.legalName,
         address: BRANDING.address,
         email: BRANDING.email,
@@ -30,22 +44,6 @@ const resolveBranding = (role: UserRole, agentProfile?: User | null): BrandingOp
         website: BRANDING.website,
         primaryColorHex: '#0ea5e9'
     };
-
-    // If Agent or Operator viewing, and Agent Profile exists, use Agent Branding
-    // This supports "White Label" behavior for Agents
-    if ((role === UserRole.AGENT || role === UserRole.ADMIN || role === UserRole.STAFF) && agentProfile) {
-        const ab = agentProfile.agentBranding;
-        branding = {
-            companyName: ab?.agencyName || agentProfile.companyName || agentProfile.name,
-            address: ab?.officeAddress || agentProfile.city || BRANDING.address, 
-            email: agentProfile.email, // Use registered email
-            phone: ab?.contactPhone || agentProfile.phone || "",
-            website: ab?.website || "",
-            logoUrl: ab?.logoUrl,
-            primaryColorHex: ab?.primaryColor || '#0ea5e9'
-        };
-    }
-    return branding;
 };
 
 const hexToRgb = (hex: string): [number, number, number] => {
@@ -82,7 +80,6 @@ export const generateQuotePDF = (
   if (branding.logoUrl) {
       try {
           // Attempt to add logo. If format isn't supported or URL fails (CORS), it will throw.
-          // Note: In real production, images usually need to be base64 strings or proxied.
           doc.addImage(branding.logoUrl, 'PNG', 16, 11, 23, 23, undefined, 'FAST');
       } catch (e) {
           // Fallback Initials
@@ -285,6 +282,7 @@ export const generateQuotePDF = (
     
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
+    // Use the Branding Company Name instead of platform hardcode
     doc.text(`Prepared by ${branding.companyName}`, 15, 286);
     doc.text(`Page ${i} of ${pageCount}`, 195, 286, { align: 'right' });
   }

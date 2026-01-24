@@ -2,14 +2,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole, Activity } from '../../types';
-import { Edit2, Trash2, Plus, X, Camera, Clock, Image as ImageIcon, Search, DollarSign, Check, MapPin, Calendar } from 'lucide-react';
+import { UserRole, Activity, Destination } from '../../types';
+import { Edit2, Trash2, Plus, X, Camera, Clock, Image as ImageIcon, Search, DollarSign, Check, MapPin, Calendar, Loader2 } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 
 export const Sightseeing: React.FC = () => {
   const { user } = useAuth();
-  const allDestinations = adminService.getDestinationsSync();
-  const [allActivities, setAllActivities] = useState<Activity[]>(adminService.getActivitiesSync());
+  
+  // Data State
+  const [allDestinations, setAllDestinations] = useState<Destination[]>([]);
+  const [allActivities, setAllActivities] = useState<Activity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
   const showCost = user?.role !== UserRole.AGENT;
@@ -20,8 +23,19 @@ export const Sightseeing: React.FC = () => {
   }, []);
 
   const refreshData = async () => {
-      const fresh = await adminService.getActivities();
-      setAllActivities(fresh);
+      setIsLoading(true);
+      try {
+        const [activitiesData, destinationsData] = await Promise.all([
+            adminService.getActivities(),
+            adminService.getDestinations()
+        ]);
+        setAllActivities(activitiesData || []);
+        setAllDestinations(destinationsData || []);
+      } catch (error) {
+        console.error("Failed to load sightseeing data", error);
+      } finally {
+        setIsLoading(false);
+      }
   };
 
   const displayedActivities = useMemo(() => {
@@ -31,8 +45,12 @@ export const Sightseeing: React.FC = () => {
       return allActivities;
   }, [allActivities, user]);
 
+  // Local state for table (can be filtered)
   const [activities, setActivities] = useState<Activity[]>(displayedActivities);
+  
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   
   // Update local state when source changes
@@ -50,12 +68,14 @@ export const Sightseeing: React.FC = () => {
   const handleOpenModal = (activity?: Activity) => {
     if (activity) {
       setEditingActivity(activity);
-      setFormData(activity);
+      setFormData({ ...activity }); // Clone to avoid direct mutation
     } else {
       setEditingActivity(null);
+      // Initialize with safe defaults
       setFormData({ 
         isActive: true,
-        destinationId: allDestinations[0]?.id || '',
+        destinationId: allDestinations.length > 0 ? allDestinations[0].id : '',
+        activityName: '',
         activityType: 'City Tour',
         ticketIncluded: false,
         transferIncluded: false,
@@ -63,8 +83,10 @@ export const Sightseeing: React.FC = () => {
         costChild: 0,
         currency: 'INR', // Enforced INR
         description: '',
+        notes: '',
         duration: '4 Hours',
         startTime: 'Flexible',
+        imageUrl: '',
         season: 'All Year',
         validFrom: new Date().toISOString().split('T')[0],
         validTo: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
@@ -75,38 +97,67 @@ export const Sightseeing: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.activityName || !formData.destinationId) return;
+    
+    if (!formData.activityName?.trim()) {
+        alert("Activity Name is required.");
+        return;
+    }
+    if (!formData.destinationId) {
+        alert("Please select a Destination. If none exist, add one in the Destinations tab first.");
+        return;
+    }
 
-    await adminService.saveActivity({
-      id: editingActivity?.id || '',
-      activityName: formData.activityName!,
-      destinationId: formData.destinationId!,
-      activityType: (formData.activityType || 'City Tour') as any,
-      costAdult: Number(formData.costAdult),
-      costChild: Number(formData.costChild),
-      currency: 'INR', // Enforced INR
-      ticketIncluded: formData.ticketIncluded || false,
-      transferIncluded: formData.transferIncluded || false,
-      isActive: formData.isActive || false,
-      createdBy: editingActivity?.createdBy || user?.id,
-      description: formData.description,
-      notes: formData.notes,
-      duration: formData.duration,
-      startTime: formData.startTime,
-      imageUrl: formData.imageUrl,
-      season: formData.season as any,
-      validFrom: formData.validFrom,
-      validTo: formData.validTo
-    });
+    setIsSaving(true);
 
-    await refreshData();
-    setIsModalOpen(false);
+    try {
+        const payload: Activity = {
+            id: editingActivity?.id || '', // Service generates ID if empty
+            activityName: formData.activityName,
+            destinationId: formData.destinationId,
+            activityType: (formData.activityType || 'City Tour') as any,
+            
+            // Safe Number Conversion (Handle empty strings or undefined)
+            costAdult: Number(formData.costAdult) || 0,
+            costChild: Number(formData.costChild) || 0,
+            
+            currency: 'INR',
+            ticketIncluded: !!formData.ticketIncluded,
+            transferIncluded: !!formData.transferIncluded,
+            isActive: formData.isActive !== undefined ? formData.isActive : true,
+            
+            createdBy: editingActivity?.createdBy || user?.id,
+            
+            description: formData.description || '',
+            notes: formData.notes || '',
+            duration: formData.duration || '4 Hours',
+            startTime: formData.startTime || 'Flexible',
+            imageUrl: formData.imageUrl || '',
+            season: (formData.season || 'All Year') as any,
+            
+            // Date Fallbacks
+            validFrom: formData.validFrom || new Date().toISOString().split('T')[0],
+            validTo: formData.validTo || new Date().toISOString().split('T')[0]
+        };
+
+        await adminService.saveActivity(payload);
+        await refreshData();
+        setIsModalOpen(false);
+    } catch (error: any) {
+        console.error("Save failed", error);
+        alert(`Failed to save activity: ${error.message}`);
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Delete this activity?')) {
-      await adminService.deleteActivity(id);
-      await refreshData();
+    if (window.confirm('Are you sure you want to delete this activity?')) {
+      try {
+          await adminService.deleteActivity(id);
+          await refreshData();
+      } catch (error) {
+          alert("Failed to delete activity.");
+      }
     }
   };
 
@@ -134,7 +185,11 @@ export const Sightseeing: React.FC = () => {
                     filename="activities"
                     onImport={() => refreshData()}
                 />
-                <button onClick={() => handleOpenModal()} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition shadow-lg shadow-brand-200 font-medium">
+                <button 
+                    onClick={() => handleOpenModal()} 
+                    disabled={isLoading}
+                    className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition shadow-lg shadow-brand-200 font-medium disabled:opacity-50"
+                >
                     <Plus size={20} /> Add Activity
                 </button>
             </div>
@@ -178,95 +233,104 @@ export const Sightseeing: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full text-left border-collapse text-sm">
-          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-4 w-16">Image</th>
-              <th className="px-6 py-4">Activity Name</th>
-              <th className="px-6 py-4">Description</th>
-              <th className="px-6 py-4">Validity</th>
-              {showCost && <th className="px-6 py-4">Net Cost (Ad/Ch)</th>}
-              <th className="px-6 py-4">Inclusions</th>
-              <th className="px-6 py-4">Status</th>
-              {canEdit && <th className="px-6 py-4 text-right">Actions</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredData.map((activity) => {
-              const dest = allDestinations.find(d => d.id === activity.destinationId);
-              return (
-                <tr key={activity.id} className="hover:bg-brand-50/30 transition-colors group">
-                  <td className="px-6 py-4">
-                      <div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center border border-slate-200 shadow-sm">
-                          {activity.imageUrl ? (
-                              <img src={activity.imageUrl} alt={activity.activityName} className="w-full h-full object-cover" />
-                          ) : (
-                              <Camera size={16} className="text-slate-400" />
-                          )}
-                      </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-slate-900 text-base">
-                      {activity.activityName}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                       <span className="flex items-center gap-1"><MapPin size={10}/> {dest?.city}</span>
-                       <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-medium">{activity.activityType}</span>
-                       <span className="flex items-center gap-1"><Clock size={10}/> {activity.duration || '-'}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500 text-xs max-w-xs truncate">
-                    {activity.description || '-'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase w-fit ${activity.season === 'Peak' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
-                        {activity.season || 'All Year'}
-                        </span>
-                        <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                            <Calendar size={10}/> {activity.validFrom} <span className="mx-0.5">→</span> {activity.validTo}
-                        </div>
-                    </div>
-                  </td>
-                  {showCost && (
-                    <td className="px-6 py-4 text-slate-900 font-mono font-medium">
-                        {activity.currency || 'INR'} {activity.costAdult} <span className="text-slate-400 mx-1">/</span> {activity.costChild}
-                    </td>
-                  )}
-                  <td className="px-6 py-4 text-xs space-y-1">
-                    {activity.ticketIncluded && <span className="flex items-center gap-1 text-green-700 font-medium"><Check size={10} strokeWidth={3}/> Ticket</span>}
-                    {activity.transferIncluded && <span className="flex items-center gap-1 text-blue-700 font-medium"><Check size={10} strokeWidth={3}/> Transfer</span>}
-                    {!activity.ticketIncluded && !activity.transferIncluded && <span className="text-slate-400">-</span>}
-                  </td>
-                  <td className="px-6 py-4">
-                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${activity.isActive ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${activity.isActive ? 'bg-emerald-600' : 'bg-slate-400'}`}></div>
-                      {activity.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  {canEdit && (
-                    <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-100">
-                            <button onClick={() => handleOpenModal(activity)} className="p-2 text-slate-500 hover:text-brand-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition shadow-sm">
-                                <Edit2 size={16} />
-                            </button>
-                            <button onClick={() => handleDelete(activity.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition shadow-sm">
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {filteredData.length === 0 && (
-          <div className="p-12 text-center text-slate-500 bg-slate-50/50">
-              <Camera size={48} className="mx-auto mb-3 text-slate-300 opacity-50" />
-              <p className="font-medium">No sightseeing activities found.</p>
-          </div>
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
+        {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                <Loader2 size={32} className="animate-spin mb-2 text-brand-600" />
+                <p>Loading inventory...</p>
+            </div>
+        ) : (
+            <>
+                <table className="w-full text-left border-collapse text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200">
+                    <tr>
+                    <th className="px-6 py-4 w-16">Image</th>
+                    <th className="px-6 py-4">Activity Name</th>
+                    <th className="px-6 py-4">Description</th>
+                    <th className="px-6 py-4">Validity</th>
+                    {showCost && <th className="px-6 py-4">Net Cost (Ad/Ch)</th>}
+                    <th className="px-6 py-4">Inclusions</th>
+                    <th className="px-6 py-4">Status</th>
+                    {canEdit && <th className="px-6 py-4 text-right">Actions</th>}
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {filteredData.map((activity) => {
+                    const dest = allDestinations.find(d => d.id === activity.destinationId);
+                    return (
+                        <tr key={activity.id} className="hover:bg-brand-50/30 transition-colors group">
+                        <td className="px-6 py-4">
+                            <div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center border border-slate-200 shadow-sm">
+                                {activity.imageUrl ? (
+                                    <img src={activity.imageUrl} alt={activity.activityName} className="w-full h-full object-cover" />
+                                ) : (
+                                    <Camera size={16} className="text-slate-400" />
+                                )}
+                            </div>
+                        </td>
+                        <td className="px-6 py-4">
+                            <div className="font-bold text-slate-900 text-base">
+                            {activity.activityName}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                            <span className="flex items-center gap-1"><MapPin size={10}/> {dest?.city || 'Unknown'}</span>
+                            <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-medium">{activity.activityType}</span>
+                            <span className="flex items-center gap-1"><Clock size={10}/> {activity.duration || '-'}</span>
+                            </div>
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 text-xs max-w-xs truncate">
+                            {activity.description || '-'}
+                        </td>
+                        <td className="px-6 py-4">
+                            <div className="flex flex-col gap-1">
+                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase w-fit ${activity.season === 'Peak' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
+                                {activity.season || 'All Year'}
+                                </span>
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                    <Calendar size={10}/> {activity.validFrom} <span className="mx-0.5">→</span> {activity.validTo}
+                                </div>
+                            </div>
+                        </td>
+                        {showCost && (
+                            <td className="px-6 py-4 text-slate-900 font-mono font-medium">
+                                {activity.currency || 'INR'} {activity.costAdult} <span className="text-slate-400 mx-1">/</span> {activity.costChild}
+                            </td>
+                        )}
+                        <td className="px-6 py-4 text-xs space-y-1">
+                            {activity.ticketIncluded && <span className="flex items-center gap-1 text-green-700 font-medium"><Check size={10} strokeWidth={3}/> Ticket</span>}
+                            {activity.transferIncluded && <span className="flex items-center gap-1 text-blue-700 font-medium"><Check size={10} strokeWidth={3}/> Transfer</span>}
+                            {!activity.ticketIncluded && !activity.transferIncluded && <span className="text-slate-400">-</span>}
+                        </td>
+                        <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${activity.isActive ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${activity.isActive ? 'bg-emerald-600' : 'bg-slate-400'}`}></div>
+                            {activity.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                        </td>
+                        {canEdit && (
+                            <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-2 opacity-100">
+                                    <button onClick={() => handleOpenModal(activity)} className="p-2 text-slate-500 hover:text-brand-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition shadow-sm">
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button onClick={() => handleDelete(activity.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition shadow-sm">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </td>
+                        )}
+                        </tr>
+                    );
+                    })}
+                </tbody>
+                </table>
+                {filteredData.length === 0 && (
+                <div className="p-12 text-center text-slate-500 bg-slate-50/50">
+                    <Camera size={48} className="mx-auto mb-3 text-slate-300 opacity-50" />
+                    <p className="font-medium">No sightseeing activities found.</p>
+                </div>
+                )}
+            </>
         )}
       </div>
 
@@ -279,21 +343,26 @@ export const Sightseeing: React.FC = () => {
             </div>
             
             <form onSubmit={handleSave} className="p-6 space-y-8">
-              {/* Form content remains same as previous */}
               {/* SECTION 1: BASICS */}
               <div className="space-y-4">
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Activity Name</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Activity Name *</label>
                     <input required type="text" value={formData.activityName || ''} onChange={e => setFormData({...formData, activityName: e.target.value})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white font-medium shadow-sm transition" placeholder="e.g. Desert Safari" />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-5">
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Destination</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Destination *</label>
                         <div className="relative">
                             <MapPin size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
-                            <select value={formData.destinationId} onChange={e => setFormData({...formData, destinationId: e.target.value})} className="w-full border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm transition appearance-none">
-                            {allDestinations.map(d => <option key={d.id} value={d.id}>{d.city}, {d.country}</option>)}
+                            <select 
+                                required
+                                value={formData.destinationId} 
+                                onChange={e => setFormData({...formData, destinationId: e.target.value})} 
+                                className="w-full border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm transition appearance-none"
+                            >
+                                <option value="">Select Destination...</option>
+                                {allDestinations.map(d => <option key={d.id} value={d.id}>{d.city}, {d.country}</option>)}
                             </select>
                         </div>
                     </div>
@@ -429,7 +498,14 @@ export const Sightseeing: React.FC = () => {
 
               <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 sticky bottom-0 bg-white pb-2">
                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 text-slate-700 hover:bg-slate-100 rounded-xl font-bold border border-slate-200 transition">Cancel</button>
-                 <button type="submit" className="px-8 py-3 bg-brand-600 text-white rounded-xl hover:bg-brand-700 font-bold shadow-lg shadow-brand-200 transition transform hover:-translate-y-0.5">Save Activity</button>
+                 <button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="px-8 py-3 bg-brand-600 text-white rounded-xl hover:bg-brand-700 font-bold shadow-lg shadow-brand-200 transition transform hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-50"
+                 >
+                    {isSaving ? <Loader2 size={18} className="animate-spin" /> : null}
+                    {isSaving ? 'Saving...' : 'Save Activity'}
+                 </button>
               </div>
             </form>
           </div>

@@ -2,8 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
-import { profileService } from '../../services/profileService';
-import { agentService } from '../../services/agentService'; // Needed for Quote retrieval
+// import { profileService } from '../../services/profileService'; // Removed sync service dependency
+import { agentService } from '../../services/agentService'; 
 import { Booking, Quote, User, UserRole, Traveler, PricingBreakdown } from '../../types';
 import { MapPin, Calendar, Users, CheckCircle, Briefcase, ArrowRight, CreditCard, ShieldCheck, Download, Printer } from 'lucide-react';
 import { generateQuotePDF } from '../../utils/pdfGenerator';
@@ -12,7 +12,7 @@ import { AgentContactCard } from '../../components/client/AgentContactCard';
 import { ClientBookingModal } from '../../components/client/ClientBookingModal';
 import { useClientBranding } from '../../hooks/useClientBranding';
 import { ItineraryView } from '../../components/ItineraryView';
-import { dbHelper } from '../../services/firestoreHelper'; // Direct DB access if services fail logic
+import { dbHelper } from '../../services/firestoreHelper'; 
 
 // Internal Component to consume hooks inside the provider
 const TripContent: React.FC<{ 
@@ -26,9 +26,11 @@ const TripContent: React.FC<{
   const navigate = useNavigate();
 
   const handleDownloadPDF = () => {
-      if (!data || !agent) return;
-      const isBooking = 'payments' in data;
+      // Ensure data and agent are available
+      if (!data) return;
+      // If agent is null, PDF generator will fallback to platform defaults, which is acceptable if agent loading failed
       
+      const isBooking = 'payments' in data;
       let breakdown: PricingBreakdown | null = null;
       
       // For Client view, we construct a breakdown based on the single "selling price"
@@ -46,6 +48,7 @@ const TripContent: React.FC<{
           platformNetCost: 0
       };
       
+      // Pass the LOADED agent profile to ensuring branding is correct in PDF
       generateQuotePDF(data as Quote, breakdown, UserRole.AGENT, agent);
   };
 
@@ -224,29 +227,37 @@ export const ClientTripView: React.FC = () => {
         const loadTrip = async () => {
             if (!id) return;
             
-            // 1. Try Finding in Bookings
-            const booking = await bookingService.getBooking(id);
-            if (booking) {
-                setData(booking);
-                const agentData = profileService.getUser(booking.agentId);
-                setAgent(agentData || null);
-                setLoading(false);
-                return;
-            }
-
-            // 2. Try Finding in Quotes (Firestore)
             try {
-                const quote = await dbHelper.getById<Quote>('quotes', id);
-                if (quote) {
-                    setData(quote);
-                    const agentData = profileService.getUser(quote.agentId);
-                    setAgent(agentData || null);
+                // 1. Try Finding in Bookings
+                let booking = await bookingService.getBooking(id);
+                let agentId = '';
+                
+                if (booking) {
+                    setData(booking);
+                    agentId = booking.agentId;
+                } else {
+                    // 2. Try Finding in Quotes (Firestore)
+                    const quote = await dbHelper.getById<Quote>('quotes', id);
+                    if (quote) {
+                        setData(quote);
+                        agentId = quote.agentId;
+                    }
                 }
+
+                // 3. ASYNC AGENT LOAD (Critical Fix for Public View)
+                if (agentId) {
+                    // Fetch agent directly from DB, bypassing internal admin cache
+                    const agentProfile = await dbHelper.getById<User>('users', agentId);
+                    if (agentProfile) {
+                        setAgent(agentProfile);
+                    }
+                }
+                
             } catch(e) { 
                 console.error("Public fetch failed", e); 
+            } finally {
+                setLoading(false);
             }
-
-            setLoading(false);
         };
         loadTrip();
     }, [id]);

@@ -47,12 +47,12 @@ export const resolveAgentBranding = (agent: User | null): ResolvedBranding => {
   return {
     agencyName: ab?.agencyName || agent.companyName || agent.name,
     logoUrl: ab?.logoUrl || agent.logoUrl, // Fallback to legacy logo field
-    primaryColor: ab?.primaryColor || '#0ea5e9', // Default blue if missing
+    primaryColor: ab?.primaryColor || '#0ea5e9', // Default blue if missing or empty
     secondaryColor: ab?.secondaryColor || '#0f172a', // Default dark slate
     phone: ab?.contactPhone || agent.phone || '',
     email: agent.email, // Always use agent account email for reliability
-    website: ab?.website,
-    address: ab?.officeAddress,
-    whatsapp: ab?.whatsappNumber
+    website: ab?.website || '',
+    address: ab?.officeAddress || '',
+    whatsapp: ab?.whatsappNumber || ''
   };
 };

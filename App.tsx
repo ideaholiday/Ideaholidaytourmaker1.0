@@ -1,5 +1,4 @@
-
-import React, { useMemo, Component } from 'react';
+import React, { useMemo, Component, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -81,7 +80,7 @@ import { ClientTripView } from './pages/public/ClientTripView';
 import { ClientPaymentPage } from './pages/public/ClientPaymentPage'; 
 
 interface ErrorBoundaryProps {
-  children: React.ReactNode;
+  children?: ReactNode;
 }
 
 interface ErrorBoundaryState {
@@ -90,11 +89,8 @@ interface ErrorBoundaryState {
 }
 
 // --- ERROR BOUNDARY ---
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false };
-  }
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };

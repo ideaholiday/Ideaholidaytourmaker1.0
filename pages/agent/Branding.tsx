@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { AgentBranding, User } from '../../types';
-import { profileService } from '../../services/profileService';
+import { agentService } from '../../services/agentService';
 import { LogoUploader } from '../../components/agent/LogoUploader';
 import { BrandColorPicker } from '../../components/agent/BrandColorPicker';
 import { Palette, Globe, Phone, MapPin, Save, ArrowLeft, LayoutTemplate } from 'lucide-react';
@@ -14,7 +14,7 @@ const DEFAULT_BRANDING: AgentBranding = {
 };
 
 export const Branding: React.FC = () => {
-  const { user } = useAuth();
+  const { user, reloadUser } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<AgentBranding>(DEFAULT_BRANDING);
   const [isSaving, setIsSaving] = useState(false);
@@ -42,19 +42,26 @@ export const Branding: React.FC = () => {
 
   const handleSave = async () => {
       setIsSaving(true);
-      // Construct updated user object
-      const updatedUser: Partial<User> = {
-          agentBranding: formData
-      };
       
-      // Persist
-      profileService.updateProfileDetails(user.id, updatedUser);
-      
-      // Simulate delay for feedback
-      setTimeout(() => {
+      try {
+        // Construct updated user object
+        const updatedFields: Partial<User> = {
+            agentBranding: formData
+        };
+        
+        // Persist directly to DB
+        await agentService.updateAgentProfile(user.id, updatedFields);
+        
+        // Important: Refresh local user context so the UI (Header, etc.) updates immediately
+        await reloadUser();
+        
+        alert("Branding settings saved successfully!");
+      } catch (error) {
+          console.error(error);
+          alert("Failed to save branding settings.");
+      } finally {
           setIsSaving(false);
-          alert("Branding settings saved successfully!");
-      }, 600);
+      }
   };
 
   return (

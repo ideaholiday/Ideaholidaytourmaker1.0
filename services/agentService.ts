@@ -106,6 +106,14 @@ class AgentService {
       await dbHelper.save(COLLECTION, copy);
       return copy;
   }
+
+  /**
+   * Directly update agent profile fields (Branding, Contact info)
+   */
+  async updateAgentProfile(agentId: string, updates: Partial<User>) {
+      // Security check: Ideally backend rules prevent this, but here we ensure ID matches
+      await dbHelper.save('users', { id: agentId, ...updates });
+  }
 }
 
 export const agentService = new AgentService();

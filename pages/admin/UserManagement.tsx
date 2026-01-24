@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import { permissionService, ALL_PERMISSIONS } from '../../services/permissionService';
 import { useAuth } from '../../context/AuthContext';
 import { User, UserRole, Permission, Destination, Hotel, Transfer } from '../../types';
-import { Users, Edit2, Trash2, Plus, X, Shield, Briefcase, User as UserIcon, Lock, Check, Search, MapPin, CreditCard, Building, Store, Hotel as HotelIcon, Car, KeyRound, AlertTriangle, Globe, Image } from 'lucide-react';
+import { Users, Edit2, Trash2, Plus, X, Shield, Briefcase, User as UserIcon, Lock, Check, Search, MapPin, CreditCard, Building, Store, Hotel as HotelIcon, Car, KeyRound, AlertTriangle, Globe, Image, ShieldAlert } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -325,6 +326,9 @@ export const UserManagement: React.FC = () => {
                             <span className="truncate">{getInventoryNames(u.linkedInventoryIds || [], u.partnerType)}</span>
                         </div>
                     )}
+                    {u.role === UserRole.ADMIN && (
+                        <span className="text-red-500 font-bold flex items-center gap-1"><Shield size={10} /> Full System Access</span>
+                    )}
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -583,6 +587,20 @@ export const UserManagement: React.FC = () => {
                                   </div>
                               </label>
                           ))}
+                      </div>
+                  </div>
+              )}
+
+              {/* 5. ADMIN FIELDS */}
+              {formData.role === UserRole.ADMIN && (
+                  <div className="bg-red-50 p-4 rounded-xl border border-red-100 animate-in fade-in flex items-start gap-3">
+                      <ShieldAlert size={20} className="text-red-600 mt-1" />
+                      <div>
+                          <h3 className="font-bold text-red-900 text-sm mb-1">Full System Access</h3>
+                          <p className="text-xs text-red-800 leading-relaxed">
+                              Administrators have unrestricted access to all modules, settings, and financial data. 
+                              They bypass all permission checks. <strong>Use with caution.</strong>
+                          </p>
                       </div>
                   </div>
               )}

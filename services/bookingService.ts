@@ -1,3 +1,4 @@
+
 import { Booking, BookingStatus, Quote, User, Message, UserRole, PaymentEntry, PaymentMode, Traveler } from '../types';
 import { agentService } from './agentService';
 import { dbHelper } from './firestoreHelper';
@@ -49,19 +50,19 @@ class BookingService {
 
     const newBooking: Booking = {
       id: `bk_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
-      quoteId: quote.id,
-      uniqueRefNo: quote.uniqueRefNo,
+      quoteId: quote.id || '',
+      uniqueRefNo: quote.uniqueRefNo || 'REF-ERR',
       status: 'REQUESTED',
       
-      destination: quote.destination,
-      travelDate: quote.travelDate,
-      paxCount: quote.paxCount,
+      destination: quote.destination || 'Unknown',
+      travelDate: quote.travelDate || new Date().toISOString(),
+      paxCount: quote.paxCount || 0,
       travelers: travelers || quote.travelers || [],
-      itinerary: quote.itinerary, 
+      itinerary: quote.itinerary || [], 
       
       netCost: quote.price || 0,
       sellingPrice: totalAmount,
-      currency: quote.currency,
+      currency: quote.currency || 'INR',
       
       paymentStatus: 'PENDING',
       totalAmount: totalAmount,
@@ -70,9 +71,14 @@ class BookingService {
       balanceAmount: totalAmount,
       payments: [],
 
-      agentId: quote.agentId,
-      agentName: quote.agentName,
-      staffId: quote.staffId,
+      agentId: quote.agentId || '',
+      agentName: quote.agentName || 'Unknown Agent',
+      // FIX: Ensure undefined becomes null for Firestore
+      staffId: quote.staffId || null, 
+      
+      // FIX: Ensure undefined becomes null for Firestore
+      operatorId: quote.operatorId || null,
+      operatorName: quote.operatorName || null,
       
       companyId: defaultCompany.id,
 

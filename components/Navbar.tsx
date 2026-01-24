@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, LayoutDashboard, FileText, PlusCircle, Store, UserPlus, Globe } from 'lucide-react';
+import { bookingService } from '../services/bookingService';
+import { LogOut, LayoutDashboard, FileText, PlusCircle, Store, UserPlus, Globe, Bell } from 'lucide-react';
 import { UserRole } from '../types';
 import { useClientBranding } from '../hooks/useClientBranding';
 
@@ -10,6 +11,8 @@ export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { agencyName, logoUrl, styles, isPlatformDefault } = useClientBranding();
+  
+  const [pendingCount, setPendingCount] = useState(0);
 
   const handleLogout = () => {
     logout();
@@ -19,6 +22,23 @@ export const Navbar: React.FC = () => {
   const canAccessCMS = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
   const isAgent = user?.role === UserRole.AGENT;
   const isPartner = user?.role === UserRole.HOTEL_PARTNER;
+  const isAdminOrStaff = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF;
+
+  // Poll for notifications
+  useEffect(() => {
+    if (isAdminOrStaff) {
+        const checkNotifications = async () => {
+            const bookings = await bookingService.getAllBookings();
+            const count = bookings.filter(b => b.status === 'REQUESTED').length;
+            setPendingCount(count);
+        };
+        
+        checkNotifications();
+        // Simple polling every 30s
+        const interval = setInterval(checkNotifications, 30000);
+        return () => clearInterval(interval);
+    }
+  }, [user]);
 
   // Use the backend-provided route if available, otherwise default to home
   const homeLink = user?.dashboardRoute || '/';
@@ -59,6 +79,22 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center gap-4">
           {user ? (
             <>
+              {/* ADMIN NOTIFICATION BELL */}
+              {isAdminOrStaff && (
+                  <Link 
+                    to="/admin/bookings?status=REQUESTED" 
+                    className="relative p-2 text-slate-500 hover:text-brand-600 hover:bg-slate-50 rounded-full transition-all mr-1"
+                    title="Pending Approvals"
+                  >
+                      <Bell size={20} />
+                      {pendingCount > 0 && (
+                          <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full animate-pulse shadow-sm border border-white">
+                              {pendingCount}
+                          </span>
+                      )}
+                  </Link>
+              )}
+
               {canAccessCMS && (
                 <Link 
                   to="/admin/dashboard" 

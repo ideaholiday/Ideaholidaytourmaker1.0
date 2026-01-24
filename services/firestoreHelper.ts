@@ -13,6 +13,26 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 
+// Helper to remove undefined values which Firestore rejects
+const sanitizeData = (data: any): any => {
+    if (data === null || data === undefined) return null;
+    if (Array.isArray(data)) return data.map(sanitizeData);
+    if (typeof data === 'object' && !(data instanceof Date)) {
+        const result: any = {};
+        for (const key in data) {
+            const value = data[key];
+            if (value !== undefined) {
+                result[key] = sanitizeData(value);
+            } else {
+                // Explicitly set undefined fields to null to ensure consistency in DB
+                result[key] = null;
+            }
+        }
+        return result;
+    }
+    return data;
+};
+
 export const dbHelper = {
     // --- READ ---
     async getAll<T>(collectionName: string): Promise<T[]> {
@@ -51,7 +71,8 @@ export const dbHelper = {
     // Uses setDoc with merge:true to act as both Create and Update safely
     async save<T extends { id: string }>(collectionName: string, data: T): Promise<void> {
         try {
-            await setDoc(doc(db, collectionName, data.id), data, { merge: true });
+            const cleanData = sanitizeData(data);
+            await setDoc(doc(db, collectionName, data.id), cleanData, { merge: true });
         } catch (error) {
             console.error(`Error saving to ${collectionName}:`, error);
             throw error;
@@ -71,8 +92,9 @@ export const dbHelper = {
     async batchSave<T extends { id: string }>(collectionName: string, items: T[]): Promise<void> {
         const batch = writeBatch(db);
         items.forEach(item => {
+            const cleanItem = sanitizeData(item);
             const docRef = doc(db, collectionName, item.id);
-            batch.set(docRef, item, { merge: true });
+            batch.set(docRef, cleanItem, { merge: true });
         });
         await batch.commit();
     }
