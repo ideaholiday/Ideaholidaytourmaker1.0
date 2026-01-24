@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Visa } from '../../types';
@@ -7,7 +7,16 @@ import { Edit2, Trash2, Plus, X, FileText, CheckCircle, Clock, BookOpen, AlertCi
 
 export const VisaPage: React.FC = () => {
   const { user } = useAuth();
-  const allVisas = adminService.getVisas();
+  const [allVisas, setAllVisas] = useState<Visa[]>([]);
+  
+  useEffect(() => {
+      refreshData();
+  }, []);
+
+  const refreshData = async () => {
+      const data = await adminService.getVisas();
+      setAllVisas(data);
+  };
   
   // Operators now have full access
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
@@ -16,13 +25,20 @@ export const VisaPage: React.FC = () => {
   const showCost = user?.role !== UserRole.AGENT;
 
   // Filter for Operators: Only see what they created. Admins/Staff see all.
-  const displayedVisas = user?.role === UserRole.OPERATOR 
-    ? allVisas.filter(v => v.createdBy === user.id)
-    : allVisas;
+  const displayedVisas = useMemo(() => {
+      return user?.role === UserRole.OPERATOR 
+        ? allVisas.filter(v => v.createdBy === user.id)
+        : allVisas;
+  }, [allVisas, user]);
 
   const [visas, setVisas] = useState<Visa[]>(displayedVisas);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVisa, setEditingVisa] = useState<Visa | null>(null);
+  
+  // Update local state when source changes
+  useEffect(() => {
+      setVisas(displayedVisas);
+  }, [displayedVisas]);
   
   // For the form, we will handle documents as a newline separated string
   const [formData, setFormData] = useState<Partial<Visa> & { documentsText: string }>({ documentsText: '' });
@@ -51,14 +67,14 @@ export const VisaPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.country || !formData.visaType) return;
 
     // Split text area by new lines and filter empty strings
     const docs = formData.documentsText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
 
-    adminService.saveVisa({
+    await adminService.saveVisa({
       id: editingVisa?.id || '',
       country: formData.country!,
       visaType: formData.visaType!,
@@ -72,14 +88,14 @@ export const VisaPage: React.FC = () => {
       createdBy: editingVisa?.createdBy || user?.id
     });
 
-    setVisas(adminService.getVisas());
+    await refreshData();
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Delete this visa configuration?')) {
-      adminService.deleteVisa(id);
-      setVisas(adminService.getVisas());
+      await adminService.deleteVisa(id);
+      await refreshData();
     }
   };
 

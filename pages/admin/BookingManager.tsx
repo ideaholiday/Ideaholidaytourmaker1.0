@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { bookingService } from '../../services/bookingService';
 import { bookingOperatorService } from '../../services/bookingOperatorService';
@@ -22,8 +21,8 @@ export const BookingManager: React.FC = () => {
     loadBookings();
   }, []);
 
-  const loadBookings = () => {
-    setBookings(bookingService.getAllBookings());
+  const loadBookings = async () => {
+    setBookings(await bookingService.getAllBookings());
   };
 
   const handleAssignOperator = (operatorId: string, operatorName: string, options: any) => {

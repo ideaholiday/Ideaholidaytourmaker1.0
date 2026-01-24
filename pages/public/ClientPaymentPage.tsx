@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
@@ -26,23 +25,26 @@ export const ClientPaymentPage: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    if (!id) return;
-    const found = bookingService.getBooking(id);
-    if (found) {
-        setBooking(found);
-        
-        // Load Agent for Branding
-        const ag = profileService.getUser(found.agentId);
-        setAgent(ag || null);
-        
-        // Default Option Logic
-        if (found.paidAmount === 0 && found.advanceAmount < found.totalAmount) {
-            setPaymentOption('ADVANCE');
-        } else {
-            setPaymentOption('FULL');
+    const load = async () => {
+        if (!id) return;
+        const found = await bookingService.getBooking(id);
+        if (found) {
+            setBooking(found);
+            
+            // Load Agent for Branding
+            const ag = profileService.getUser(found.agentId);
+            setAgent(ag || null);
+            
+            // Default Option Logic
+            if (found.paidAmount === 0 && found.advanceAmount < found.totalAmount) {
+                setPaymentOption('ADVANCE');
+            } else {
+                setPaymentOption('FULL');
+            }
         }
-    }
-    setLoading(false);
+        setLoading(false);
+    };
+    load();
   }, [id]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading Payment Gateway...</div>;

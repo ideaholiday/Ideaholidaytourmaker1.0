@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -18,12 +17,19 @@ export const BookingDetail: React.FC = () => {
   const { user } = useAuth();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [hasInvoice, setHasInvoice] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      const found = bookingService.getBooking(id);
-      setBooking(found || null);
-    }
+    const load = async () => {
+        if (id) {
+            const found = await bookingService.getBooking(id);
+            setBooking(found || null);
+            if(found) {
+                gstService.getInvoiceByBooking(found.id).then(inv => setHasInvoice(!!inv));
+            }
+        }
+    };
+    load();
   }, [id]);
 
   if (!booking || !user) return <div className="p-8 text-center">Loading Booking...</div>;
@@ -43,8 +49,8 @@ export const BookingDetail: React.FC = () => {
       generateQuotePDF(mockQuote, breakdown, user.role, user);
   };
 
-  const handleDownloadInvoice = () => {
-      const invoice = gstService.getInvoiceByBooking(booking.id);
+  const handleDownloadInvoice = async () => {
+      const invoice = await gstService.getInvoiceByBooking(booking.id);
       if (invoice) {
           generateInvoicePDF(invoice, booking);
       } else {
@@ -68,15 +74,15 @@ export const BookingDetail: React.FC = () => {
       alert(msg);
   };
 
-  const handleCancellationRequest = (reason: string) => {
-      bookingService.requestCancellation(booking.id, reason, user);
+  const handleCancellationRequest = async (reason: string) => {
+      await bookingService.requestCancellation(booking.id, reason, user);
       setIsCancelModalOpen(false);
-      setBooking(bookingService.getBooking(booking.id) || null);
+      const updated = await bookingService.getBooking(booking.id);
+      setBooking(updated || null);
   };
 
   const isCancellable = ['CONFIRMED', 'BOOKED', 'IN_PROGRESS'].includes(booking.status);
   const isCancelled = booking.status.includes('CANCEL') || booking.status === 'CANCELLATION_REQUESTED';
-  const hasInvoice = !!gstService.getInvoiceByBooking(booking.id);
 
   return (
     <div className="container mx-auto px-4 py-8">

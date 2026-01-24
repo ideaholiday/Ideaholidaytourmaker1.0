@@ -49,18 +49,23 @@ class ApiClient {
                    const qty = Number(svc.quantity) || 1;
                    const nights = Number(svc.nights) || 1;
                    
+                   let itemCost = 0;
+
                    if (svc.inventory_id) {
-                       // SYSTEM ITEM: Strict Lookup from "Database" (AdminService)
+                       // SYSTEM ITEM: Strict Lookup from "Database" (AdminService) to simulate backend truth
                        const adminPrice = this.getAdminItemPrice(svc.inventory_id, svc.type);
-                       // We ignore stored currency and assume INR because we forced migration
-                       const priceInBase = adminPrice; 
-                       
-                       supplierCostTotal += (priceInBase * qty * nights);
+                       if (adminPrice > 0) {
+                           itemCost = adminPrice;
+                           supplierCostTotal += (itemCost * qty * nights);
+                       } else {
+                           // Fallback if ID not found (e.g. newly added in session)
+                           itemCost = Number(svc.cost) || 0;
+                           supplierCostTotal += (itemCost * qty * nights);
+                       }
                    } else {
                        // MANUAL ITEM: Trust Agent Input
-                       const manualCost = Number(svc.cost) || 0;
-                       // Assume input is INR
-                       manualCostTotal += (manualCost * qty * nights);
+                       itemCost = Number(svc.cost) || 0;
+                       manualCostTotal += (itemCost * qty * nights);
                    }
                });
            });
@@ -79,7 +84,7 @@ class ApiClient {
 
        // 3. Agent Markup (Agent Profit)
        // Applied on top of the B2B Price
-       // Use overridden markup from request if present, else default
+       // Use overridden markup from request if present, else default 10%
        const agentMarkupPercent = body.markup !== undefined ? Number(body.markup) / 100 : 0.10; 
        const agentMarkupValue = platformNetCost * agentMarkupPercent;
 
@@ -133,9 +138,9 @@ class ApiClient {
 
   // Helper to simulate DB Lookup
   private getAdminItemPrice(id: string, type: string): number {
-      const hotels = adminService.getHotels();
-      const activities = adminService.getActivities();
-      const transfers = adminService.getTransfers();
+      const hotels = adminService.getHotelsSync();
+      const activities = adminService.getActivitiesSync();
+      const transfers = adminService.getTransfersSync();
 
       if (type === 'HOTEL') {
           const h = hotels.find(x => x.id === id);
@@ -143,6 +148,7 @@ class ApiClient {
       }
       if (type === 'ACTIVITY') {
           const a = activities.find(x => x.id === id);
+          // Assuming adult cost for simplicity in calc
           return a ? a.costAdult : 0; 
       }
       if (type === 'TRANSFER') {
@@ -150,10 +156,6 @@ class ApiClient {
           return t ? t.cost : 0;
       }
       return 0;
-  }
-
-  private getAdminItemCurrency(id: string, type: string): string {
-      return 'INR'; // Enforced
   }
 
   setSession(token: string) {

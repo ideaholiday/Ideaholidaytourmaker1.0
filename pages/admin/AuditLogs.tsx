@@ -16,25 +16,25 @@ export const AuditLogs: React.FC = () => {
 
   useEffect(() => {
     // Load Logs
-    const data = auditLogService.getLogs();
-    setLogs(data);
-    setFilteredLogs(data);
+    auditLogService.getLogs().then(data => {
+        setLogs(data);
+        setFilteredLogs(data);
+    });
   }, []);
 
   // Apply Filters
   useEffect(() => {
-    const result = auditLogService.getLogs({
+    auditLogService.getLogs({
       entityType: filterEntity,
       action: filterAction,
       userId: filterUser ? undefined : undefined // For simple text match we use local filter below
+    }).then(result => {
+        const textFiltered = result.filter(l => {
+           const matchUser = filterUser ? l.performedByName.toLowerCase().includes(filterUser.toLowerCase()) : true;
+           return matchUser;
+        });
+        setFilteredLogs(textFiltered);
     });
-
-    const textFiltered = result.filter(l => {
-       const matchUser = filterUser ? l.performedByName.toLowerCase().includes(filterUser.toLowerCase()) : true;
-       return matchUser;
-    });
-
-    setFilteredLogs(textFiltered);
   }, [filterEntity, filterAction, filterUser]);
 
   const toggleExpand = (id: string) => {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { bookingService } from '../../services/bookingService';
@@ -15,8 +14,8 @@ export const AssignedBookings: React.FC = () => {
   const loadData = () => {
     if (user) {
       setIsLoading(true);
-      setTimeout(() => {
-          const all = bookingService.getBookingsForOperator(user.id);
+      setTimeout(async () => {
+          const all = await bookingService.getBookingsForOperator(user.id);
           // Sort by date created desc
           all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           setBookings(all);

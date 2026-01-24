@@ -1,6 +1,5 @@
 
 import { User, UserRole } from '../types';
-import { MOCK_USERS } from '../constants'; // Fallback
 import { apiClient } from './apiClient';
 import { idGeneratorService } from './idGenerator'; 
 import { auth } from './firebase';
@@ -18,8 +17,6 @@ import {
 
 class AuthService {
   
-  // No local state 'users' array anymore. We trust the Cloud.
-
   async login(email: string, password: string): Promise<User> {
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -32,8 +29,10 @@ class AuthService {
   async logout(user?: User | null, reason: string = 'User initiated'): Promise<void> {
     try {
         await signOut(auth);
+        // We still clear session storage for the React context/UI state
         sessionStorage.clear();
         apiClient.clearSession();
+        console.log(`[Auth] Logged out: ${reason}`);
     } catch (e) {
         console.warn("Sign out error", e);
     }
@@ -45,7 +44,9 @@ class AuthService {
         const fbUser = userCredential.user;
         await sendEmailVerification(fbUser);
         
-        const uniqueId = idGeneratorService.generateUniqueId(role);
+        // Generate ID asynchronously from Firestore
+        const uniqueId = await idGeneratorService.generateUniqueId(role);
+        
         const newUser: User = {
             id: fbUser.uid,
             uniqueId,
@@ -75,8 +76,13 @@ class AuthService {
           const unsubscribe = auth.onAuthStateChanged(async (fbUser) => {
               unsubscribe();
               if (fbUser) {
-                  const user = await this.handleFirebaseUser(fbUser);
-                  resolve(user);
+                  try {
+                      const user = await this.handleFirebaseUser(fbUser);
+                      resolve(user);
+                  } catch (e) {
+                      console.error("Failed to load user profile", e);
+                      resolve(null);
+                  }
               } else {
                   resolve(null);
               }
@@ -85,18 +91,20 @@ class AuthService {
   }
 
   private async handleFirebaseUser(fbUser: FirebaseUser): Promise<User> {
-      // 1. Fetch Profile
+      // 1. Fetch Profile from Firestore
       let user = await dbHelper.getById<User>('users', fbUser.uid);
 
-      // 2. Auto-Create Profile if missing (Self-Healing)
+      // 2. Auto-Create Profile if missing (Self-Healing / First Login fix)
       if (!user) {
           console.warn("User profile missing in Firestore. Creating default.");
+          const uniqueId = await idGeneratorService.generateUniqueId(UserRole.AGENT);
+          
           user = {
               id: fbUser.uid,
-              uniqueId: idGeneratorService.generateUniqueId(UserRole.AGENT),
+              uniqueId,
               name: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
               email: fbUser.email || '',
-              role: UserRole.AGENT, // Default role
+              role: UserRole.AGENT, // Default fallback role
               isVerified: fbUser.emailVerified,
               status: 'ACTIVE',
               joinedAt: new Date().toISOString(),
@@ -105,7 +113,7 @@ class AuthService {
           await dbHelper.save('users', user);
       }
 
-      // 3. Update verification status if changed
+      // 3. Sync verification status
       if (fbUser.emailVerified !== user.isVerified) {
           user.isVerified = fbUser.emailVerified;
           await dbHelper.save('users', user);
@@ -131,7 +139,6 @@ class AuthService {
       }
   }
 
-  // --- Password Management (Firebase Native) ---
   async requestPasswordReset(email: string): Promise<void> {
       await sendPasswordResetEmail(auth, email);
   }
@@ -139,7 +146,6 @@ class AuthService {
   async handleActionCode(code: string, mode: 'verifyEmail' | 'resetPassword', newPassword?: string): Promise<void> {
       if (mode === 'verifyEmail') {
           await applyActionCode(auth, code);
-          // Reload user to update verification status in DB logic
           if (auth.currentUser) await this.handleFirebaseUser(auth.currentUser);
       } else if (mode === 'resetPassword') {
           if (!newPassword) throw new Error("New password required.");
@@ -147,20 +153,15 @@ class AuthService {
       }
   }
 
-  // Used for non-firebase verification flows (Legacy)
-  async verifyUser(token: string): Promise<boolean> { return false; }
+  async verifyUser(token: string): Promise<boolean> { return false; } // Legacy fallback
+  
   async resendVerification(email: string): Promise<void> {
       if (auth.currentUser) await sendEmailVerification(auth.currentUser);
   }
   
-  // Method called by Context to ensure DB is populated
   async syncDirectory() {
-      // Check if users collection is empty
-      const existing = await dbHelper.getAll<User>('users');
-      if (existing.length === 0) {
-          console.log("🔥 Seed: Uploading Mock Users to Firestore...");
-          await dbHelper.batchSave('users', MOCK_USERS);
-      }
+      // No-op for now, or could pre-fetch data if needed.
+      // Firestore handles data availability.
   }
 }
 

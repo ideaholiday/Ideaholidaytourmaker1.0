@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { companyService } from '../../services/companyService';
 import { CompanyProfile } from '../../types';
 import { Building, Plus, Edit2, Trash2, CheckCircle, XCircle } from 'lucide-react';
 
 export const CompanyManagement: React.FC = () => {
-  const [companies, setCompanies] = useState<CompanyProfile[]>(companyService.getAllCompanies());
+  const [companies, setCompanies] = useState<CompanyProfile[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingComp, setEditingComp] = useState<CompanyProfile | null>(null);
   
   const [formData, setFormData] = useState<Partial<CompanyProfile>>({});
 
-  const refresh = () => setCompanies(companyService.getAllCompanies());
+  useEffect(() => {
+      refresh();
+  }, []);
+
+  const refresh = () => companyService.getAllCompanies().then(setCompanies);
 
   const handleOpenModal = (comp?: CompanyProfile) => {
     if (comp) {

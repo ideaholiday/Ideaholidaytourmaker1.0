@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { PricingRule } from '../../types';
 import { Save, AlertCircle } from 'lucide-react';
 
 export const PricingRules: React.FC = () => {
-  const [rule, setRule] = useState<PricingRule>(adminService.getPricingRule());
+  const [rule, setRule] = useState<PricingRule>(adminService.getPricingRuleSync());
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {

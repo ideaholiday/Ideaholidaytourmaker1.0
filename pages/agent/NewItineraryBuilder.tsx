@@ -24,8 +24,8 @@ const BuilderContent: React.FC = () => {
 
   const getInventoryCounts = (destId: string) => {
       // Simple count of available items for this destination to help agent choose
-      const hotels = adminService.getHotels().filter(h => h.destinationId === destId).length;
-      const activities = adminService.getActivities().filter(a => a.destinationId === destId).length;
+      const hotels = adminService.getHotelsSync().filter(h => h.destinationId === destId).length;
+      const activities = adminService.getActivitiesSync().filter(a => a.destinationId === destId).length;
       return { hotels, activities };
   };
 

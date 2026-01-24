@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -25,58 +24,61 @@ export const OperatorBookingView: React.FC = () => {
   });
 
   useEffect(() => {
-    if (id) {
-      const found = bookingService.getBooking(id);
-      if (found && found.operatorId === user?.id) {
-          setBooking(found);
-          if (found.driverDetails) {
-              setDriverForm(found.driverDetails);
-          }
-      }
-    }
+    const load = async () => {
+        if (id) {
+            const found = await bookingService.getBooking(id);
+            if (found && found.operatorId === user?.id) {
+                setBooking(found);
+                if (found.driverDetails) {
+                    setDriverForm(found.driverDetails);
+                }
+            }
+        }
+    };
+    load();
   }, [id, user]);
 
   if (!booking || !user) return <div className="p-8 text-center">Loading Booking...</div>;
 
-  const refresh = () => {
-      const found = bookingService.getBooking(booking.id);
+  const refresh = async () => {
+      const found = await bookingService.getBooking(booking.id);
       setBooking(found || null);
       if (found?.driverDetails) setDriverForm(found.driverDetails);
   };
 
   // --- WORKFLOW ACTIONS ---
 
-  const handleStartService = () => {
+  const handleStartService = async () => {
       if(window.confirm("Confirm Start of Service? This status will be visible to the Admin and Agent.")) {
-          bookingService.updateStatus(booking.id, 'IN_PROGRESS', user);
+          await bookingService.updateStatus(booking.id, 'IN_PROGRESS', user);
           refresh();
       }
   };
 
-  const handleCompleteService = () => {
+  const handleCompleteService = async () => {
       if(window.confirm("Mark this booking as Completed? Ensure all services are delivered.")) {
-          bookingService.updateStatus(booking.id, 'COMPLETED', user);
+          await bookingService.updateStatus(booking.id, 'COMPLETED', user);
           refresh();
       }
   };
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
       if(window.confirm("Accept this booking assignment? You confirm availability and pricing.")) {
-          bookingOperatorService.acceptAssignment(booking.id, user);
+          await bookingOperatorService.acceptAssignment(booking.id, user);
           refresh();
       }
   };
 
-  const handleDecline = () => {
+  const handleDecline = async () => {
       if(!declineReason.trim()) return;
-      bookingOperatorService.declineAssignment(booking.id, declineReason, user);
+      await bookingOperatorService.declineAssignment(booking.id, declineReason, user);
       setShowDeclineModal(false);
       refresh();
   };
 
-  const handleSaveDriver = (e: React.FormEvent) => {
+  const handleSaveDriver = async (e: React.FormEvent) => {
       e.preventDefault();
-      bookingOperatorService.updateDriverDetails(booking.id, driverForm, user);
+      await bookingOperatorService.updateDriverDetails(booking.id, driverForm, user);
       setIsEditingDriver(false);
       refresh();
   };

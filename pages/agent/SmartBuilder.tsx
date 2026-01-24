@@ -112,7 +112,7 @@ export const SmartBuilder: React.FC = () => {
   const calculateFinancials = () => {
       let totalRawCost = 0;
       const currency = 'INR'; 
-      const pricingRules = adminService.getPricingRule();
+      const pricingRules = adminService.getPricingRuleSync();
 
       itinerary.forEach(day => {
           day.services?.forEach(svc => {

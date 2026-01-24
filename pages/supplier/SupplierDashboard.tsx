@@ -57,16 +57,16 @@ export const SupplierDashboard: React.FC = () => {
     }
   }, [user]);
 
-  const loadData = () => {
+  const loadData = async () => {
     if (!user || user.role !== UserRole.HOTEL_PARTNER) return;
 
     // 1. Load Inventory (Created by this supplier)
     // NOTE: In the new model, Partners create their own items in the inventory service
-    const myItems = inventoryService.getItemsByOperator(user.id);
+    const myItems = await inventoryService.getItemsByOperator(user.id);
     setInventory(myItems);
 
     // 2. Load Bookings (Logic remains similar but mapped to inventory IDs)
-    const allBookings = bookingService.getAllBookings();
+    const allBookings = await bookingService.getAllBookings();
     const myReservations: ReservationRow[] = [];
     const myInventoryIds = myItems.map(i => i.id);
 

@@ -19,9 +19,9 @@ export const TemplateSelector: React.FC<Props> = ({ onSelect, onClose }) => {
   useEffect(() => {
     if (!user) return;
     if (activeTab === 'SYSTEM') {
-      setTemplates(quickQuoteTemplateService.getSystemTemplates());
+      quickQuoteTemplateService.getSystemTemplates().then(setTemplates);
     } else {
-      setTemplates(quickQuoteTemplateService.getAgentTemplates(user.id));
+      quickQuoteTemplateService.getAgentTemplates(user.id).then(setTemplates);
     }
   }, [activeTab, user]);
 

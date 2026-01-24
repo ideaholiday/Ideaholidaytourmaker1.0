@@ -1,72 +1,55 @@
 
+import { doc, runTransaction } from 'firebase/firestore';
+import { db } from './firebase';
 import { UserRole } from '../types';
 
-const STORAGE_KEY_ID_COUNTERS = 'iht_id_counters';
-
-interface IdCounters {
-  AGENT: number;
-  OPERATOR: number;
-  PARTNER: number;
-  STAFF: number;
-  ADMIN: number;
-}
-
-const DEFAULT_COUNTERS: IdCounters = {
-  AGENT: 100,
-  OPERATOR: 20,
-  PARTNER: 10,
-  STAFF: 5,
-  ADMIN: 1
-};
+const COUNTER_DOC_REF = 'settings/id_counters';
 
 class IdGeneratorService {
   
-  private getCounters(): IdCounters {
-    const stored = localStorage.getItem(STORAGE_KEY_ID_COUNTERS);
-    return stored ? JSON.parse(stored) : DEFAULT_COUNTERS;
-  }
-
-  private saveCounters(counters: IdCounters) {
-    localStorage.setItem(STORAGE_KEY_ID_COUNTERS, JSON.stringify(counters));
-  }
-
   /**
-   * Generates a unique, human-readable ID based on role.
+   * Generates a unique, human-readable ID based on role using Firestore Transactions.
    * Format: PREFIX-IH-NUMBER (e.g. AG-IH-000123)
    */
-  generateUniqueId(role: UserRole): string {
-    const counters = this.getCounters();
-    let prefix = '';
-    let count = 0;
+  async generateUniqueId(role: UserRole | string): Promise<string> {
+    const roleKey = role.toString().toUpperCase();
+    let prefix = 'GEN';
 
-    switch (role) {
-      case UserRole.AGENT:
-        prefix = 'AG';
-        count = ++counters.AGENT;
-        break;
-      case UserRole.OPERATOR:
-        prefix = 'OP';
-        count = ++counters.OPERATOR;
-        break;
-      case UserRole.HOTEL_PARTNER:
-        prefix = 'HP';
-        count = ++counters.PARTNER;
-        break;
-      case UserRole.STAFF:
-        prefix = 'ST';
-        count = ++counters.STAFF;
-        break;
-      case UserRole.ADMIN:
-        prefix = 'AD';
-        count = ++counters.ADMIN;
-        break;
+    switch (roleKey) {
+      case 'AGENT': prefix = 'AG'; break;
+      case 'OPERATOR': prefix = 'OP'; break;
+      case 'HOTEL_PARTNER': prefix = 'HP'; break;
+      case 'STAFF': prefix = 'ST'; break;
+      case 'ADMIN': prefix = 'AD'; break;
+      default: prefix = 'GEN'; break;
     }
 
-    this.saveCounters(counters);
-    
-    // Pad with leading zeros (6 digits)
-    const paddedCount = count.toString().padStart(6, '0');
-    return `${prefix}-IH-${paddedCount}`;
+    try {
+        const newCount = await runTransaction(db, async (transaction) => {
+            const sfDocRef = doc(db, COUNTER_DOC_REF);
+            const sfDoc = await transaction.get(sfDocRef);
+
+            let currentCount = 0;
+            if (sfDoc.exists()) {
+                const data = sfDoc.data();
+                currentCount = data[roleKey] || 0;
+            }
+
+            const nextCount = currentCount + 1;
+            
+            transaction.set(sfDocRef, { [roleKey]: nextCount }, { merge: true });
+            
+            return nextCount;
+        });
+
+        const paddedCount = newCount.toString().padStart(6, '0');
+        return `${prefix}-IH-${paddedCount}`;
+
+    } catch (e) {
+        console.error("ID Generation Failed", e);
+        // Fallback random ID if transaction fails (prevent blocking)
+        return `${prefix}-ERR-${Date.now().toString().slice(-6)}`;
+    }
   }
 }
 

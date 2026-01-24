@@ -20,7 +20,7 @@ export const WorkQueue: React.FC = () => {
         // Simulate concurrent data fetching
         setTimeout(async () => {
             const qData = await agentService.getOperatorAssignments(user.id);
-            const bData = bookingService.getBookingsForOperator(user.id);
+            const bData = await bookingService.getBookingsForOperator(user.id);
             
             // Sort by latest interaction
             qData.sort((a, b) => new Date(b.travelDate).getTime() - new Date(a.travelDate).getTime());

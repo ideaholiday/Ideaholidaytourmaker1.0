@@ -3,16 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { gstService } from '../../services/gstService';
 import { GstSummaryCards } from '../../components/gst/GstSummaryCards';
 import { GstReportTable } from '../../components/gst/GstReportTable';
+import { GSTRecord } from '../../types';
 import { FileText, Calendar } from 'lucide-react';
 
 export const GstDashboard: React.FC = () => {
-  const [records, setRecords] = useState(gstService.getAllRecords());
+  const [records, setRecords] = useState<GSTRecord[]>([]);
   // const [cnList, setCnList] = useState(gstService.getAllCreditNotes()); // Future use for detailed CN table
-  const [stats, setStats] = useState(gstService.getSummaryStats());
+  const [stats, setStats] = useState({ grossTaxable: 0, grossGst: 0, netTaxable: 0, netGst: 0, cnCount: 0, invCount: 0 });
 
-  const handleRefresh = () => {
-      setRecords(gstService.getAllRecords());
-      setStats(gstService.getSummaryStats());
+  const handleRefresh = async () => {
+      const recs = await gstService.getAllRecords();
+      setRecords(recs);
+      const sts = await gstService.getSummaryStats();
+      setStats(sts);
   };
 
   useEffect(() => {

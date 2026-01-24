@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services/inventoryService';
 import { adminService } from '../../services/adminService';
@@ -20,9 +19,9 @@ export const InventoryManager: React.FC = () => {
     loadItems();
   }, [user]);
 
-  const loadItems = () => {
+  const loadItems = async () => {
     if (user) {
-        setItems(inventoryService.getItemsByOperator(user.id));
+        setItems(await inventoryService.getItemsByOperator(user.id));
     }
   };
 

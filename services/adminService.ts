@@ -1,18 +1,6 @@
-
 import { Destination, Hotel, PricingRule, Transfer, Activity, Visa, FixedPackage, User, ItineraryTemplate } from '../types';
 import { dbHelper } from './firestoreHelper';
 import { idGeneratorService } from './idGenerator';
-// Import existing constants for seeding
-import { INITIAL_TEMPLATES } from '../data/itineraryTemplates';
-
-// We define initial data inside here to seed if Firestore is empty
-// This ensures a smooth migration from local to cloud
-const INITIAL_DESTINATIONS: Destination[] = [
-  { id: 'd11', country: 'India', city: 'Delhi', currency: 'INR', timezone: 'GMT+5:30', isActive: true },
-  { id: 'd1', country: 'UAE', city: 'Dubai', currency: 'INR', timezone: 'GMT+4', isActive: true },
-  { id: 'd2', country: 'Thailand', city: 'Phuket', currency: 'INR', timezone: 'GMT+7', isActive: true },
-];
-// ... (Add more defaults if needed for seeding)
 
 const COLLECTIONS = {
     DESTINATIONS: 'destinations',
@@ -23,146 +11,181 @@ const COLLECTIONS = {
     PACKAGES: 'fixed_packages',
     TEMPLATES: 'system_templates',
     USERS: 'users',
-    SETTINGS: 'system_settings' // For Pricing Rules
+    SETTINGS: 'system_settings'
 };
 
 class AdminService {
-  
-  // Local Cache to avoid reading Firestore on every render
-  // In a larger app, use React Query or Redux. Here we use simple singleton cache.
-  private cache: any = {};
+  private cache: {
+      destinations: Destination[];
+      hotels: Hotel[];
+      activities: Activity[];
+      transfers: Transfer[];
+      visas: Visa[];
+      packages: FixedPackage[];
+      templates: ItineraryTemplate[];
+      users: User[];
+      pricingRule: PricingRule | null;
+  } = { destinations: [], hotels: [], activities: [], transfers: [], visas: [], packages: [], templates: [], users: [], pricingRule: null };
 
-  /**
-   * Called on App Start.
-   * Checks if Firestore has data. If not, uploads defaults.
-   */
   async syncAllFromCloud() {
-      const dests = await this.getDestinations(true); // Force fetch
-      if (dests.length === 0) {
-          console.log("🔥 Seed: Uploading Master Data to Firestore...");
-          await dbHelper.batchSave(COLLECTIONS.DESTINATIONS, INITIAL_DESTINATIONS);
-          await dbHelper.batchSave(COLLECTIONS.TEMPLATES, INITIAL_TEMPLATES);
-          // Pricing Rule Seed
-          await dbHelper.save(COLLECTIONS.SETTINGS, { 
-             id: 'pricing_rule', 
-             name: 'Default', 
-             markupType: 'Percentage', 
-             companyMarkup: 10, 
-             agentMarkup: 10, 
-             gstPercentage: 5, 
-             roundOff: 'Nearest 10', 
-             baseCurrency: 'INR', 
-             isActive: true 
-          });
-      }
+      const [d, h, a, t, v, p, tp, u, pr] = await Promise.all([
+          dbHelper.getAll<Destination>(COLLECTIONS.DESTINATIONS),
+          dbHelper.getAll<Hotel>(COLLECTIONS.HOTELS),
+          dbHelper.getAll<Activity>(COLLECTIONS.ACTIVITIES),
+          dbHelper.getAll<Transfer>(COLLECTIONS.TRANSFERS),
+          dbHelper.getAll<Visa>(COLLECTIONS.VISAS),
+          dbHelper.getAll<FixedPackage>(COLLECTIONS.PACKAGES),
+          dbHelper.getAll<ItineraryTemplate>(COLLECTIONS.TEMPLATES),
+          dbHelper.getAll<User>(COLLECTIONS.USERS),
+          dbHelper.getById<PricingRule>(COLLECTIONS.SETTINGS, 'pricing_rule')
+      ]);
+      this.cache.destinations = d;
+      this.cache.hotels = h;
+      this.cache.activities = a;
+      this.cache.transfers = t;
+      this.cache.visas = v;
+      this.cache.packages = p;
+      this.cache.templates = tp;
+      this.cache.users = u;
+      this.cache.pricingRule = pr || { id:'pricing_rule', name:'Default', markupType:'Percentage', companyMarkup:10, agentMarkup:10, gstPercentage:5, roundOff:'Nearest 10', isActive:true };
   }
 
+  // --- SYNC ACCESSORS (From Cache) ---
+  getDestinationsSync(): Destination[] { return this.cache.destinations; }
+  getHotelsSync(): Hotel[] { return this.cache.hotels; }
+  getActivitiesSync(): Activity[] { return this.cache.activities; }
+  getTransfersSync(): Transfer[] { return this.cache.transfers; }
+  getVisasSync(): Visa[] { return this.cache.visas; }
+  getFixedPackagesSync(): FixedPackage[] { return this.cache.packages; }
+  getSystemTemplatesSync(): ItineraryTemplate[] { return this.cache.templates; }
+  getUsersSync(): User[] { return this.cache.users; }
+  getPricingRuleSync(): PricingRule { return this.cache.pricingRule!; }
+
   // --- DESTINATIONS ---
-  async getDestinations(force = false): Promise<Destination[]> {
-     if (!force && this.cache.destinations) return this.cache.destinations;
+  async getDestinations(): Promise<Destination[]> {
      const data = await dbHelper.getAll<Destination>(COLLECTIONS.DESTINATIONS);
      this.cache.destinations = data;
      return data;
   }
-  // Sync wrapper for UI components that expect sync return
-  getDestinationsSync(): Destination[] { return this.cache.destinations || []; }
-
+  
   async saveDestination(dest: Destination) {
-      if (!dest.id) dest.id = idGeneratorService.generateUniqueId('ADMIN' as any);
+      if (!dest.id) dest.id = await idGeneratorService.generateUniqueId('ADMIN');
       await dbHelper.save(COLLECTIONS.DESTINATIONS, dest);
-      this.getDestinations(true); // Refresh cache
+      this.syncAllFromCloud(); // Background update
   }
-  async deleteDestination(id: string) { await dbHelper.delete(COLLECTIONS.DESTINATIONS, id); this.getDestinations(true); }
+  
+  async deleteDestination(id: string) { 
+      await dbHelper.delete(COLLECTIONS.DESTINATIONS, id); 
+      this.syncAllFromCloud();
+  }
 
   // --- HOTELS ---
-  getHotels(): Hotel[] { return this.cache.hotels || []; } // Sync accessor
-  async fetchHotels() { this.cache.hotels = await dbHelper.getAll<Hotel>(COLLECTIONS.HOTELS); }
+  async getHotels(): Promise<Hotel[]> { 
+      const data = await dbHelper.getAll<Hotel>(COLLECTIONS.HOTELS);
+      this.cache.hotels = data;
+      return data;
+  }
 
   async saveHotel(hotel: Hotel) {
       if (!hotel.id) hotel.id = `h_${Date.now()}`;
       await dbHelper.save(COLLECTIONS.HOTELS, hotel);
-      this.fetchHotels();
+      this.syncAllFromCloud();
   }
-  async deleteHotel(id: string) { await dbHelper.delete(COLLECTIONS.HOTELS, id); this.fetchHotels(); }
+  async deleteHotel(id: string) { await dbHelper.delete(COLLECTIONS.HOTELS, id); this.syncAllFromCloud(); }
 
   // --- ACTIVITIES ---
-  getActivities(): Activity[] { return this.cache.activities || []; }
-  async fetchActivities() { this.cache.activities = await dbHelper.getAll<Activity>(COLLECTIONS.ACTIVITIES); }
+  async getActivities(): Promise<Activity[]> { 
+      const data = await dbHelper.getAll<Activity>(COLLECTIONS.ACTIVITIES);
+      this.cache.activities = data;
+      return data;
+  }
 
   async saveActivity(activity: Activity) {
       if (!activity.id) activity.id = `a_${Date.now()}`;
       await dbHelper.save(COLLECTIONS.ACTIVITIES, activity);
-      this.fetchActivities();
+      this.syncAllFromCloud();
   }
-  async deleteActivity(id: string) { await dbHelper.delete(COLLECTIONS.ACTIVITIES, id); this.fetchActivities(); }
+  async deleteActivity(id: string) { await dbHelper.delete(COLLECTIONS.ACTIVITIES, id); this.syncAllFromCloud(); }
 
   // --- TRANSFERS ---
-  getTransfers(): Transfer[] { return this.cache.transfers || []; }
-  async fetchTransfers() { this.cache.transfers = await dbHelper.getAll<Transfer>(COLLECTIONS.TRANSFERS); }
+  async getTransfers(): Promise<Transfer[]> { 
+      const data = await dbHelper.getAll<Transfer>(COLLECTIONS.TRANSFERS);
+      this.cache.transfers = data;
+      return data;
+  }
 
   async saveTransfer(transfer: Transfer) {
       if (!transfer.id) transfer.id = `t_${Date.now()}`;
       await dbHelper.save(COLLECTIONS.TRANSFERS, transfer);
-      this.fetchTransfers();
+      this.syncAllFromCloud();
   }
-  async deleteTransfer(id: string) { await dbHelper.delete(COLLECTIONS.TRANSFERS, id); this.fetchTransfers(); }
+  async deleteTransfer(id: string) { await dbHelper.delete(COLLECTIONS.TRANSFERS, id); this.syncAllFromCloud(); }
 
   // --- VISAS ---
-  getVisas(): Visa[] { return this.cache.visas || []; }
-  async fetchVisas() { this.cache.visas = await dbHelper.getAll<Visa>(COLLECTIONS.VISAS); }
-
+  async getVisas(): Promise<Visa[]> { 
+      const data = await dbHelper.getAll<Visa>(COLLECTIONS.VISAS);
+      this.cache.visas = data;
+      return data;
+  }
   async saveVisa(visa: Visa) {
       if (!visa.id) visa.id = `v_${Date.now()}`;
       await dbHelper.save(COLLECTIONS.VISAS, visa);
-      this.fetchVisas();
+      this.syncAllFromCloud();
   }
-  async deleteVisa(id: string) { await dbHelper.delete(COLLECTIONS.VISAS, id); this.fetchVisas(); }
+  async deleteVisa(id: string) { await dbHelper.delete(COLLECTIONS.VISAS, id); this.syncAllFromCloud(); }
 
   // --- PACKAGES ---
-  getFixedPackages(): FixedPackage[] { return this.cache.packages || []; }
-  async fetchPackages() { this.cache.packages = await dbHelper.getAll<FixedPackage>(COLLECTIONS.PACKAGES); }
-
+  async getFixedPackages(): Promise<FixedPackage[]> { 
+      const data = await dbHelper.getAll<FixedPackage>(COLLECTIONS.PACKAGES);
+      this.cache.packages = data;
+      return data;
+  }
   async saveFixedPackage(pkg: FixedPackage) {
       if (!pkg.id) pkg.id = `pkg_${Date.now()}`;
       await dbHelper.save(COLLECTIONS.PACKAGES, pkg);
-      this.fetchPackages();
+      this.syncAllFromCloud();
   }
-  async deleteFixedPackage(id: string) { await dbHelper.delete(COLLECTIONS.PACKAGES, id); this.fetchPackages(); }
+  async deleteFixedPackage(id: string) { await dbHelper.delete(COLLECTIONS.PACKAGES, id); this.syncAllFromCloud(); }
 
   // --- TEMPLATES ---
-  getSystemTemplates(): ItineraryTemplate[] { return this.cache.templates || []; }
-  async fetchTemplates() { this.cache.templates = await dbHelper.getAll<ItineraryTemplate>(COLLECTIONS.TEMPLATES); }
-
+  async getSystemTemplates(): Promise<ItineraryTemplate[]> { 
+      const data = await dbHelper.getAll<ItineraryTemplate>(COLLECTIONS.TEMPLATES);
+      this.cache.templates = data;
+      return data;
+  }
   async saveSystemTemplate(template: ItineraryTemplate) {
       if (!template.id) template.id = `tpl_${Date.now()}`;
       await dbHelper.save(COLLECTIONS.TEMPLATES, template);
-      this.fetchTemplates();
+      this.syncAllFromCloud();
   }
-  async deleteSystemTemplate(id: string) { await dbHelper.delete(COLLECTIONS.TEMPLATES, id); this.fetchTemplates(); }
+  async deleteSystemTemplate(id: string) { await dbHelper.delete(COLLECTIONS.TEMPLATES, id); this.syncAllFromCloud(); }
 
   // --- SETTINGS (Pricing) ---
-  getPricingRule(): PricingRule { return this.cache.pricingRule || { id:'pricing_rule', name:'Default', markupType:'Percentage', companyMarkup:10, agentMarkup:10, gstPercentage:5, roundOff:'Nearest 10', isActive:true }; }
-  async fetchPricingRule() { 
+  async getPricingRule(): Promise<PricingRule> { 
       const rule = await dbHelper.getById<PricingRule>(COLLECTIONS.SETTINGS, 'pricing_rule');
-      if(rule) this.cache.pricingRule = rule;
+      const finalRule = rule || { id:'pricing_rule', name:'Default', markupType:'Percentage', companyMarkup:10, agentMarkup:10, gstPercentage:5, roundOff:'Nearest 10', isActive:true };
+      this.cache.pricingRule = finalRule;
+      return finalRule;
   }
   async savePricingRule(rule: PricingRule) {
       await dbHelper.save(COLLECTIONS.SETTINGS, rule);
-      this.fetchPricingRule();
+      this.syncAllFromCloud();
   }
 
   // --- USERS ---
-  getUsers(): User[] { return this.cache.users || []; }
-  async fetchUsers() { this.cache.users = await dbHelper.getAll<User>(COLLECTIONS.USERS); }
+  async getUsers(): Promise<User[]> { 
+      const data = await dbHelper.getAll<User>(COLLECTIONS.USERS);
+      this.cache.users = data;
+      return data;
+  }
 
   async saveUser(user: Partial<User>) {
-      // Merging happens in dbHelper.save
       if (!user.id) throw new Error("User ID required");
       // @ts-ignore
       await dbHelper.save(COLLECTIONS.USERS, user);
-      this.fetchUsers();
+      this.syncAllFromCloud();
   }
-  async deleteUser(id: string) { await dbHelper.delete(COLLECTIONS.USERS, id); this.fetchUsers(); }
+  async deleteUser(id: string) { await dbHelper.delete(COLLECTIONS.USERS, id); this.syncAllFromCloud(); }
 }
 
 export const adminService = new AdminService();

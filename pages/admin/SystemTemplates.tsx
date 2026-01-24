@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { ItineraryTemplate, TemplateDay, TemplateServiceSlot } from '../../types';
 import { Edit2, Trash2, Plus, X, Layers, Save, Tag } from 'lucide-react';
 
 export const SystemTemplates: React.FC = () => {
-  const [templates, setTemplates] = useState<ItineraryTemplate[]>(adminService.getSystemTemplates());
+  const [templates, setTemplates] = useState<ItineraryTemplate[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTpl, setEditingTpl] = useState<ItineraryTemplate | null>(null);
   
@@ -13,7 +13,14 @@ export const SystemTemplates: React.FC = () => {
   const [formData, setFormData] = useState<Partial<ItineraryTemplate>>({});
   const [tagsInput, setTagsInput] = useState('');
 
-  const refresh = () => setTemplates(adminService.getSystemTemplates());
+  useEffect(() => {
+      refresh();
+  }, []);
+
+  const refresh = async () => {
+      const data = await adminService.getSystemTemplates();
+      setTemplates(data);
+  };
 
   const handleOpenModal = (tpl?: ItineraryTemplate) => {
     if (tpl) {
@@ -33,7 +40,7 @@ export const SystemTemplates: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.destinationKeyword) return;
 
@@ -63,15 +70,15 @@ export const SystemTemplates: React.FC = () => {
       days: days
     };
 
-    adminService.saveSystemTemplate(template);
-    refresh();
+    await adminService.saveSystemTemplate(template);
+    await refresh();
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Delete this template?')) {
-      adminService.deleteSystemTemplate(id);
-      refresh();
+      await adminService.deleteSystemTemplate(id);
+      await refresh();
     }
   };
 

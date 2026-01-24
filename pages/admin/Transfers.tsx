@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Transfer } from '../../types';
@@ -8,19 +9,37 @@ import { InventoryImportExport } from '../../components/admin/InventoryImportExp
 export const Transfers: React.FC = () => {
   const { user } = useAuth();
   const allDestinations = adminService.getDestinationsSync();
-  const allTransfers = adminService.getTransfers();
+  const [allTransfers, setAllTransfers] = useState<Transfer[]>(adminService.getTransfersSync());
   
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.HOTEL_PARTNER;
   const showCost = user?.role !== UserRole.AGENT;
 
-  let displayedTransfers = allTransfers;
-  if (user?.role === UserRole.OPERATOR) {
-      displayedTransfers = allTransfers.filter(t => t.createdBy === user.id);
-  } else if (user?.role === UserRole.HOTEL_PARTNER) {
-      displayedTransfers = allTransfers.filter(t => user.linkedInventoryIds?.includes(t.id));
-  }
+  // Refresh on load
+  useEffect(() => {
+      refreshData();
+  }, []);
+
+  const refreshData = async () => {
+      const fresh = await adminService.getTransfers();
+      setAllTransfers(fresh);
+  };
+
+  const displayedTransfers = useMemo(() => {
+      if (user?.role === UserRole.OPERATOR) {
+          return allTransfers.filter(t => t.createdBy === user.id);
+      }
+      if (user?.role === UserRole.HOTEL_PARTNER) {
+          return allTransfers.filter(t => user.linkedInventoryIds?.includes(t.id));
+      }
+      return allTransfers;
+  }, [allTransfers, user]);
 
   const [transfers, setTransfers] = useState<Transfer[]>(displayedTransfers);
+  
+  useEffect(() => {
+      setTransfers(displayedTransfers);
+  }, [displayedTransfers]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null);
   
@@ -64,11 +83,11 @@ export const Transfers: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.transferName || !formData.destinationId) return;
 
-    adminService.saveTransfer({
+    await adminService.saveTransfer({
       id: editingTransfer?.id || '',
       transferName: formData.transferName!,
       destinationId: formData.destinationId!,
@@ -91,25 +110,14 @@ export const Transfers: React.FC = () => {
       validTo: formData.validTo
     });
 
-    refreshList();
+    await refreshData();
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Delete this transfer?')) {
-      adminService.deleteTransfer(id);
-      refreshList();
-    }
-  };
-
-  const refreshList = () => {
-    const freshAll = adminService.getTransfers();
-    if (user?.role === UserRole.HOTEL_PARTNER) {
-        setTransfers(freshAll.filter(t => user.linkedInventoryIds?.includes(t.id)));
-    } else if (user?.role === UserRole.OPERATOR) {
-        setTransfers(freshAll.filter(t => t.createdBy === user.id));
-    } else {
-        setTransfers(freshAll);
+      await adminService.deleteTransfer(id);
+      await refreshData();
     }
   };
 
@@ -138,7 +146,7 @@ export const Transfers: React.FC = () => {
                         filename="transfers"
                         onImport={() => {
                             alert("Import processed");
-                            refreshList();
+                            refreshData();
                         }}
                     />
                 )}
@@ -190,8 +198,8 @@ export const Transfers: React.FC = () => {
             <tr>
               <th className="px-6 py-4 w-16">Vehicle</th>
               <th className="px-6 py-4">Transfer Details</th>
+              <th className="px-6 py-4">Description</th>
               <th className="px-6 py-4">Capacity</th>
-              <th className="px-6 py-4">Validity</th>
               {showCost && <th className="px-6 py-4">Cost</th>}
               <th className="px-6 py-4">Status</th>
               {canEdit && <th className="px-6 py-4 text-right">Actions</th>}
@@ -222,21 +230,14 @@ export const Transfers: React.FC = () => {
                         </span>
                       </div>
                   </td>
+                  <td className="px-6 py-4 text-slate-500 text-xs max-w-xs truncate">
+                    {transfer.description || '-'}
+                  </td>
                   <td className="px-6 py-4 text-slate-600">
                     <p className="font-bold text-slate-800 text-sm">{transfer.vehicleType}</p>
                     <div className="text-xs text-slate-500 mt-1 space-x-2">
                         <span>{transfer.maxPassengers} Pax</span>
                         <span>{transfer.luggageCapacity || 2} Bags</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase w-fit ${transfer.season === 'Peak' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
-                        {transfer.season || 'All Year'}
-                        </span>
-                        <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                            <Calendar size={10}/> {transfer.validFrom} <span className="mx-0.5">→</span> {transfer.validTo}
-                        </div>
                     </div>
                   </td>
                   {showCost && (
@@ -287,7 +288,7 @@ export const Transfers: React.FC = () => {
             </div>
             
             <form onSubmit={handleSave} className="p-6 space-y-8">
-              
+              {/* Form Content Omitted for brevity, logic remains same */}
               {/* SECTION 1: BASICS */}
               <div className="space-y-4">
                 <div>
@@ -334,6 +335,17 @@ export const Transfers: React.FC = () => {
                         <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Luggage (Bags)</label>
                         <input required type="number" min="0" value={formData.luggageCapacity || ''} onChange={e => setFormData({...formData, luggageCapacity: Number(e.target.value)})} className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white shadow-sm transition" />
                     </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Description</label>
+                    <textarea 
+                        rows={2}
+                        value={formData.description || ''} 
+                        onChange={e => setFormData({...formData, description: e.target.value})} 
+                        className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white shadow-sm transition"
+                        placeholder="Details about the transfer..."
+                    />
                 </div>
               </div>
 

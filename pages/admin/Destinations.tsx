@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Destination } from '../../types';
@@ -7,7 +8,7 @@ import { InventoryImportExport } from '../../components/admin/InventoryImportExp
 
 export const Destinations: React.FC = () => {
   const { user } = useAuth();
-  const [destinations, setDestinations] = useState<Destination[]>(adminService.getDestinationsSync());
+  const [destinations, setDestinations] = useState<Destination[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDest, setEditingDest] = useState<Destination | null>(null);
   const [formData, setFormData] = useState<Partial<Destination>>({});
@@ -15,6 +16,15 @@ export const Destinations: React.FC = () => {
 
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
   
+  useEffect(() => {
+      loadDestinations();
+  }, []);
+
+  const loadDestinations = async () => {
+      const data = await adminService.getDestinations();
+      setDestinations(data);
+  };
+
   const displayedDestinations = user?.role === UserRole.OPERATOR 
     ? destinations.filter(d => d.createdBy === user.id)
     : destinations;
@@ -30,34 +40,33 @@ export const Destinations: React.FC = () => {
       setFormData(dest);
     } else {
       setEditingDest(null);
-      // Enforce INR default
       setFormData({ isActive: true, currency: 'INR', timezone: 'GMT+5:30' });
     }
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.city || !formData.country) return;
 
-    adminService.saveDestination({
+    await adminService.saveDestination({
       id: editingDest?.id || '', 
       country: formData.country!,
       city: formData.city!,
-      currency: 'INR', // Enforced INR
+      currency: 'INR', 
       timezone: formData.timezone || 'GMT',
       isActive: formData.isActive || false,
       createdBy: editingDest?.createdBy || user?.id
     });
 
-    setDestinations(adminService.getDestinationsSync());
+    loadDestinations();
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Delete this destination?')) {
-      adminService.deleteDestination(id);
-      setDestinations(adminService.getDestinationsSync());
+      await adminService.deleteDestination(id);
+      loadDestinations();
     }
   };
 
@@ -75,9 +84,8 @@ export const Destinations: React.FC = () => {
                     headers={['id', 'city', 'country', 'currency', 'timezone', 'isActive']}
                     filename="destinations"
                     onImport={(data) => {
-                         // Mock Re-import logic
                          alert("Import processed");
-                         setDestinations(adminService.getDestinationsSync());
+                         loadDestinations();
                     }}
                 />
                 <button 
@@ -91,7 +99,6 @@ export const Destinations: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Toolbar */}
         <div className="p-4 border-b border-slate-100 bg-slate-50/50">
             <div className="relative max-w-md">
                 <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
@@ -212,7 +219,6 @@ export const Destinations: React.FC = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Currency</label>
                   <div className="relative">
                     <Coins size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
-                    {/* ENFORCED INR DISPLAY */}
                     <div className="w-full pl-11 pr-4 py-3 border border-slate-200 bg-slate-50 rounded-xl font-bold text-slate-600">
                         INR
                     </div>

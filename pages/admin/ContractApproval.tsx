@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { contractService } from '../../services/contractService';
 import { useAuth } from '../../context/AuthContext';
@@ -13,8 +14,8 @@ export const ContractApproval: React.FC = () => {
     loadData();
   }, [user]);
 
-  const loadData = () => {
-    const all = contractService.getAllContracts();
+  const loadData = async () => {
+    const all = await contractService.getAllContracts();
     setPendingContracts(all.filter(c => c.status === 'PENDING_APPROVAL'));
   };
 

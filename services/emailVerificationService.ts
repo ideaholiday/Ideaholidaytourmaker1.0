@@ -1,79 +1,57 @@
 
 import { BRANDING } from '../constants';
 import { User } from '../types';
+import { dbHelper } from './firestoreHelper';
 
-// Mock database for verification tokens
-const STORAGE_KEY_TOKENS = 'iht_verification_tokens';
+const COLLECTION = 'verification_tokens';
 
 interface VerificationToken {
-  token: string;
+  id: string; // Token string acts as ID
   email: string;
   expiresAt: number;
 }
 
 class EmailVerificationService {
   
-  private getTokens(): VerificationToken[] {
-    const stored = localStorage.getItem(STORAGE_KEY_TOKENS);
-    return stored ? JSON.parse(stored) : [];
-  }
-
-  private saveTokens(tokens: VerificationToken[]) {
-    localStorage.setItem(STORAGE_KEY_TOKENS, JSON.stringify(tokens));
-  }
-
   /**
-   * Generates a secure, time-bound verification token.
-   * Logic: Random string, expires in 24 hours.
+   * Generates a secure, time-bound verification token and saves to Firestore.
    */
-  generateToken(email: string): string {
+  async generateToken(email: string): Promise<string> {
     const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 Hours
 
-    const tokens = this.getTokens();
-    // Remove existing tokens for this email to enforce single valid token per user
-    const cleanTokens = tokens.filter(t => t.email !== email);
-    
-    cleanTokens.push({ token, email, expiresAt });
-    this.saveTokens(cleanTokens);
+    const record: VerificationToken = { id: token, email, expiresAt };
+    await dbHelper.save(COLLECTION, record);
 
     return token;
   }
 
   /**
-   * Validates a token.
-   * Returns the email if valid, throws specific errors if invalid/expired.
+   * Validates a token from Firestore.
    */
-  validateToken(token: string): string {
-    const tokens = this.getTokens();
-    const record = tokens.find(t => t.token === token);
+  async validateToken(token: string): Promise<string> {
+    const record = await dbHelper.getById<VerificationToken>(COLLECTION, token);
 
     if (!record) {
       throw new Error("INVALID_TOKEN");
     }
 
     if (Date.now() > record.expiresAt) {
-      // Clean up expired token
-      this.saveTokens(tokens.filter(t => t.token !== token));
+      await dbHelper.delete(COLLECTION, token);
       throw new Error("TOKEN_EXPIRED");
     }
 
-    // Token is valid - Return email to process verification
+    // Return email associated with valid token
     return record.email;
   }
 
   /**
    * Consumes a token (Single-use policy).
    */
-  invalidateToken(token: string) {
-    const tokens = this.getTokens();
-    const filtered = tokens.filter(t => t.token !== token);
-    this.saveTokens(filtered);
+  async invalidateToken(token: string) {
+    await dbHelper.delete(COLLECTION, token);
   }
 
-  /**
-   * Generates the HTML Email Template.
-   */
   generateEmailTemplate(user: User, token: string): string {
     const link = `https://${BRANDING.website}/#/verify-email?token=${token}`;
     
@@ -101,17 +79,12 @@ class EmailVerificationService {
           <div class="content">
             <h2>Welcome to Idea Holiday Partner Network</h2>
             <p>Dear <strong>${user.name}</strong>,</p>
-            <p>Thank you for registering with <strong>Idea Holiday Pvt. Ltd.</strong></p>
-            <p>Your account has been created. To activate your partner access and set your secure password, please verify your email address below.</p>
-            
+            <p>Thank you for registering. To activate your partner access, verify your email below.</p>
             <a href="${link}" class="btn">Verify Email & Set Password</a>
-            
-            <p style="font-size: 13px; color: #666;">This link is valid for 24 hours. If you did not request this, please ignore this email.</p>
+            <p style="font-size: 13px; color: #666;">Valid for 24 hours.</p>
           </div>
           <div class="footer">
-            <p>Need assistance? Contact <a href="mailto:${BRANDING.email}">${BRANDING.email}</a></p>
-            <p>${BRANDING.address}</p>
-            <p>&copy; ${new Date().getFullYear()} Idea Holiday Pvt. Ltd. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} Idea Holiday Pvt. Ltd.</p>
           </div>
         </div>
       </body>
@@ -119,22 +92,14 @@ class EmailVerificationService {
     `;
   }
 
-  /**
-   * Simulates sending the email (Logs to console in this environment).
-   */
   async sendVerificationEmail(user: User): Promise<void> {
-    const token = this.generateToken(user.email);
+    const token = await this.generateToken(user.email);
     const html = this.generateEmailTemplate(user, token);
 
     console.group(`📧 [MOCK EMAIL] To: ${user.email}`);
-    console.log(`From: noreply@ideaholiday.com`);
-    console.log(`Subject: [ACTION REQUIRED] Activate your Partner Account - ${BRANDING.name}`);
     console.log(`Link: https://${BRANDING.website}/#/verify-email?token=${token}`);
     console.log(`Template:`, html);
     console.groupEnd();
-
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 800));
   }
 }
 

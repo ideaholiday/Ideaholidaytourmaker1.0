@@ -1,16 +1,48 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { profileService } from '../../services/profileService';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
-import { Users, BookCheck, Briefcase, DollarSign, Store, Shield, UserPlus, ArrowRight } from 'lucide-react';
+import { Users, BookCheck, Briefcase, DollarSign, Store, Shield, UserPlus, ArrowRight, Globe } from 'lucide-react';
 import { SupplierDashboard } from '../supplier/SupplierDashboard';
 import { StaffDashboard } from '../staff/StaffDashboard';
+import { seedInternationalInventory } from '../../utils/seedData';
 
 export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
-  
+  const [stats, setStats] = useState<any>({ activeBookings: 0, totalRevenue: 0, totalAgents: 0, totalOperators: 0, pendingPayments: 0 });
+  const [counts, setCounts] = useState({ destinations: 0, hotels: 0 });
+  const [seeding, setSeeding] = useState(false);
+
+  useEffect(() => {
+    if (user && user.role === UserRole.ADMIN) {
+        loadStats();
+    }
+  }, [user]);
+
+  const loadStats = async () => {
+      const dashboardStats = await profileService.getAdminDashboardStats();
+      const dests = await adminService.getDestinations();
+      const hotels = await adminService.getHotels();
+      
+      setStats(dashboardStats);
+      setCounts({
+          destinations: dests.length,
+          hotels: hotels.length
+      });
+  };
+
+  const handleSeed = async () => {
+      if (confirm("This will load a large set of Global Inventory (Europe, Asia, USA, etc). Continue?")) {
+          setSeeding(true);
+          await seedInternationalInventory();
+          setSeeding(false);
+          loadStats();
+      }
+  };
+
   if (!user) return null;
 
   // --- PARTNER VIEW ---
@@ -22,11 +54,6 @@ export const AdminDashboard: React.FC = () => {
   if (user.role === UserRole.STAFF) {
       return <StaffDashboard />;
   }
-
-  // --- ADMIN VIEW ---
-  const stats = profileService.getAdminDashboardStats();
-  const destinations = adminService.getDestinationsSync().length;
-  const hotels = adminService.getHotels().length;
 
   const StatCard = ({ title, value, subtext, icon, color }: any) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -45,9 +72,18 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Master Control Center</h1>
-        <p className="text-slate-500">System-wide overview and management.</p>
+      <div className="flex justify-between items-center">
+        <div>
+            <h1 className="text-2xl font-bold text-slate-900">Master Control Center</h1>
+            <p className="text-slate-500">System-wide overview and management.</p>
+        </div>
+        <button 
+            onClick={handleSeed}
+            disabled={seeding}
+            className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-900 disabled:opacity-50"
+        >
+            <Globe size={16} /> {seeding ? 'Loading...' : 'Load Global Inventory'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -146,11 +182,11 @@ export const AdminDashboard: React.FC = () => {
              </Link>
              <Link to="/admin/destinations" className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-center group">
                 <Store size={24} className="mx-auto text-slate-400 group-hover:text-amber-600 mb-2" />
-                <span className="text-sm font-medium text-slate-700">Destinations ({destinations})</span>
+                <span className="text-sm font-medium text-slate-700">Destinations ({counts.destinations})</span>
              </Link>
              <Link to="/admin/hotels" className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-center group">
                 <Store size={24} className="mx-auto text-slate-400 group-hover:text-pink-600 mb-2" />
-                <span className="text-sm font-medium text-slate-700">Hotels ({hotels})</span>
+                <span className="text-sm font-medium text-slate-700">Hotels ({counts.hotels})</span>
              </Link>
              <Link to="/admin/staff" className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-center group">
                 <Users size={24} className="mx-auto text-slate-400 group-hover:text-slate-800 mb-2" />

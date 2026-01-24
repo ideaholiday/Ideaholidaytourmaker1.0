@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -24,7 +23,7 @@ export const StaffDashboard: React.FC = () => {
 
   useEffect(() => {
     // Load all bookings for operational view
-    setBookings(bookingService.getAllBookings());
+    bookingService.getAllBookings().then(setBookings);
   }, []);
 
   if (!user) return null;

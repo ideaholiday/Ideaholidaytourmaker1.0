@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { ItineraryItem, ItineraryService } from '../types';
 import { adminService } from '../services/adminService';
 import { currencyService } from '../services/currencyService';
 import { calculatePriceFromNet } from '../utils/pricingEngine';
 import { InventoryModal } from './builder/InventoryModal';
-import { Save, Plus, Trash2, MapPin, Hotel, Camera, Car, X, Info, Settings, ToggleLeft, ToggleRight, User, Copy, ArrowUp, ArrowDown, GripVertical, Calendar } from 'lucide-react';
+import { Save, Plus, Trash2, MapPin, Hotel, Camera, Car, X, Info, Settings, ToggleLeft, ToggleRight, User, Copy, ArrowUp, ArrowDown, GripVertical, Calendar, Image as ImageIcon } from 'lucide-react';
 
 interface Props {
   initialItinerary: ItineraryItem[];
@@ -22,6 +21,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   const [modalType, setModalType] = useState<'HOTEL' | 'ACTIVITY' | 'TRANSFER'>('HOTEL');
   const [financials, setFinancials] = useState({ net: 0, selling: 0, currency: 'INR' });
   
+  // Drag and Drop State
+  const [draggedDayIndex, setDraggedDayIndex] = useState<number | null>(null);
+  
   // Pricing Controls
   const [markupPercent, setMarkupPercent] = useState<number>(10);
   const [enableMarkup, setEnableMarkup] = useState<boolean>(true);
@@ -29,7 +31,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   // Recalculate price whenever itinerary changes or markup settings change
   useEffect(() => {
     let totalNet = 0;
-    const rules = adminService.getPricingRule();
+    const rules = adminService.getPricingRuleSync();
     
     itinerary.forEach(day => {
         day.services?.forEach(svc => {
@@ -53,13 +55,14 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
     });
   }, [itinerary, pax, markupPercent, enableMarkup]);
 
+  // --- SERVICE ACTIONS ---
+
   const handleAddService = (item: any) => {
-      // Robust cost extraction
       const rawCost = item.estimated_cost || item.cost || item.costPrice || item.price || 0;
       
       const newService: ItineraryService = {
           id: item.id || `svc_${Date.now()}`,
-          inventory_id: item.inventory_id || item.id, // Fallback if inventory_id missing
+          inventory_id: item.inventory_id || item.id, 
           type: item.type,
           name: item.name,
           cost: Number(rawCost),
@@ -71,7 +74,6 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
       };
 
       const updated = [...itinerary];
-      // Ensure the services array exists
       if (!updated[activeDayIndex].services) {
           updated[activeDayIndex].services = [];
       }
@@ -96,29 +98,45 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
       if (direction === 'DOWN' && idx === services.length - 1) return;
       
       const swapIdx = direction === 'UP' ? idx - 1 : idx + 1;
-      // Swap
       [services[idx], services[swapIdx]] = [services[swapIdx], services[idx]];
       
       updated[dayIndex].services = services;
       setItinerary(updated);
   };
 
-  const handleMoveDay = (index: number, direction: 'UP' | 'DOWN', e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (direction === 'UP' && index === 0) return;
-      if (direction === 'DOWN' && index === itinerary.length - 1) return;
+  // --- DAY ACTIONS ---
 
-      const updated = [...itinerary];
-      const swapIndex = direction === 'UP' ? index - 1 : index + 1;
-      
-      // Swap content
-      [updated[index], updated[swapIndex]] = [updated[swapIndex], updated[index]];
-      
-      // Fix day numbers
-      updated.forEach((day, i) => { day.day = i + 1; });
-      
-      setItinerary(updated);
-      setActiveDayIndex(swapIndex);
+  const handleAddDay = () => {
+      const newDayNumber = itinerary.length + 1;
+      const newDay: ItineraryItem = {
+          day: newDayNumber,
+          title: `Day ${newDayNumber}`,
+          description: 'Day at leisure.',
+          services: []
+      };
+      setItinerary([...itinerary, newDay]);
+      setActiveDayIndex(itinerary.length); 
+  };
+
+  const handleCloneDay = (dayIndex: number, e: React.MouseEvent) => {
+      e.stopPropagation(); 
+      if (!confirm(`Duplicate Day ${itinerary[dayIndex].day}?`)) return;
+
+      const dayToClone = itinerary[dayIndex];
+      const clonedServices = dayToClone.services?.map(s => ({
+          ...s,
+          id: `svc_clone_${Date.now()}_${Math.random()}` 
+      })) || [];
+
+      const newDay: ItineraryItem = {
+          ...dayToClone,
+          day: itinerary.length + 1,
+          title: dayToClone.title + ' (Copy)',
+          services: clonedServices
+      };
+
+      setItinerary([...itinerary, newDay]);
+      setActiveDayIndex(itinerary.length);
   };
 
   const handleDeleteDay = (index: number, e: React.MouseEvent) => {
@@ -137,41 +155,42 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
       setActiveDayIndex(Math.max(0, index - 1));
   };
 
-  const handleAddDay = () => {
-      const newDayNumber = itinerary.length + 1;
-      const newDay: ItineraryItem = {
-          day: newDayNumber,
-          title: `Day ${newDayNumber}`,
-          description: 'Day at leisure.',
-          services: []
-      };
-      setItinerary([...itinerary, newDay]);
-      setActiveDayIndex(itinerary.length); // Select new day
+  // --- DRAG AND DROP LOGIC (HTML5) ---
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+      setDraggedDayIndex(index);
+      // Effect for drag image (optional, standard browser one is usually fine)
+      e.dataTransfer.effectAllowed = 'move';
+      // Use setTimeOut to prevent the element from disappearing immediately in some browsers
+      setTimeout(() => {
+         const el = e.target as HTMLElement;
+         el.classList.add('opacity-50'); 
+      }, 0);
   };
 
-  const handleCloneDay = (dayIndex: number, e: React.MouseEvent) => {
-      e.stopPropagation(); // Prevent activating the day
-      if (!confirm(`Duplicate Day ${itinerary[dayIndex].day}? This will add a new day at the end.`)) return;
+  const handleDragEnd = (e: React.DragEvent) => {
+      setDraggedDayIndex(null);
+      const el = e.target as HTMLElement;
+      el.classList.remove('opacity-50');
+  };
 
-      const dayToClone = itinerary[dayIndex];
-      const newDayNumber = itinerary.length + 1;
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+      e.preventDefault(); // Necessary to allow dropping
+      if (draggedDayIndex === null || draggedDayIndex === index) return;
       
-      const clonedServices = dayToClone.services?.map(s => ({
-          ...s,
-          id: `svc_clone_${Date.now()}_${Math.random()}` // New ID
-      })) || [];
+      // Perform the swap in real-time for visual feedback
+      const updated = [...itinerary];
+      const draggedItem = updated[draggedDayIndex];
+      updated.splice(draggedDayIndex, 1);
+      updated.splice(index, 0, draggedItem);
 
-      const newDay: ItineraryItem = {
-          day: newDayNumber,
-          title: dayToClone.title + ' (Copy)',
-          description: dayToClone.description,
-          cityId: dayToClone.cityId,
-          inclusions: [...(dayToClone.inclusions || [])],
-          services: clonedServices
-      };
+      // Fix day numbers immediately for UI consistency
+      updated.forEach((day, i) => { day.day = i + 1; });
 
-      setItinerary([...itinerary, newDay]);
-      setActiveDayIndex(itinerary.length);
+      setItinerary(updated);
+      setDraggedDayIndex(index); 
+      // Keep active index following the dragged item if it was active
+      if (activeDayIndex === draggedDayIndex) setActiveDayIndex(index);
+      else if (activeDayIndex === index) setActiveDayIndex(draggedDayIndex);
   };
 
   const handleOpenAdd = (type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER') => {
@@ -181,11 +200,12 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
 
   const activeDay = itinerary[activeDayIndex];
   const activeCityId = activeDay?.cityId || '';
-  
   const perPersonPrice = pax > 0 ? Math.round(financials.selling / pax) : 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] bg-slate-50 rounded-xl overflow-hidden border border-slate-200 shadow-xl fixed inset-0 z-50 m-4 md:m-8">
+    <div className="flex flex-col h-[calc(100vh-40px)] bg-slate-50 rounded-xl overflow-hidden border border-slate-200 shadow-2xl fixed inset-0 z-50 m-4 md:m-5">
+        
+        {/* TOP BAR */}
         <div className="bg-white border-b border-slate-200 p-4 flex justify-between items-center shadow-sm z-10">
             <div className="flex items-center gap-3">
                 <div className="bg-brand-600 text-white p-2 rounded-lg">
@@ -200,7 +220,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
             <div className="flex items-center gap-6">
                 
                 {/* Pricing Controls */}
-                <div className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hidden md:flex">
                     <div className="flex items-center gap-2 border-r border-slate-200 pr-3">
                         <span className="text-xs font-bold text-slate-500 uppercase">Markup</span>
                         <button onClick={() => setEnableMarkup(!enableMarkup)} className="text-brand-600 focus:outline-none">
@@ -215,13 +235,13 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                             value={markupPercent}
                             onChange={(e) => setMarkupPercent(Number(e.target.value))}
                             disabled={!enableMarkup}
-                            className="w-12 text-center text-sm font-bold bg-white border border-slate-300 rounded focus:ring-1 focus:ring-brand-500 disabled:opacity-50 disabled:bg-slate-100"
+                            className="w-12 text-center text-sm font-bold bg-white border border-slate-300 rounded focus:ring-1 focus:ring-brand-500 disabled:opacity-50 disabled:bg-slate-100 outline-none"
                         />
                         <span className="text-xs font-bold text-slate-500">%</span>
                     </div>
                 </div>
 
-                <div className="text-right hidden md:block">
+                <div className="text-right hidden sm:block">
                     <div className="flex items-center justify-end gap-2 text-xs font-bold text-slate-400 uppercase">
                         <span>Total Selling</span>
                     </div>
@@ -249,7 +269,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-            {/* SIDEBAR: DAYS LIST */}
+            {/* SIDEBAR: DAYS LIST (DRAGGABLE) */}
             <div className="w-72 bg-white border-r border-slate-200 flex flex-col">
                 <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Itinerary Days</span>
@@ -264,26 +284,32 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     {itinerary.map((day, idx) => (
                         <div 
-                            key={idx}
+                            key={idx} // Using index as key is acceptable for reorderable lists if items are transient
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, idx)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => handleDragOver(e, idx)}
                             onClick={() => setActiveDayIndex(idx)}
-                            className={`p-4 border-b border-slate-100 cursor-pointer transition relative group ${activeDayIndex === idx ? 'bg-blue-50 border-l-4 border-l-brand-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
+                            className={`p-4 border-b border-slate-100 cursor-pointer transition-colors relative group ${
+                                activeDayIndex === idx ? 'bg-blue-50 border-l-4 border-l-brand-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent'
+                            } ${draggedDayIndex === idx ? 'opacity-50 bg-slate-100' : ''}`}
                         >
                             <div className="flex justify-between items-center mb-1">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeDayIndex === idx ? 'bg-brand-200 text-brand-800' : 'bg-slate-100 text-slate-500'}`}>
-                                    Day {day.day}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <GripVertical size={14} className="text-slate-300 cursor-grab active:cursor-grabbing" />
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${activeDayIndex === idx ? 'bg-brand-200 text-brand-800' : 'bg-slate-100 text-slate-500'}`}>
+                                        Day {day.day}
+                                    </span>
+                                </div>
                                 
-                                {/* Day Actions (Visible on Hover or Active) */}
-                                <div className={`flex gap-1 ${activeDayIndex === idx ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                                    <button onClick={(e) => handleMoveDay(idx, 'UP', e)} className="p-1 text-slate-400 hover:text-slate-700 hover:bg-white rounded"><ArrowUp size={12}/></button>
-                                    <button onClick={(e) => handleMoveDay(idx, 'DOWN', e)} className="p-1 text-slate-400 hover:text-slate-700 hover:bg-white rounded"><ArrowDown size={12}/></button>
-                                    <button onClick={(e) => handleCloneDay(idx, e)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded" title="Clone"><Copy size={12}/></button>
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={(e) => handleCloneDay(idx, e)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded" title="Duplicate"><Copy size={12}/></button>
                                     <button onClick={(e) => handleDeleteDay(idx, e)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-white rounded" title="Delete"><Trash2 size={12}/></button>
                                 </div>
                             </div>
                             
-                            <h4 className={`font-bold text-sm truncate pr-2 ${activeDayIndex === idx ? 'text-brand-900' : 'text-slate-700'}`}>{day.title}</h4>
-                            <div className="flex justify-between items-end mt-2">
+                            <h4 className={`font-bold text-sm truncate pl-5 ${activeDayIndex === idx ? 'text-brand-900' : 'text-slate-700'}`}>{day.title}</h4>
+                            <div className="flex justify-between items-end mt-2 pl-5">
                                 <p className="text-[10px] text-slate-400">{day.services?.length || 0} Services</p>
                                 {day.cityId && <MapPin size={12} className="text-slate-300"/>}
                             </div>
@@ -295,7 +321,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
             {/* MAIN CONTENT: DAY EDITOR */}
             <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50">
                 {activeDay ? (
-                    <div className="max-w-4xl mx-auto">
+                    <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-right-2 duration-300">
                         
                         {/* Day Header Config */}
                         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
@@ -359,12 +385,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                             {activeDay.services && activeDay.services.length > 0 ? (
                                 <div className="space-y-3">
                                     {activeDay.services.map((svc, idx) => (
-                                        <div key={svc.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 items-center shadow-sm hover:shadow-md hover:border-brand-200 transition group relative">
-                                            {/* Drag Handle Visual */}
-                                            <div className="text-slate-300 cursor-grab active:cursor-grabbing">
-                                                <GripVertical size={20} />
-                                            </div>
-
+                                        <div key={svc.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 items-start shadow-sm hover:shadow-md hover:border-brand-200 transition group relative">
                                             {/* Icon Box */}
                                             <div className={`p-3 rounded-xl shrink-0 ${
                                                 svc.type === 'HOTEL' ? 'bg-indigo-50 text-indigo-600' :
@@ -388,16 +409,23 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                                         <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{svc.meta.roomType}</span>
                                                     )}
                                                 </div>
-                                                <p className="font-bold text-slate-800 text-sm truncate">{svc.name}</p>
-                                                {svc.type === 'HOTEL' && (
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {svc.duration_nights} Nights x {svc.quantity} Rooms
-                                                    </p>
-                                                )}
+                                                <div className="flex gap-3">
+                                                    {svc.meta?.imageUrl && (
+                                                        <img src={svc.meta.imageUrl} alt={svc.name} className="w-12 h-12 object-cover rounded-lg bg-slate-100" />
+                                                    )}
+                                                    <div>
+                                                        <p className="font-bold text-slate-800 text-sm truncate">{svc.name}</p>
+                                                        {svc.type === 'HOTEL' && (
+                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                                {svc.duration_nights} Nights x {svc.quantity} Rooms
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             {/* Pricing & Actions */}
-                                            <div className="flex items-center gap-6">
+                                            <div className="flex items-center gap-6 pt-2">
                                                 <div className="text-right">
                                                     <p className="font-mono font-bold text-slate-700 text-sm">
                                                         {svc.currency || 'INR'} {(svc.cost * (svc.quantity||1) * (svc.duration_nights||1)).toLocaleString()}

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +22,7 @@ export const QuoteDetail: React.FC = () => {
   const { user } = useAuth();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [isEditingItinerary, setIsEditingItinerary] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   const { updateHotel, setInput } = usePricingEngine();
 
@@ -28,35 +30,59 @@ export const QuoteDetail: React.FC = () => {
     loadQuote();
   }, [id, user]);
 
-  const loadQuote = () => {
-    if (id && user) {
-        // Try fetching from agent service which handles API/Local sync
-        const storedQuotes = localStorage.getItem('iht_agent_quotes');
-        const parsedQuotes: Quote[] = storedQuotes ? JSON.parse(storedQuotes) : [];
-        const found = parsedQuotes.find(q => q.id === id);
+  const loadQuote = async () => {
+    if (!id || !user) return;
+    setIsLoading(true);
+
+    try {
+        // 1. Try fetching from Service (Firestore)
+        // Note: fetchQuotes usually gets a list, we might need a single get method or filter
+        const allQuotes = await agentService.fetchQuotes(user.id);
+        const found = allQuotes.find(q => q.id === id);
 
         if (found) {
             setQuote(found);
-            setInput(prev => ({
-                ...prev,
-                targetCurrency: found.currency || 'INR', 
-                travelers: { adults: found.paxCount, children: found.childCount || 0, infants: 0 },
-                hotel: { 
-                    nights: 1, 
-                    cost: found.cost || 0, 
-                    costType: 'Per Person', 
-                    rooms: 1, 
-                    currency: found.currency || 'INR'
-                }
-            }));
+            initPricingEngine(found);
+        } else {
+            // 2. Fallback to LocalStorage (for public demo resilience)
+            const storedQuotes = localStorage.getItem('iht_agent_quotes');
+            const parsedQuotes: Quote[] = storedQuotes ? JSON.parse(storedQuotes) : [];
+            const localFound = parsedQuotes.find(q => q.id === id);
+            
+            if (localFound) {
+                setQuote(localFound);
+                initPricingEngine(localFound);
+            } else {
+                console.error("Quote not found in DB or LocalStorage");
+            }
         }
+    } catch (e) {
+        console.error("Error loading quote:", e);
+    } finally {
+        setIsLoading(false);
     }
   };
 
-  if (!quote || !user) return <div className="p-8">Loading Quote...</div>;
+  const initPricingEngine = (found: Quote) => {
+      setInput(prev => ({
+        ...prev,
+        targetCurrency: found.currency || 'INR', 
+        travelers: { adults: found.paxCount, children: found.childCount || 0, infants: 0 },
+        hotel: { 
+            nights: 1, 
+            cost: found.cost || 0, 
+            costType: 'Per Person', 
+            rooms: 1, 
+            currency: found.currency || 'INR'
+        }
+    }));
+  };
 
-  const isAgent = user.role === UserRole.AGENT;
-  const pricingRules = adminService.getPricingRule();
+  if (isLoading) return <div className="p-8 text-center text-slate-500">Loading Quote Details...</div>;
+  if (!quote) return <div className="p-8 text-center text-red-500">Quote not found or access denied.</div>;
+
+  const isAgent = user?.role === UserRole.AGENT;
+  const pricingRules = adminService.getPricingRuleSync();
   // We consider price valid for booking if it exists, but we allow 0 price for drafts/viewing
   const hasValidPrice = (quote.sellingPrice !== undefined && quote.sellingPrice > 0);
   const isBooked = quote.status === 'BOOKED' || quote.status === 'CONFIRMED';
@@ -176,12 +202,17 @@ export const QuoteDetail: React.FC = () => {
   };
 
   const handleCopyLink = () => {
-      const url = `${window.location.origin}/#/view/${quote.id}`;
+      // Robust link generation
+      const domain = window.location.host;
+      const protocol = window.location.protocol;
+      const url = `${protocol}//${domain}/#/view/${quote.id}`;
+      
       navigator.clipboard.writeText(url);
-      alert("Public Link copied to clipboard!");
+      alert("Public Link copied to clipboard!\n\n" + url);
   };
 
   const handleCreateRevision = async () => {
+      if (!user) return;
       if (confirm("Create a new version to edit? The current version will remain locked as history.")) {
           const newQuote = await agentService.createRevision(quote.id, user);
           if (newQuote) {
@@ -278,9 +309,11 @@ export const QuoteDetail: React.FC = () => {
                             <button onClick={handleShareWhatsApp} className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 text-sm font-bold transition">
                                 <Share2 size={16} /> WhatsApp
                             </button>
-                            <button onClick={() => generateQuotePDF(quote, null, user.role, user)} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-bold transition shadow-sm">
-                                <Download size={16} /> Download PDF
-                            </button>
+                            {user && (
+                                <button onClick={() => generateQuotePDF(quote, null, user.role, user)} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-bold transition shadow-sm">
+                                    <Download size={16} /> Download PDF
+                                </button>
+                            )}
                         </>
                     )}
 
@@ -310,22 +343,24 @@ export const QuoteDetail: React.FC = () => {
                         <ItineraryView itinerary={quote.itinerary} />
                     </div>
                 </div>
-                <div className="lg:col-span-1 space-y-6">
-                    <PriceSummary 
-                        breakdown={{
-                            supplierCost: quote.cost || 0,
-                            platformNetCost: quote.price || 0,
-                            finalPrice: quote.sellingPrice || 0,
-                            agentMarkupValue: (quote.sellingPrice || 0) - (quote.price || 0),
-                            gstAmount: 0, 
-                            companyMarkupValue: (quote.price || 0) - (quote.cost || 0),
-                            subtotal: quote.sellingPrice || 0,
-                            perPersonPrice: quote.paxCount > 0 ? (quote.sellingPrice || 0) / quote.paxCount : 0
-                        }}
-                        role={user.role}
-                        currency={quote.currency || 'INR'}
-                    />
-                </div>
+                {user && (
+                    <div className="lg:col-span-1 space-y-6">
+                        <PriceSummary 
+                            breakdown={{
+                                supplierCost: quote.cost || 0,
+                                platformNetCost: quote.price || 0,
+                                finalPrice: quote.sellingPrice || 0,
+                                agentMarkupValue: (quote.sellingPrice || 0) - (quote.price || 0),
+                                gstAmount: 0, 
+                                companyMarkupValue: (quote.price || 0) - (quote.cost || 0),
+                                subtotal: quote.sellingPrice || 0,
+                                perPersonPrice: quote.paxCount > 0 ? (quote.sellingPrice || 0) / quote.paxCount : 0
+                            }}
+                            role={user.role}
+                            currency={quote.currency || 'INR'}
+                        />
+                    </div>
+                )}
             </div>
         )}
     </div>

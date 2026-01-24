@@ -1,21 +1,30 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ledgerExportService } from '../../services/ledgerExportService';
 import { companyService } from '../../services/companyService';
 import { auditLogService } from '../../services/auditLogService';
 import { useAuth } from '../../context/AuthContext';
 import { LedgerTable } from '../../components/ledger/LedgerTable';
 import { Download, FileText, Calendar, Building, FileSpreadsheet } from 'lucide-react';
+import { LedgerEntry, CompanyProfile } from '../../types';
 
 export const FinancialLedgerExport: React.FC = () => {
   const { user } = useAuth();
-  const companies = companyService.getAllCompanies();
+  const [companies, setCompanies] = useState<CompanyProfile[]>([]);
   
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   
-  const entries = ledgerExportService.generateLedger(dateFrom, dateTo, selectedCompany || undefined);
+  const [entries, setEntries] = useState<LedgerEntry[]>([]);
+
+  useEffect(() => {
+      companyService.getAllCompanies().then(setCompanies);
+  }, []);
+
+  useEffect(() => {
+      ledgerExportService.generateLedger(dateFrom, dateTo, selectedCompany || undefined)
+        .then(setEntries);
+  }, [dateFrom, dateTo, selectedCompany]);
 
   const handleExport = (format: 'ZOHO' | 'TALLY' | 'CSV') => {
     if (!user) return;

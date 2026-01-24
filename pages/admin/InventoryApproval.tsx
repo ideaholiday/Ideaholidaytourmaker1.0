@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services/inventoryService';
 import { permissionService } from '../../services/permissionService';
@@ -18,8 +17,8 @@ export const InventoryApproval: React.FC = () => {
     }
   }, [user]);
 
-  const loadItems = () => {
-    setItems(inventoryService.getAllItems());
+  const loadItems = async () => {
+    setItems(await inventoryService.getAllItems());
   };
 
   const handleApprove = (id: string) => {

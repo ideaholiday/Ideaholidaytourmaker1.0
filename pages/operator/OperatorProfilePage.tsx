@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { profileService } from '../../services/profileService';
@@ -15,30 +14,33 @@ export const OperatorProfilePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      setFormData({
-        name: user.name,
-        companyName: user.companyName,
-        phone: user.phone,
-        email: user.email
-      });
+    const load = async () => {
+        if (user) {
+            setFormData({
+                name: user.name,
+                companyName: user.companyName,
+                phone: user.phone,
+                email: user.email
+            });
 
-      // Load Inventory Stats
-      const items = inventoryService.getItemsByOperator(user.id);
-      setInventoryStats({
-        total: items.length,
-        approved: items.filter(i => i.status === 'APPROVED').length,
-        pending: items.filter(i => i.status === 'PENDING_APPROVAL').length
-      });
+            // Load Inventory Stats
+            const items = await inventoryService.getItemsByOperator(user.id);
+            setInventoryStats({
+                total: items.length,
+                approved: items.filter(i => i.status === 'APPROVED').length,
+                pending: items.filter(i => i.status === 'PENDING_APPROVAL').length
+            });
 
-      // Resolve City Names
-      const allDestinations = adminService.getDestinationsSync();
-      const names = (user.assignedDestinations || []).map(id => {
-        const dest = allDestinations.find(d => d.id === id);
-        return dest ? `${dest.city}, ${dest.country}` : id;
-      });
-      setAssignedCityNames(names);
-    }
+            // Resolve City Names
+            const allDestinations = adminService.getDestinationsSync();
+            const names = (user.assignedDestinations || []).map(id => {
+                const dest = allDestinations.find(d => d.id === id);
+                return dest ? `${dest.city}, ${dest.country}` : id;
+            });
+            setAssignedCityNames(names);
+        }
+    };
+    load();
   }, [user]);
 
   const handleSave = async (e: React.FormEvent) => {

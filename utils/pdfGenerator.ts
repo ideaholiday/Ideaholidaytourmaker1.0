@@ -38,7 +38,7 @@ const resolveBranding = (role: UserRole, agentProfile?: User | null): BrandingOp
         branding = {
             companyName: ab?.agencyName || agentProfile.companyName || agentProfile.name,
             address: ab?.officeAddress || agentProfile.city || BRANDING.address, 
-            email: agentProfile.email,
+            email: agentProfile.email, // Use registered email
             phone: ab?.contactPhone || agentProfile.phone || "",
             website: ab?.website || "",
             logoUrl: ab?.logoUrl,
@@ -67,7 +67,7 @@ export const generateQuotePDF = (
   const branding = resolveBranding(role, agentProfile);
   const primaryRGB = hexToRgb(branding.primaryColorHex);
   
-  // Font Upgrade: Use standard serif font (Times) as a proxy for elegant typography like Garamond
+  // Font Upgrade: Use standard serif font (Times) as a proxy for elegant typography
   doc.setFont("times", "normal");
 
   // --- HEADER ---
@@ -75,16 +75,17 @@ export const generateQuotePDF = (
   doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
   doc.rect(0, 0, 210, 40, 'F'); 
 
-  // Logo Placeholder
-  // White box for logo to pop against brand color
+  // Logo Handling
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(15, 10, 25, 25, 2, 2, 'F');
   
   if (branding.logoUrl) {
       try {
+          // Attempt to add logo. If format isn't supported or URL fails (CORS), it will throw.
+          // Note: In real production, images usually need to be base64 strings or proxied.
           doc.addImage(branding.logoUrl, 'PNG', 16, 11, 23, 23, undefined, 'FAST');
       } catch (e) {
-          // Fallback if logo fails to load (e.g. CORS)
+          // Fallback Initials
           doc.setFontSize(20);
           doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
           doc.text(branding.companyName.charAt(0), 27.5, 26, { align: 'center' });
@@ -108,7 +109,7 @@ export const generateQuotePDF = (
   // --- AGENCY CONTACT INFO (Under Header) ---
   let yPos = 50;
   doc.setFontSize(16);
-  doc.setTextColor(SECONDARY[0], SECONDARY[1], SECONDARY[2]);
+  doc.setTextColor(SECONDARY[0], SECONDARY[1], SECONDARY[2]); // Slate Dark
   doc.setFont("times", "bold");
   doc.text(branding.companyName, 15, yPos);
   
@@ -142,7 +143,8 @@ export const generateQuotePDF = (
   
   doc.setFont("times", "normal");
   doc.setFontSize(10);
-  doc.text(`Destination: ${quote.destination}`, 125, yPos + 8);
+  const city = quote.destination || 'Multiple Cities';
+  doc.text(`Destination: ${city}`, 125, yPos + 8);
   doc.text(`Travel Date: ${new Date(quote.travelDate).toLocaleDateString()}`, 125, yPos + 14);
   doc.text(`Guests: ${quote.paxCount} Pax`, 125, yPos + 20);
   if(quote.leadGuestName) doc.text(`Guest Name: ${quote.leadGuestName}`, 125, yPos + 26);
@@ -194,7 +196,7 @@ export const generateQuotePDF = (
               if (svc.meta?.vehicle) details += `Vehicle: ${svc.meta.vehicle}`;
               if (svc.meta?.type) details += `Type: ${svc.meta.type}`;
               
-              // Rich Description
+              // Rich Description logic if needed
               if (svc.meta?.description) {
                   details += details ? `\n` : '';
                   details += `${svc.meta.description}`;
@@ -214,7 +216,7 @@ export const generateQuotePDF = (
       body: tableBody,
       theme: 'grid',
       headStyles: { 
-          fillColor: primaryRGB, 
+          fillColor: primaryRGB, // Use Agent Primary Color
           textColor: TABLE_HEADER_TEXT, 
           fontStyle: 'bold',
           fontSize: 11
@@ -229,11 +231,11 @@ export const generateQuotePDF = (
           overflow: 'linebreak', // Essential for wrapping long text
           fontSize: 10
       },
-      margin: { top: 15, right: 15, bottom: 15, left: 15 }, // Ensure safe margins
+      margin: { top: 15, right: 15, bottom: 15, left: 15 }, 
       didParseCell: (data) => {
-          // Remove border for inner content to look cleaner
+          // Clean grouping rows
           if (data.section === 'body' && data.row.cells[0].colSpan === 2) {
-             // Styling for Day Header Row handled in definition
+             // Let styling handle it
           }
       }
     });
@@ -246,7 +248,7 @@ export const generateQuotePDF = (
   const displayPrice = quote.sellingPrice || quote.price || 0;
   
   if (displayPrice > 0) {
-      // Check for page overflow
+      // Check page break
       if (yPos > 240) {
           doc.addPage();
           yPos = 30;
@@ -261,7 +263,7 @@ export const generateQuotePDF = (
       
       doc.setFontSize(18);
       doc.setFont("times", "bold");
-      const currency = quote.currency || 'USD';
+      const currency = quote.currency || 'INR';
       doc.text(`${currency} ${displayPrice.toLocaleString()}`, 125, yPos + 18);
       
       if (breakdown?.perPersonPrice) {
@@ -276,14 +278,14 @@ export const generateQuotePDF = (
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     
-    // Bottom Line
+    // Bottom Line with Brand Color
     doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-    doc.setLineWidth(0.5);
+    doc.setLineWidth(1);
     doc.line(15, 280, 195, 280);
     
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Generated by ${branding.companyName}`, 15, 286);
+    doc.text(`Prepared by ${branding.companyName}`, 15, 286);
     doc.text(`Page ${i} of ${pageCount}`, 195, 286, { align: 'right' });
   }
 

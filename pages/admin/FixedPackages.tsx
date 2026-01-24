@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, FixedPackage } from '../../types';
@@ -7,20 +7,36 @@ import { Edit2, Trash2, Plus, X, Package, Calendar, Image as ImageIcon, Tag } fr
 export const FixedPackages: React.FC = () => {
   const { user } = useAuth();
   const allDestinations = adminService.getDestinationsSync();
-  const allPackages = adminService.getFixedPackages();
+  const [allPackages, setAllPackages] = useState<FixedPackage[]>([]);
+
+  useEffect(() => {
+      refreshData();
+  }, []);
+
+  const refreshData = async () => {
+      const data = await adminService.getFixedPackages();
+      setAllPackages(data);
+  };
   
   // Operators now have full access
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
 
   // Filter for Operators: Only see what they created. Admins/Staff see all.
-  const displayedPackages = user?.role === UserRole.OPERATOR 
-    ? allPackages.filter(p => p.createdBy === user.id)
-    : allPackages;
+  const displayedPackages = useMemo(() => {
+      return user?.role === UserRole.OPERATOR 
+        ? allPackages.filter(p => p.createdBy === user.id)
+        : allPackages;
+  }, [allPackages, user]);
 
   const [packages, setPackages] = useState<FixedPackage[]>(displayedPackages);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPkg, setEditingPkg] = useState<FixedPackage | null>(null);
   
+  // Update local state
+  useEffect(() => {
+      setPackages(displayedPackages);
+  }, [displayedPackages]);
+
   // Temporary state for form handling (string arrays handled as text areas)
   const [formData, setFormData] = useState<Partial<FixedPackage> & { 
       inclusionsText: string; 
@@ -56,7 +72,7 @@ export const FixedPackages: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.packageName || !formData.destinationId) return;
 
@@ -65,7 +81,7 @@ export const FixedPackages: React.FC = () => {
     const exclusions = formData.exclusionsText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
     const validDates = formData.datesText.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
-    adminService.saveFixedPackage({
+    await adminService.saveFixedPackage({
       id: editingPkg?.id || '',
       packageName: formData.packageName!,
       destinationId: formData.destinationId!,
@@ -81,14 +97,14 @@ export const FixedPackages: React.FC = () => {
       createdBy: editingPkg?.createdBy || user?.id
     });
 
-    setPackages(adminService.getFixedPackages());
+    await refreshData();
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Delete this package?')) {
-      adminService.deleteFixedPackage(id);
-      setPackages(adminService.getFixedPackages());
+      await adminService.deleteFixedPackage(id);
+      await refreshData();
     }
   };
 

@@ -21,34 +21,38 @@ export const TemplateSelector: React.FC<Props> = ({ destination, nights, onSelec
 
   useEffect(() => {
     // Load System Templates
-    const allSystem = adminService.getSystemTemplates();
-    const filteredSystem = allSystem.filter(t => 
-      destination.includes(t.destinationKeyword) && t.nights === nights
-    );
-    setSystemTemplates(filteredSystem);
+    adminService.getSystemTemplates().then(allSystem => {
+        const filteredSystem = allSystem.filter(t => 
+          destination.includes(t.destinationKeyword) && t.nights === nights
+        );
+        setSystemTemplates(filteredSystem);
+    });
 
     // Load Favorites
     if (user && activeTab === 'FAVORITE') {
-      const userFavs = favoriteTemplateService.getTemplates(user.id);
-      const relevantFavs = userFavs.filter(t => 
-        (destination.toLowerCase().includes(t.destinationName.toLowerCase()) || t.destinationName.toLowerCase().includes(destination.toLowerCase())) 
-        && t.nights === nights
-      );
-      setFavorites(relevantFavs);
+      favoriteTemplateService.getTemplates(user.id).then(userFavs => {
+          const relevantFavs = userFavs.filter(t => 
+            (destination.toLowerCase().includes(t.destinationName.toLowerCase()) || t.destinationName.toLowerCase().includes(destination.toLowerCase())) 
+            && t.nights === nights
+          );
+          setFavorites(relevantFavs);
+      });
     }
   }, [user, activeTab, destination, nights]);
 
   const handleDeleteFavorite = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if(window.confirm('Remove this template from favorites?')) {
-        favoriteTemplateService.deleteTemplate(id);
-        if (user) {
-            const userFavs = favoriteTemplateService.getTemplates(user.id);
-            const relevantFavs = userFavs.filter(t => 
-                destination.toLowerCase().includes(t.destinationName.toLowerCase()) && t.nights === nights
-            );
-            setFavorites(relevantFavs);
-        }
+        favoriteTemplateService.deleteTemplate(id).then(() => {
+            if (user) {
+                favoriteTemplateService.getTemplates(user.id).then(userFavs => {
+                    const relevantFavs = userFavs.filter(t => 
+                        destination.toLowerCase().includes(t.destinationName.toLowerCase()) && t.nights === nights
+                    );
+                    setFavorites(relevantFavs);
+                });
+            }
+        });
     }
   };
 

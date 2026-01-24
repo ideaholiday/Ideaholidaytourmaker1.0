@@ -1,4 +1,3 @@
-
 import { Booking, BookingStatus, Quote, User, Message, UserRole, PaymentEntry, PaymentMode, Traveler } from '../types';
 import { agentService } from './agentService';
 import { dbHelper } from './firestoreHelper';
@@ -7,34 +6,46 @@ import { companyService } from './companyService';
 const COLLECTION = 'bookings';
 
 class BookingService {
-  private cache: Booking[] = [];
+  private bookingsCache: Booking[] = [];
 
-  // Used by AuthContext to preload data
   async syncAllBookings() {
-      this.cache = await dbHelper.getAll<Booking>(COLLECTION);
+      this.bookingsCache = await dbHelper.getAll<Booking>(COLLECTION);
   }
 
-  // Sync access for UI components (Relies on syncAllBookings being called)
-  getAllBookings(): Booking[] { return this.cache; }
+  getAllBookingsSync() { return this.bookingsCache; }
+  getBookingSync(id: string) { return this.bookingsCache.find(b => b.id === id) || null; }
+
+  async getAllBookings(): Promise<Booking[]> { 
+      const bookings = await dbHelper.getAll<Booking>(COLLECTION); 
+      this.bookingsCache = bookings;
+      return bookings;
+  }
   
-  getBooking(id: string): Booking | undefined {
-    return this.cache.find(b => b.id === id);
+  async getBooking(id: string): Promise<Booking | null> {
+    // Prefer cache if fresh logic existed, but for now simple fetch
+    const booking = await dbHelper.getById<Booking>(COLLECTION, id);
+    if(booking) {
+        // Update cache
+        const idx = this.bookingsCache.findIndex(b => b.id === id);
+        if(idx !== -1) this.bookingsCache[idx] = booking;
+        else this.bookingsCache.push(booking);
+    }
+    return booking;
   }
 
-  getBookingsForAgent(agentId: string): Booking[] {
-    return this.cache.filter(b => b.agentId === agentId);
+  async getBookingsForAgent(agentId: string): Promise<Booking[]> {
+    return await dbHelper.getWhere<Booking>(COLLECTION, 'agentId', '==', agentId);
   }
 
-  getBookingsForOperator(operatorId: string): Booking[] {
-    return this.cache.filter(b => b.operatorId === operatorId && b.status !== 'REQUESTED' && b.status !== 'REJECTED');
+  async getBookingsForOperator(operatorId: string): Promise<Booking[]> {
+    const all = await this.getAllBookings();
+    return all.filter(b => b.operatorId === operatorId && b.status !== 'REQUESTED' && b.status !== 'REJECTED');
   }
-
-  // --- CRUD ---
 
   async createBookingFromQuote(quote: Quote, user: User, travelers?: Traveler[]): Promise<Booking> {
     const totalAmount = quote.sellingPrice || quote.price || 0;
     const advanceAmount = Math.ceil(totalAmount * 0.30);
-    const defaultCompany = companyService.getDefaultCompany();
+    const defaultCompany = await companyService.getDefaultCompany();
 
     const newBooking: Booking = {
       id: `bk_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
@@ -82,10 +93,8 @@ class BookingService {
     
     // Update Quote status
     await agentService.updateQuote({ ...quote, status: 'BOOKED' });
+    this.syncAllBookings();
 
-    // Refresh cache
-    await this.syncAllBookings();
-    
     return newBooking;
   }
 
@@ -94,10 +103,8 @@ class BookingService {
       return this.createBookingFromQuote(quote, clientUser, travelers);
   }
 
-  // --- UPDATES ---
-
   async updateStatus(bookingId: string, status: BookingStatus, user: User, reason?: string) {
-    const booking = this.getBooking(bookingId);
+    const booking = await this.getBooking(bookingId);
     if (!booking) return;
 
     const updated = {
@@ -116,16 +123,16 @@ class BookingService {
     };
 
     await dbHelper.save(COLLECTION, updated);
-    await this.syncAllBookings();
+    this.syncAllBookings();
   }
 
   async recordPayment(bookingId: string, amount: number, mode: PaymentMode, reference: string, user: User) {
-      const booking = this.getBooking(bookingId);
+      const booking = await this.getBooking(bookingId);
       if (!booking) return;
 
       const type = (booking.paidAmount === 0 && amount < booking.totalAmount) ? 'ADVANCE' : 'FULL';
-      const companyId = booking.companyId || companyService.getDefaultCompany().id;
-      const receiptNumber = companyService.generateNextReceiptNumber(companyId);
+      const companyId = booking.companyId || (await companyService.getDefaultCompany()).id;
+      const receiptNumber = await companyService.generateNextReceiptNumber(companyId);
 
       const entry: PaymentEntry = {
           id: `pay_${Date.now()}`,
@@ -154,11 +161,11 @@ class BookingService {
       };
 
       await dbHelper.save(COLLECTION, updated);
-      await this.syncAllBookings();
+      this.syncAllBookings();
   }
 
   async requestCancellation(bookingId: string, reason: string, user: User) {
-    const booking = this.getBooking(bookingId);
+    const booking = await this.getBooking(bookingId);
     if (!booking) return;
 
     const updated = {
@@ -174,16 +181,16 @@ class BookingService {
     };
 
     await dbHelper.save(COLLECTION, updated);
-    await this.syncAllBookings();
+    this.syncAllBookings();
   }
 
   async addComment(bookingId: string, message: Message) {
-    const booking = this.getBooking(bookingId);
+    const booking = await this.getBooking(bookingId);
     if (!booking) return;
     
     const updated = { ...booking, comments: [...booking.comments, message] };
     await dbHelper.save(COLLECTION, updated);
-    await this.syncAllBookings();
+    this.syncAllBookings();
   }
 }
 

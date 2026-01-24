@@ -7,19 +7,14 @@ const COLLECTION = 'quotes';
 
 class AgentService {
   
-  // --- READ ---
-  
   async fetchQuotes(agentId: string): Promise<Quote[]> {
-      // Firestore Index: quotes where agentId == X
       return await dbHelper.getWhere<Quote>(COLLECTION, 'agentId', '==', agentId);
   }
 
-  // Sync access not possible with Firestore (async), components must wait for promise.
-  // We keep this signature but it returns empty until fetched, or components need refactor.
-  // For safety in this refactor, we rely on components handling the async fetch in their useEffect.
-  getQuotes(agentId: string): Quote[] { return []; } 
-
-  // --- WRITE ---
+  // Backwards compatibility for components not yet async
+  getQuotes(agentId: string): Quote[] { 
+      return []; 
+  } 
 
   async createQuote(agent: User, destination: string, travelDate: string, pax: number, leadGuestName?: string): Promise<Quote> {
     const newQuote: Quote = {
@@ -72,18 +67,15 @@ class AgentService {
     });
   }
 
-  // --- OPERATOR ---
   async getOperatorAssignments(operatorId: string): Promise<Quote[]> {
       return await dbHelper.getWhere<Quote>(COLLECTION, 'operatorId', '==', operatorId);
   }
 
   async getBookedHistory(agentId: string): Promise<Quote[]> {
-      // In Firestore, we'd do a compound query, but here we can filter client side or do simple where
       const all = await this.fetchQuotes(agentId);
       return all.filter(q => q.status === 'BOOKED' || q.status === 'CONFIRMED');
   }
   
-  // Stats calculation needs to fetch all quotes for the agent
   async getStats(agentId: string) {
     const myQuotes = await this.fetchQuotes(agentId);
     const confirmed = myQuotes.filter(q => q.status === 'BOOKED' || q.status === 'CONFIRMED');
@@ -97,7 +89,6 @@ class AgentService {
     };
   }
 
-  // Revisions/Duplications
   async createRevision(originalId: string, agent: User): Promise<Quote | null> {
       const original = await dbHelper.getById<Quote>(COLLECTION, originalId);
       if (!original) return null;

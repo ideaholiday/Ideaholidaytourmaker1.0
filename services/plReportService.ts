@@ -1,4 +1,3 @@
-
 import { PLSummary, PLTransaction } from '../types';
 import { gstService } from './gstService';
 import { bookingService } from './bookingService';
@@ -22,26 +21,14 @@ class PLReportService {
 
   /**
    * Generates P&L Report.
-   * 
-   * LOGIC MATRIX:
-   * 
-   * ADMIN VIEW:
-   * - Revenue: Taxable Value of Invoices sent to Agents (B2B Price)
-   * - COGS: System Net Cost (Supplier Cost)
-   * - Profit: Platform Margin
-   * 
-   * AGENT VIEW:
-   * - Revenue: Booking Total Amount (Client Price)
-   * - COGS: Invoice Total Amount (Cost paid to Platform)
-   * - Profit: Agent Markup
    */
-  generateReport(
+  async generateReport(
     role: UserRole,
     userId: string,
     dateFrom: string, 
     dateTo: string, 
     filters: { agentId?: string; destination?: string } = {}
-  ): PLReportData {
+  ): Promise<PLReportData> {
     
     const startDate = new Date(dateFrom);
     const endDate = new Date(dateTo);
@@ -56,28 +43,31 @@ class PLReportService {
     let totalRefunds = 0;
 
     // 1. Get Base Data (Invoices are the source of truth for confirmed sales)
-    let invoices = gstService.getAllRecords().filter(inv => {
+    const allRecords = await gstService.getAllRecords();
+    let invoices = allRecords.filter(inv => {
         const d = new Date(inv.invoiceDate);
         return d >= startDate && d < endDate;
     });
 
     // Filter by Agent if applicable
     if (role === UserRole.AGENT) {
-        // Agents only see their own bookings via invoice linkage
-        // We need to look up booking to verify agentId because invoice stores customerName string
-        const agentBookings = bookingService.getBookingsForAgent(userId).map(b => b.id);
-        invoices = invoices.filter(inv => agentBookings.includes(inv.bookingId));
+        const agentBookings = await bookingService.getBookingsForAgent(userId);
+        const agentBookingIds = agentBookings.map(b => b.id);
+        invoices = invoices.filter(inv => agentBookingIds.includes(inv.bookingId));
     } else if (role === UserRole.ADMIN && filters.agentId) {
-        const agentBookings = bookingService.getBookingsForAgent(filters.agentId).map(b => b.id);
-        invoices = invoices.filter(inv => agentBookings.includes(inv.bookingId));
+        const agentBookings = await bookingService.getBookingsForAgent(filters.agentId);
+        const agentBookingIds = agentBookings.map(b => b.id);
+        invoices = invoices.filter(inv => agentBookingIds.includes(inv.bookingId));
     }
 
-    invoices.forEach(inv => {
-        const booking = bookingService.getBooking(inv.bookingId);
-        if (!booking) return;
+    const allCNs = await gstService.getAllCreditNotes();
+
+    for (const inv of invoices) {
+        const booking = await bookingService.getBooking(inv.bookingId);
+        if (!booking) continue;
 
         // Apply Destination Filter
-        if (filters.destination && !booking.destination.includes(filters.destination)) return;
+        if (filters.destination && !booking.destination.includes(filters.destination)) continue;
 
         // --- CALCULATION CORE ---
         let revenue = 0;
@@ -86,9 +76,6 @@ class PLReportService {
         if (role === UserRole.AGENT) {
             // Agent Perspective
             revenue = booking.sellingPrice; // What Client Pays
-            // Cost is what they pay platform (Taxable + GST from invoice)
-            // Or strictly Net Expense. Usually P&L tracks Net Income vs Net Expense.
-            // Let's use Invoice Total as Cost.
             cost = inv.totalInvoiceAmount; 
         } else {
             // Admin Perspective
@@ -97,16 +84,12 @@ class PLReportService {
         }
 
         // --- CREDIT NOTE REVERSAL ---
-        const creditNote = gstService.getAllCreditNotes().find(cn => cn.originalInvoiceId === inv.id);
+        const creditNote = allCNs.find(cn => cn.originalInvoiceId === inv.id);
         let status: 'CONFIRMED' | 'REFUNDED' | 'CANCELLED' = 'CONFIRMED';
 
         if (creditNote) {
             status = 'REFUNDED';
             if (role === UserRole.AGENT) {
-                // If refunded, Revenue is lost (Refunded to client). Cost is reversed (Refunded by platform).
-                // Simplified: Revenue - Refund, Cost - Refund.
-                // Actually:
-                // Refund Amount to Client (Agent decides). Assuming Booking.cancellation.refundAmount
                 const clientRefund = booking.cancellation?.refundAmount || 0;
                 revenue -= clientRefund;
                 
@@ -152,17 +135,15 @@ class PLReportService {
         monthlyData[monthKey].profit += grossProfit;
 
         // 4. Destination Breakdown
-        // Only count positive profit for "Profit Centers" chart
         if (grossProfit > 0) {
             const dest = booking.destination.split(',')[0].trim(); // City only
             destData[dest] = (destData[dest] || 0) + grossProfit;
         }
-    });
+    }
 
     // Formatting Output
     const trends = Object.values(monthlyData).sort((a, b) => {
-        // Quick hack to sort MMM-YY strings chronologically would require parsing
-        // Since input is sorted by date loop mostly, might be okay, but robust app needs date obj key
+        // Simple alphanumeric sort or map back to date
         return 0; 
     });
 

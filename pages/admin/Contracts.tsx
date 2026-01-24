@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { contractService } from '../../services/contractService';
 import { adminService } from '../../services/adminService';
@@ -23,17 +22,17 @@ export const Contracts: React.FC = () => {
     loadData();
   }, [user]);
 
-  const loadData = () => {
+  const loadData = async () => {
     // Load Suppliers
-    const allUsers = adminService.getUsers();
+    const allUsers = await adminService.getUsers();
     setSuppliers(allUsers.filter(u => u.role === UserRole.HOTEL_PARTNER && u.status === 'ACTIVE'));
     setDestinations(adminService.getDestinationsSync().filter(d => d.isActive));
 
     // Load Contracts
     if (user?.role === UserRole.HOTEL_PARTNER) {
-        setContracts(contractService.getContractsBySupplier(user.id));
+        contractService.getContractsBySupplier(user.id).then(setContracts);
     } else {
-        setContracts(contractService.getAllContracts());
+        contractService.getAllContracts().then(setContracts);
     }
   };
 

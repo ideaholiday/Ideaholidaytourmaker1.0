@@ -23,7 +23,7 @@ export const QuickQuoteTemplateManager: React.FC = () => {
   }, []);
 
   const loadTemplates = () => {
-    setTemplates(quickQuoteTemplateService.getSystemTemplates());
+    quickQuoteTemplateService.getSystemTemplates().then(setTemplates);
   };
 
   const handleDelete = (id: string) => {

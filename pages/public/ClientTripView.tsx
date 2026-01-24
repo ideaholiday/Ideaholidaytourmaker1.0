@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { bookingService } from '../../services/bookingService';
 import { profileService } from '../../services/profileService';
+import { agentService } from '../../services/agentService'; // Needed for Quote retrieval
 import { Booking, Quote, User, UserRole, Traveler, PricingBreakdown } from '../../types';
 import { MapPin, Calendar, Users, CheckCircle, Briefcase, ArrowRight, CreditCard, ShieldCheck, Download, Printer } from 'lucide-react';
 import { generateQuotePDF } from '../../utils/pdfGenerator';
@@ -11,6 +12,7 @@ import { AgentContactCard } from '../../components/client/AgentContactCard';
 import { ClientBookingModal } from '../../components/client/ClientBookingModal';
 import { useClientBranding } from '../../hooks/useClientBranding';
 import { ItineraryView } from '../../components/ItineraryView';
+import { dbHelper } from '../../services/firestoreHelper'; // Direct DB access if services fail logic
 
 // Internal Component to consume hooks inside the provider
 const TripContent: React.FC<{ 
@@ -223,7 +225,7 @@ export const ClientTripView: React.FC = () => {
             if (!id) return;
             
             // 1. Try Finding in Bookings
-            const booking = bookingService.getBooking(id);
+            const booking = await bookingService.getBooking(id);
             if (booking) {
                 setData(booking);
                 const agentData = profileService.getUser(booking.agentId);
@@ -232,19 +234,17 @@ export const ClientTripView: React.FC = () => {
                 return;
             }
 
-            // 2. Try Finding in Quotes (Public Fallback from LocalStorage for demo)
+            // 2. Try Finding in Quotes (Firestore)
             try {
-                const storedQuotes = localStorage.getItem('iht_agent_quotes');
-                if (storedQuotes) {
-                    const quotes = JSON.parse(storedQuotes);
-                    const quote = quotes.find((q: Quote) => q.id === id);
-                    if (quote) {
-                        setData(quote);
-                        const agentData = profileService.getUser(quote.agentId);
-                        setAgent(agentData || null);
-                    }
+                const quote = await dbHelper.getById<Quote>('quotes', id);
+                if (quote) {
+                    setData(quote);
+                    const agentData = profileService.getUser(quote.agentId);
+                    setAgent(agentData || null);
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error("Public fetch failed", e); 
+            }
 
             setLoading(false);
         };

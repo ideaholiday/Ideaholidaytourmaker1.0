@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { User, UserRole } from '../../types';
@@ -21,8 +20,9 @@ export const AssignOperatorModal: React.FC<Props> = ({ isOpen, onClose, onAssign
 
   useEffect(() => {
     if (isOpen) {
-        const allUsers = adminService.getUsers();
-        setOperators(allUsers.filter(u => u.role === UserRole.OPERATOR && u.isVerified));
+        adminService.getUsers().then(allUsers => {
+            setOperators(allUsers.filter(u => u.role === UserRole.OPERATOR && u.isVerified));
+        });
     }
   }, [isOpen]);
 

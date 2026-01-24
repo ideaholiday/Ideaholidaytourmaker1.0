@@ -1,4 +1,3 @@
-
 import { LedgerEntry, GSTRecord, GSTCreditNote, PaymentEntry, Booking } from '../types';
 import { gstService } from './gstService';
 import { bookingService } from './bookingService';
@@ -9,14 +8,17 @@ class LedgerExportService {
   /**
    * Generates double-entry ledger records.
    */
-  generateLedger(dateFrom: string, dateTo: string, companyId?: string): LedgerEntry[] {
+  async generateLedger(dateFrom: string, dateTo: string, companyId?: string): Promise<LedgerEntry[]> {
     const entries: LedgerEntry[] = [];
     const startDate = new Date(dateFrom);
     const endDate = new Date(dateTo);
     endDate.setDate(endDate.getDate() + 1); // Inclusive
 
+    const allRecords = await gstService.getAllRecords();
+    const allCNs = await gstService.getAllCreditNotes();
+
     // 1. SALES INVOICES (GST Records)
-    const invoices = gstService.getAllRecords().filter(r => {
+    const invoices = allRecords.filter(r => {
         const d = new Date(r.invoiceDate);
         const dateMatch = d >= startDate && d < endDate;
         const compMatch = companyId ? r.companyId === companyId : true;
@@ -93,7 +95,7 @@ class LedgerExportService {
     });
 
     // 2. RECEIPTS (Payments)
-    const allBookings = bookingService.getAllBookings();
+    const allBookings = await bookingService.getAllBookings();
     
     allBookings.forEach(booking => {
         if (companyId && booking.companyId !== companyId) return;
@@ -120,7 +122,7 @@ class LedgerExportService {
     });
 
     // 3. CREDIT NOTES (Returns / Cancellations)
-    const creditNotes = gstService.getAllCreditNotes().filter(cn => {
+    const creditNotes = allCNs.filter(cn => {
         const d = new Date(cn.issuedDate);
         const dateMatch = d >= startDate && d < endDate;
         const compMatch = companyId ? cn.companyId === companyId : true;
@@ -147,7 +149,7 @@ class LedgerExportService {
              // Assuming simple reversal, typically split IGST/CGST/SGST based on original invoice. 
              // For this demo, we debit a generic Output GST Reversal or split 50/50 if assumed intra.
              // Ideally we fetch original invoice to know tax type.
-             const invoice = gstService.getAllRecords().find(r => r.id === cn.originalInvoiceId);
+             const invoice = allRecords.find(r => r.id === cn.originalInvoiceId);
              const isIGST = invoice?.igstAmount && invoice.igstAmount > 0;
 
              if (isIGST) {

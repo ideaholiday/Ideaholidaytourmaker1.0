@@ -1,9 +1,9 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
 import { authService } from '../services/authService';
 import { adminService } from '../services/adminService';
 import { bookingService } from '../services/bookingService';
+import { inventoryService } from '../services/inventoryService';
 import { auth } from '../services/firebase'; 
 
 interface AuthContextType {
@@ -34,7 +34,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
          Promise.all([
              adminService.syncAllFromCloud().catch(e => console.warn("Admin sync failed", e)),
              bookingService.syncAllBookings().catch(e => console.warn("Booking sync failed", e)),
-             authService.syncDirectory().catch(e => console.warn("Dir sync failed", e))
+             authService.syncDirectory().catch(e => console.warn("Dir sync failed", e)),
+             inventoryService.syncFromCloud().catch(e => console.warn("Inventory sync failed", e))
          ]).then(() => {
              console.log("✅ [AuthContext] Background Sync Complete");
          });

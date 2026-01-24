@@ -1,4 +1,3 @@
-
 import { OperatorInventoryItem, Hotel, SystemAlert, ExpiringRate, OpsStats } from '../types';
 import { inventoryService } from './inventoryService';
 import { adminService } from './adminService';
@@ -8,8 +7,9 @@ class OpsDashboardService {
 
   // --- OVERVIEW STATS ---
   getOverviewStats(): OpsStats {
-    const allInventory = inventoryService.getAllItems();
-    const allHotels = adminService.getHotels();
+    const allInventory = inventoryService.getAllItemsSync();
+    // Use Sync
+    const allHotels = adminService.getHotelsSync(); 
     const expiring = this.getExpiringRates();
     
     return {
@@ -23,17 +23,17 @@ class OpsDashboardService {
 
   // --- PENDING ITEMS ---
   getPendingInventory(): OperatorInventoryItem[] {
-    return inventoryService.getAllItems().filter(i => i.status === 'PENDING_APPROVAL');
+    return inventoryService.getAllItemsSync().filter(i => i.status === 'PENDING_APPROVAL');
   }
 
   getPendingHotels(): Hotel[] {
     // Assuming adminService.getHotels can return pending items if workflow enabled
-    return adminService.getHotels().filter(h => h.status === 'PENDING_APPROVAL');
+    return adminService.getHotelsSync().filter(h => h.status === 'PENDING_APPROVAL');
   }
 
   // --- EXPIRING RATES LOGIC ---
   getExpiringRates(thresholdDays: number = 30): ExpiringRate[] {
-    const hotels = adminService.getHotels();
+    const hotels = adminService.getHotelsSync();
     const today = new Date();
     const thresholdDate = new Date();
     thresholdDate.setDate(today.getDate() + thresholdDays);
@@ -65,7 +65,7 @@ class OpsDashboardService {
 
   // --- REJECTED / INACTIVE ---
   getRejectedItems(): OperatorInventoryItem[] {
-      return inventoryService.getAllItems().filter(i => i.status === 'REJECTED');
+      return inventoryService.getAllItemsSync().filter(i => i.status === 'REJECTED');
   }
 
   // --- ALERTS GENERATION ---

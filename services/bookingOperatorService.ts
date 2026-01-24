@@ -1,4 +1,3 @@
-
 import { Booking, User, UserRole, Message, DriverDetails } from '../types';
 import { bookingService } from './bookingService';
 import { auditLogService } from './auditLogService';
@@ -6,7 +5,7 @@ import { auditLogService } from './auditLogService';
 class BookingOperatorService {
 
   // Assign Operator to a Booking
-  assignOperator(
+  async assignOperator(
     bookingId: string, 
     operatorId: string, 
     operatorName: string, 
@@ -17,7 +16,7 @@ class BookingOperatorService {
     },
     adminUser: User
   ) {
-    const booking = bookingService.getBooking(bookingId);
+    const booking = await bookingService.getBooking(bookingId);
     if (!booking) throw new Error("Booking not found");
 
     const previousOperator = booking.operatorName || 'None';
@@ -53,7 +52,7 @@ class BookingOperatorService {
     booking.updatedAt = new Date().toISOString();
 
     // Persist via BookingService (it saves the array ref)
-    bookingService.updateStatus(booking.id, booking.status, adminUser, 'Operator Assigned');
+    await bookingService.updateStatus(booking.id, booking.status, adminUser, 'Operator Assigned');
 
     // Audit Log
     auditLogService.logAction({
@@ -68,8 +67,8 @@ class BookingOperatorService {
   }
 
   // Operator Accepts Booking
-  acceptAssignment(bookingId: string, operatorUser: User) {
-    const booking = bookingService.getBooking(bookingId);
+  async acceptAssignment(bookingId: string, operatorUser: User) {
+    const booking = await bookingService.getBooking(bookingId);
     if (!booking) throw new Error("Booking not found");
     if (booking.operatorId !== operatorUser.id) throw new Error("Unauthorized");
 
@@ -91,7 +90,7 @@ class BookingOperatorService {
     };
     booking.comments.push(msg);
     
-    bookingService.updateStatus(booking.id, booking.status, operatorUser, 'Operator Accepted');
+    await bookingService.updateStatus(booking.id, booking.status, operatorUser, 'Operator Accepted');
 
     auditLogService.logAction({
         entityType: 'OPERATOR_ASSIGNMENT',
@@ -104,8 +103,8 @@ class BookingOperatorService {
   }
 
   // Operator Declines Booking
-  declineAssignment(bookingId: string, reason: string, operatorUser: User) {
-    const booking = bookingService.getBooking(bookingId);
+  async declineAssignment(bookingId: string, reason: string, operatorUser: User) {
+    const booking = await bookingService.getBooking(bookingId);
     if (!booking) throw new Error("Booking not found");
     if (booking.operatorId !== operatorUser.id) throw new Error("Unauthorized");
 
@@ -124,7 +123,7 @@ class BookingOperatorService {
     booking.comments.push(msg);
 
     // Persist
-    bookingService.updateStatus(booking.id, booking.status, operatorUser, 'Operator Declined');
+    await bookingService.updateStatus(booking.id, booking.status, operatorUser, 'Operator Declined');
 
     auditLogService.logAction({
         entityType: 'OPERATOR_ASSIGNMENT',
@@ -137,8 +136,8 @@ class BookingOperatorService {
   }
 
   // Update Driver Details
-  updateDriverDetails(bookingId: string, details: DriverDetails, user: User) {
-    const booking = bookingService.getBooking(bookingId);
+  async updateDriverDetails(bookingId: string, details: DriverDetails, user: User) {
+    const booking = await bookingService.getBooking(bookingId);
     if (!booking) throw new Error("Booking not found");
     if (booking.operatorId !== user.id) throw new Error("Unauthorized");
 
@@ -155,7 +154,7 @@ class BookingOperatorService {
     };
     
     // Saving via comment addition to ensure persistence
-    bookingService.addComment(bookingId, msg);
+    await bookingService.addComment(bookingId, msg);
 
     auditLogService.logAction({
         entityType: 'BOOKING',

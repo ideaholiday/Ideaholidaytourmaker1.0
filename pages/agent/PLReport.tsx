@@ -1,99 +1,124 @@
 
 import React, { useState, useEffect } from 'react';
-import { plReportService } from '../../services/plReportService';
+import { useNavigate } from 'react-router-dom';
+import { plReportService, PLReportData } from '../../services/plReportService';
 import { useAuth } from '../../context/AuthContext';
 import { PLSummaryCards } from '../../components/pl/PLSummaryCards';
 import { PLCharts } from '../../components/pl/PLCharts';
 import { PLTable } from '../../components/pl/PLTable';
 import { UserRole } from '../../types';
-import { Calendar, Download, TrendingUp, DollarSign, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Download, Filter, Calendar, Loader2 } from 'lucide-react';
+import { jsPDF } from "jspdf";
+import autoTable from 'jspdf-autotable';
 
 export const AgentPLReport: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
-  const [dateFrom, setDateFrom] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]); // Current Year Start
+
+  const [dateFrom, setDateFrom] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
-  
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<PLReportData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-      if (user) {
-          const report = plReportService.generateReport(UserRole.AGENT, user.id, dateFrom, dateTo);
-          setData(report);
-      }
+      const fetchData = async () => {
+          if (user) {
+              setLoading(true);
+              try {
+                // Agent only sees their own data
+                const result = await plReportService.generateReport(UserRole.AGENT, user.id, dateFrom, dateTo);
+                setData(result);
+              } catch (err) {
+                  console.error("Failed to load PL Report", err);
+              } finally {
+                  setLoading(false);
+              }
+          }
+      };
+      fetchData();
   }, [dateFrom, dateTo, user]);
 
-  if (!data) return <div className="p-8">Loading Financials...</div>;
+  const handleExportPDF = () => {
+      if (!data) return;
+      const doc = new jsPDF();
+      doc.text("My Business Performance Report", 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Period: ${dateFrom} to ${dateTo}`, 14, 22);
+
+      autoTable(doc, {
+          startY: 35,
+          head: [['Date', 'Ref', 'Client', 'Revenue', 'Cost', 'Profit']],
+          body: data.transactions.map(t => [
+              new Date(t.date).toLocaleDateString(),
+              t.referenceRef,
+              t.agentName, // In agent view, this might be redundant or client name if available
+              t.income.toLocaleString(),
+              t.cogs.toLocaleString(),
+              t.grossProfit.toLocaleString()
+          ]),
+          foot: [['Total', '', '', data.summary.totalRevenue.toLocaleString(), data.summary.totalCost.toLocaleString(), data.summary.grossProfit.toLocaleString()]]
+      });
+      doc.save(`Agent_PL_${dateFrom}.pdf`);
+  };
+
+  if (!user) return null;
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <button onClick={() => navigate('/agent/dashboard')} className="flex items-center text-slate-500 hover:text-slate-800 mb-6">
-        <ArrowLeft size={18} className="mr-1" /> Back to Dashboard
-      </button>
+        <button onClick={() => navigate('/agent/dashboard')} className="flex items-center text-slate-500 hover:text-slate-800 mb-6">
+            <ArrowLeft size={18} className="mr-1" /> Back to Dashboard
+        </button>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <DollarSign className="text-emerald-600" /> Profit & Sales Report
-          </h1>
-          <p className="text-slate-500">Analyze your bookings, revenue, and net earnings.</p>
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Financial Reports</h1>
+                <p className="text-slate-500">Track your earnings, margins, and business growth.</p>
+            </div>
+            <button 
+                onClick={handleExportPDF} 
+                disabled={!data || loading}
+                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition disabled:opacity-50"
+            >
+                <Download size={16} /> Download Report
+            </button>
         </div>
-        
-        <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-            <Calendar size={16} className="text-slate-400 ml-2" />
-            <input 
-                type="date" 
-                value={dateFrom} 
-                onChange={e => setDateFrom(e.target.value)} 
-                className="text-sm border-none outline-none text-slate-600"
-            />
-            <span className="text-slate-300">-</span>
-            <input 
-                type="date" 
-                value={dateTo} 
-                onChange={e => setDateTo(e.target.value)} 
-                className="text-sm border-none outline-none text-slate-600"
-            />
+
+        {/* Date Filter */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
+            <div className="flex flex-col md:flex-row gap-6 items-end">
+                <div className="flex-1 w-full">
+                    <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                        <Calendar size={16} /> Reporting Period
+                    </label>
+                    <div className="flex gap-2">
+                        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="flex-1 border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="flex-1 border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" />
+                    </div>
+                </div>
+                <div>
+                    <button className="h-[42px] px-6 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 flex items-center gap-2 text-sm transition shadow-sm">
+                        <Filter size={16} /> Refresh Data
+                    </button>
+                </div>
+            </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <p className="text-xs font-bold text-slate-500 uppercase">Total Sales Value</p>
-              <h3 className="text-2xl font-bold text-blue-600 mt-2">
-                  {(user?.agentBranding?.primaryColor || '#000000').substring(0,0)} 
-                  {/* Just using currency symbol from data if available or default */}
-                  $ {data.summary.totalRevenue.toLocaleString()}
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">Gross Client Billing</p>
-          </div>
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <p className="text-xs font-bold text-slate-500 uppercase">Net Payable to Platform</p>
-              <h3 className="text-2xl font-bold text-slate-700 mt-2">
-                  $ {data.summary.totalCost.toLocaleString()}
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">Cost of Services</p>
-          </div>
-          <div className="bg-white p-6 rounded-xl border border-emerald-100 shadow-sm bg-emerald-50/50">
-              <p className="text-xs font-bold text-emerald-700 uppercase">Net Earnings (Markup)</p>
-              <h3 className="text-2xl font-bold text-emerald-600 mt-2 flex items-center gap-2">
-                  <TrendingUp size={20} />
-                  $ {data.summary.grossProfit.toLocaleString()}
-              </h3>
-              <p className="text-xs text-emerald-600/80 mt-1">Your Retained Profit</p>
-          </div>
-      </div>
-
-      <PLCharts trends={data.trends} />
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
-              <h3 className="font-bold text-slate-800">Booking Financials</h3>
-          </div>
-          <PLTable transactions={data.transactions} />
-      </div>
+        {loading ? (
+            <div className="p-12 text-center text-slate-500 bg-white rounded-xl border border-slate-200 flex flex-col items-center justify-center">
+                <Loader2 size={32} className="animate-spin mb-2 text-brand-600"/>
+                <p>Calculating Financials...</p>
+            </div>
+        ) : !data ? (
+            <div className="p-12 text-center text-slate-500 bg-white rounded-xl border border-slate-200">
+                No data available for this period.
+            </div>
+        ) : (
+            <div className="space-y-8 animate-in fade-in">
+                <PLSummaryCards data={data.summary} />
+                <PLCharts trends={data.trends} />
+                <PLTable transactions={data.transactions} />
+            </div>
+        )}
     </div>
   );
 };

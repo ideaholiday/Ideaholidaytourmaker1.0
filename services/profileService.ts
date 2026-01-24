@@ -8,19 +8,19 @@ class ProfileService {
   
   // --- RETRIEVAL ---
   getAllAgents(): User[] {
-    return adminService.getUsers().filter(u => u.role === UserRole.AGENT);
+    return adminService.getUsersSync().filter(u => u.role === UserRole.AGENT);
   }
 
   getAllOperators(): User[] {
-    return adminService.getUsers().filter(u => u.role === UserRole.OPERATOR);
+    return adminService.getUsersSync().filter(u => u.role === UserRole.OPERATOR);
   }
 
   getAllStaff(): User[] {
-    return adminService.getUsers().filter(u => u.role === UserRole.STAFF);
+    return adminService.getUsersSync().filter(u => u.role === UserRole.STAFF);
   }
 
   getUser(userId: string): User | undefined {
-    return adminService.getUsers().find(u => u.id === userId);
+    return adminService.getUsersSync().find(u => u.id === userId);
   }
 
   // --- UPDATES ---
@@ -75,8 +75,12 @@ class ProfileService {
   // --- STATISTICS ---
   
   getAgentStats(agentId: string) {
-    const quotes = agentService.getQuotes(agentId);
-    const bookings = bookingService.getBookingsForAgent(agentId);
+    // This assumes agentService.getQuotes returns sync mock or cache. 
+    // If agentService is purely async, this needs to be async.
+    // However, agentService was defined with a sync getQuotes placeholder in previous code.
+    const quotes = agentService.getQuotes(agentId); 
+    // Bookings relies on sync cache now
+    const bookings = bookingService.getAllBookingsSync().filter(b => b.agentId === agentId);
     
     const activeQuotes = quotes.filter(q => q.status === 'PENDING' || q.status === 'BOOKED');
     const confirmedBookings = bookings.filter(b => b.status === 'CONFIRMED' || b.status === 'IN_PROGRESS' || b.status === 'COMPLETED');
@@ -96,7 +100,7 @@ class ProfileService {
 
   async getOperatorStats(operatorId: string) {
     const assignments = await agentService.getOperatorAssignments(operatorId); // These are Quotes with operatorId
-    const bookings = bookingService.getBookingsForOperator(operatorId);
+    const bookings = await bookingService.getBookingsForOperator(operatorId);
 
     const pending = assignments.filter(q => q.operatorStatus === 'PENDING' || q.operatorStatus === 'ASSIGNED');
     const accepted = assignments.filter(q => q.operatorStatus === 'ACCEPTED');
@@ -113,10 +117,10 @@ class ProfileService {
   }
 
   getAdminDashboardStats() {
-    const users = adminService.getUsers();
+    const users = adminService.getUsersSync();
     const agents = users.filter(u => u.role === UserRole.AGENT).length;
     const operators = users.filter(u => u.role === UserRole.OPERATOR).length;
-    const bookings = bookingService.getAllBookings();
+    const bookings = bookingService.getAllBookingsSync();
     
     const activeBookings = bookings.filter(b => ['CONFIRMED', 'IN_PROGRESS'].includes(b.status));
     const pendingPayments = bookings.reduce((sum, b) => sum + b.balanceAmount, 0);

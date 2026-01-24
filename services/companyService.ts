@@ -1,8 +1,9 @@
 
 import { CompanyProfile } from '../types';
+import { dbHelper } from './firestoreHelper';
 import { BRANDING } from '../constants';
 
-const STORAGE_KEY_COMPANIES = 'iht_companies';
+const COLLECTION = 'companies';
 
 const DEFAULT_COMPANY: CompanyProfile = {
   id: 'comp_default',
@@ -25,116 +26,67 @@ const DEFAULT_COMPANY: CompanyProfile = {
 };
 
 class CompanyService {
-  private companies: CompanyProfile[];
 
-  constructor() {
-    const stored = localStorage.getItem(STORAGE_KEY_COMPANIES);
-    this.companies = stored ? JSON.parse(stored) : [DEFAULT_COMPANY];
-  }
-
-  private save() {
-    localStorage.setItem(STORAGE_KEY_COMPANIES, JSON.stringify(this.companies));
-  }
-
-  getAllCompanies(): CompanyProfile[] {
-    return this.companies;
-  }
-
-  getCompany(id: string): CompanyProfile | undefined {
-    return this.companies.find(c => c.id === id);
-  }
-
-  getActiveCompanies(): CompanyProfile[] {
-    return this.companies.filter(c => c.isActive);
-  }
-
-  getDefaultCompany(): CompanyProfile {
-    // Return first active or the absolute default
-    return this.companies.find(c => c.isActive) || this.companies[0];
-  }
-
-  saveCompany(company: CompanyProfile) {
-    const index = this.companies.findIndex(c => c.id === company.id);
-    if (index >= 0) {
-      // Preserve sequential numbers if updating existing company configuration
-      const existing = this.companies[index];
-      this.companies[index] = { 
-          ...company, 
-          nextInvoiceNumber: existing.nextInvoiceNumber,
-          nextReceiptNumber: existing.nextReceiptNumber,
-          nextCreditNoteNumber: existing.nextCreditNoteNumber
-      };
-    } else {
-      // New company
-      this.companies.push({ 
-        ...company, 
-        id: company.id || `comp_${Date.now()}`,
-        nextInvoiceNumber: 1,
-        nextReceiptNumber: 1,
-        nextCreditNoteNumber: 1
-      });
+  async getAllCompanies(): Promise<CompanyProfile[]> {
+    const companies = await dbHelper.getAll<CompanyProfile>(COLLECTION);
+    if (companies.length === 0) {
+        await this.saveCompany(DEFAULT_COMPANY);
+        return [DEFAULT_COMPANY];
     }
-    this.save();
+    return companies;
   }
 
-  deleteCompany(id: string) {
-    if (this.companies.length <= 1) {
-        alert("Cannot delete the only company.");
-        return;
-    }
-    this.companies = this.companies.filter(c => c.id !== id);
-    this.save();
+  async getCompany(id: string): Promise<CompanyProfile | null> {
+    return await dbHelper.getById<CompanyProfile>(COLLECTION, id);
   }
 
-  /**
-   * Generates next invoice number for a specific company and increments the counter.
-   * Format: PREFIX-YEAR-SEQUENCE (e.g., IH-DEL-2024-0001)
-   */
-  generateNextInvoiceNumber(companyId: string): string {
-    const company = this.getCompany(companyId);
+  async getDefaultCompany(): Promise<CompanyProfile> {
+    const companies = await this.getAllCompanies();
+    return companies.find(c => c.isActive) || companies[0] || DEFAULT_COMPANY;
+  }
+
+  async saveCompany(company: CompanyProfile) {
+    if (!company.id) company.id = `comp_${Date.now()}`;
+    await dbHelper.save(COLLECTION, company);
+  }
+
+  async deleteCompany(id: string) {
+    await dbHelper.delete(COLLECTION, id);
+  }
+
+  async generateNextInvoiceNumber(companyId: string): Promise<string> {
+    const company = await dbHelper.getById<CompanyProfile>(COLLECTION, companyId);
     if (!company) throw new Error("Company not found");
 
     const year = new Date().getFullYear();
     const sequence = company.nextInvoiceNumber.toString().padStart(4, '0');
     const invoiceNo = `${company.invoicePrefix}${year}-${sequence}`;
 
-    // Increment and save
     company.nextInvoiceNumber += 1;
-    this.save();
+    await dbHelper.save(COLLECTION, company);
 
     return invoiceNo;
   }
 
-  /**
-   * Generates next payment receipt number.
-   * Format: PREFIX-YEAR-SEQUENCE (e.g., RCPT-2024-0001)
-   */
-  generateNextReceiptNumber(companyId: string): string {
-    const company = this.getCompany(companyId);
+  async generateNextReceiptNumber(companyId: string): Promise<string> {
+    const company = await dbHelper.getById<CompanyProfile>(COLLECTION, companyId);
     if (!company) throw new Error("Company not found");
 
     const year = new Date().getFullYear();
-    // Use default prefix if missing
     const prefix = company.receiptPrefix || 'RCPT-';
-    // Use default start if missing
     const currentNum = company.nextReceiptNumber || 1;
     
     const sequence = currentNum.toString().padStart(4, '0');
     const receiptNo = `${prefix}${year}-${sequence}`;
 
-    // Increment and save
     company.nextReceiptNumber = currentNum + 1;
-    this.save();
+    await dbHelper.save(COLLECTION, company);
 
     return receiptNo;
   }
 
-  /**
-   * Generates next credit note number.
-   * Format: PREFIX-YEAR-SEQUENCE (e.g., CN-2024-0001)
-   */
-  generateNextCreditNoteNumber(companyId: string): string {
-    const company = this.getCompany(companyId);
+  async generateNextCreditNoteNumber(companyId: string): Promise<string> {
+    const company = await dbHelper.getById<CompanyProfile>(COLLECTION, companyId);
     if (!company) throw new Error("Company not found");
 
     const year = new Date().getFullYear();
@@ -144,9 +96,8 @@ class CompanyService {
     const sequence = currentNum.toString().padStart(4, '0');
     const cnNo = `${prefix}${year}-${sequence}`;
 
-    // Increment and save
     company.nextCreditNoteNumber = currentNum + 1;
-    this.save();
+    await dbHelper.save(COLLECTION, company);
 
     return cnNo;
   }

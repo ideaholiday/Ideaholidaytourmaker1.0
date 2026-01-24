@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService'; 
 import { User, UserRole, BankDetails, Hotel, Transfer } from '../../types'; 
@@ -24,11 +23,15 @@ export const Suppliers: React.FC = () => { // Kept file export name same to avoi
     loadData();
   }, []);
 
-  const loadData = () => {
-    const allUsers = adminService.getUsers();
+  const loadData = async () => {
+    const allUsers = await adminService.getUsers();
     setPartners(allUsers.filter(u => u.role === UserRole.HOTEL_PARTNER));
-    setAllHotels(adminService.getHotels());
-    setAllTransfers(adminService.getTransfers());
+    
+    const hotels = await adminService.getHotels();
+    setAllHotels(hotels);
+    
+    const transfers = await adminService.getTransfers();
+    setAllTransfers(transfers);
   };
 
   const handleOpenModal = (partner?: User) => {

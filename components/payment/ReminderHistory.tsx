@@ -19,7 +19,7 @@ export const ReminderHistory: React.FC<Props> = ({ booking }) => {
   }, [booking.id]);
 
   const loadReminders = () => {
-    setReminders(paymentReminderService.getRemindersForBooking(booking.id));
+    paymentReminderService.getRemindersForBooking(booking.id).then(setReminders);
   };
 
   const handleManualSend = async () => {

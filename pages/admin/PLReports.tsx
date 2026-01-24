@@ -1,12 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
-import { plReportService } from '../../services/plReportService';
+import { plReportService, PLReportData } from '../../services/plReportService';
 import { adminService } from '../../services/adminService'; // For agent list
 import { useAuth } from '../../context/AuthContext';
 import { PLSummaryCards } from '../../components/pl/PLSummaryCards';
 import { PLCharts } from '../../components/pl/PLCharts';
 import { PLTable } from '../../components/pl/PLTable';
-import { UserRole } from '../../types';
+import { UserRole, User } from '../../types';
 import { Calendar, Filter, Users, Download } from 'lucide-react';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
@@ -20,19 +19,26 @@ export const PLReports: React.FC = () => {
   
   // Filters
   const [selectedAgent, setSelectedAgent] = useState<string>('');
-  const [agents, setAgents] = useState(adminService.getUsers().filter(u => u.role === UserRole.AGENT));
+  const [agents, setAgents] = useState<User[]>([]);
 
   // Data State
-  const [data, setData] = useState(plReportService.generateReport(UserRole.ADMIN, user?.id || '', dateFrom, dateTo));
+  const [data, setData] = useState<PLReportData | null>(null);
+
+  useEffect(() => {
+      adminService.getUsers().then(users => {
+          setAgents(users.filter(u => u.role === UserRole.AGENT));
+      });
+  }, []);
 
   useEffect(() => {
       if (user) {
-          const report = plReportService.generateReport(UserRole.ADMIN, user.id, dateFrom, dateTo, { agentId: selectedAgent || undefined });
-          setData(report);
+          plReportService.generateReport(UserRole.ADMIN, user.id, dateFrom, dateTo, { agentId: selectedAgent || undefined })
+            .then(setData);
       }
   }, [dateFrom, dateTo, selectedAgent, user]);
 
   const handleExportPDF = () => {
+      if (!data) return;
       const doc = new jsPDF();
       doc.text("Profit & Loss Report", 14, 15);
       doc.setFontSize(10);
@@ -58,6 +64,8 @@ export const PLReports: React.FC = () => {
 
       doc.save(`PL_Report_${dateFrom}_${dateTo}.pdf`);
   };
+
+  if (!data) return <div className="p-8">Loading...</div>;
 
   return (
     <div className="space-y-6">

@@ -1,30 +1,48 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole, Hotel } from '../../types';
+import { UserRole, Hotel, Destination } from '../../types';
 import { Edit2, Plus, X, Search, Hotel as HotelIcon, Calendar, DollarSign, Image as ImageIcon, Phone, Mail, MapPin } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 
 export const Hotels: React.FC = () => {
   const { user } = useAuth();
-  const allDestinations = adminService.getDestinationsSync();
-  const allHotels = adminService.getHotels();
+  const [allDestinations, setAllDestinations] = useState<Destination[]>([]);
+  const [allHotels, setAllHotels] = useState<Hotel[]>([]);
   
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.HOTEL_PARTNER;
   const showCost = user?.role !== UserRole.AGENT;
 
-  let displayedHotels = allHotels;
-  if (user?.role === UserRole.OPERATOR) {
-      displayedHotels = allHotels.filter(h => h.createdBy === user.id);
-  } else if (user?.role === UserRole.HOTEL_PARTNER) {
-      displayedHotels = allHotels.filter(h => user.linkedInventoryIds?.includes(h.id));
-  }
+  // Ensure fresh data on load
+  useEffect(() => {
+      refreshData();
+  }, []);
+
+  const refreshData = async () => {
+      const [hotels, dests] = await Promise.all([
+          adminService.getHotels(),
+          adminService.getDestinations()
+      ]);
+      setAllHotels(hotels);
+      setAllDestinations(dests);
+  };
   
   const [search, setSearch] = useState('');
-  const [hotels, setHotels] = useState<Hotel[]>(displayedHotels);
+  const [hotels, setHotels] = useState<Hotel[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHotel, setEditingHotel] = useState<Hotel | null>(null);
   const [formData, setFormData] = useState<Partial<Hotel>>({});
+
+  useEffect(() => {
+      let filtered = allHotels;
+      if (user?.role === UserRole.OPERATOR) {
+          filtered = allHotels.filter(h => h.createdBy === user.id);
+      } else if (user?.role === UserRole.HOTEL_PARTNER) {
+          filtered = allHotels.filter(h => user.linkedInventoryIds?.includes(h.id));
+      }
+      setHotels(filtered);
+  }, [allHotels, user]);
 
   const filteredHotels = hotels.filter(h => 
     h.name.toLowerCase().includes(search.toLowerCase())
@@ -61,11 +79,11 @@ export const Hotels: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) return;
 
-    adminService.saveHotel({
+    await adminService.saveHotel({
       id: editingHotel?.id || '',
       name: formData.name!,
       destinationId: formData.destinationId!,
@@ -89,22 +107,14 @@ export const Hotels: React.FC = () => {
       website: formData.website
     });
 
-    const freshAll = adminService.getHotels();
-    if (user?.role === UserRole.HOTEL_PARTNER) {
-        setHotels(freshAll.filter(h => user.linkedInventoryIds?.includes(h.id)));
-    } else if (user?.role === UserRole.OPERATOR) {
-        setHotels(freshAll.filter(h => h.createdBy === user.id));
-    } else {
-        setHotels(freshAll);
-    }
-    
+    await refreshData();
     setIsModalOpen(false);
   };
 
-  const handleBulkImport = (data: any[]) => {
-      // Mock logic as before
-      alert(`Processed ${data.length} items`);
-      setHotels(adminService.getHotels());
+  const handleBulkImport = async (data: any[]) => {
+      // Logic for bulk import
+      alert(`Processed ${data.length} items (Mock)`);
+      await refreshData();
   };
 
   return (
@@ -118,7 +128,7 @@ export const Hotels: React.FC = () => {
             <div className="flex gap-3">
                 {user?.role !== UserRole.HOTEL_PARTNER && (
                     <InventoryImportExport 
-                        data={displayedHotels}
+                        data={hotels}
                         headers={['id', 'name', 'destinationId', 'category', 'roomType', 'mealPlan', 'cost', 'currency', 'costType', 'season', 'isActive']}
                         filename="hotels_rates"
                         onImport={handleBulkImport}

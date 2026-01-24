@@ -40,11 +40,11 @@ export const UserManagement: React.FC = () => {
     }
   }, [searchParams]);
 
-  const loadData = () => {
-    setUsers(adminService.getUsers());
+  const loadData = async () => {
+    setUsers(await adminService.getUsers());
     setDestinations(adminService.getDestinationsSync());
-    setAllHotels(adminService.getHotels());
-    setAllTransfers(adminService.getTransfers());
+    setAllHotels(adminService.getHotelsSync());
+    setAllTransfers(adminService.getTransfersSync());
   };
 
   const handleOpenModal = (user?: User, defaultRole: UserRole = UserRole.AGENT) => {

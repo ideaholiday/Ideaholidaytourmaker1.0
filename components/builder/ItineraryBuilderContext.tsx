@@ -38,6 +38,7 @@ interface BuilderState {
   isCalculating: boolean;
   isSaving: boolean;
   paxCount: number;
+  markupPercent: number; // Added to state
 }
 
 // --- ACTIONS ---
@@ -48,6 +49,7 @@ type Action =
   | { type: 'UPDATE_SERVICE'; payload: { dayId: string, serviceId: string, updates: Partial<BuilderService> } }
   | { type: 'SET_PRICE'; payload: { total: number, net: number, currency: string, line_items?: any[] } }
   | { type: 'SET_PAX'; payload: number }
+  | { type: 'SET_MARKUP'; payload: number }
   | { type: 'SET_CALCULATING'; payload: boolean };
 
 const initialState: BuilderState = {
@@ -57,7 +59,8 @@ const initialState: BuilderState = {
   currency: 'INR', // Default to INR
   isCalculating: false,
   isSaving: false,
-  paxCount: 2
+  paxCount: 2,
+  markupPercent: 10
 };
 
 const reducer = (state: BuilderState, action: Action): BuilderState => {
@@ -116,6 +119,9 @@ const reducer = (state: BuilderState, action: Action): BuilderState => {
     case 'SET_PAX':
         return { ...state, paxCount: action.payload };
 
+    case 'SET_MARKUP':
+        return { ...state, markupPercent: action.payload };
+
     case 'SET_CALCULATING':
         return { ...state, isCalculating: action.payload };
 
@@ -131,6 +137,7 @@ const BuilderContext = createContext<{
   removeService: (dayId: string, serviceId: string) => void;
   updateService: (dayId: string, serviceId: string, updates: Partial<BuilderService>) => void;
   setPaxCount: (count: number) => void;
+  setMarkup: (percent: number) => void;
   saveItinerary: (title: string, destinationSummary: string, travelDate: string) => Promise<void>;
 } | undefined>(undefined);
 
@@ -157,7 +164,8 @@ export const ItineraryBuilderProvider: React.FC<{ children: React.ReactNode }> =
                 }))
             })),
             pax: state.paxCount,
-            currency: state.currency // Request specific currency
+            currency: state.currency,
+            markup: state.markupPercent
         };
 
         apiClient.request('/builder/calculate', {
@@ -177,7 +185,7 @@ export const ItineraryBuilderProvider: React.FC<{ children: React.ReactNode }> =
             dispatch({ type: 'SET_CALCULATING', payload: false });
         });
     }
-  }, [state.days, state.paxCount, state.currency]);
+  }, [state.days, state.paxCount, state.currency, state.markupPercent]);
 
   const initDestination = (days: number, destId: string) => {
     dispatch({ type: 'INIT_DAYS', payload: { days, destination_id: destId } });
@@ -199,6 +207,10 @@ export const ItineraryBuilderProvider: React.FC<{ children: React.ReactNode }> =
       dispatch({ type: 'SET_PAX', payload: count });
   };
 
+  const setMarkup = (percent: number) => {
+      dispatch({ type: 'SET_MARKUP', payload: percent });
+  };
+
   const saveItinerary = async (title: string, destinationSummary: string, travelDate: string) => {
       // Map state days to backend expected structure (specifically estimated_cost -> cost)
       const daysPayload = state.days.map(d => ({
@@ -217,14 +229,14 @@ export const ItineraryBuilderProvider: React.FC<{ children: React.ReactNode }> =
               travel_date: travelDate,
               pax: state.paxCount,
               days: daysPayload,
-              currency: state.currency
-              // Backend will recalculate price and store snapshot
+              currency: state.currency,
+              markup: state.markupPercent
           })
       });
   };
 
   return (
-    <BuilderContext.Provider value={{ state, initDestination, addService, removeService, updateService, setPaxCount, saveItinerary }}>
+    <BuilderContext.Provider value={{ state, initDestination, addService, removeService, updateService, setPaxCount, setMarkup, saveItinerary }}>
       {children}
     </BuilderContext.Provider>
   );

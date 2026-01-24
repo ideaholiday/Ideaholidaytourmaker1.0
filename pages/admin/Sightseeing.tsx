@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Activity } from '../../types';
@@ -8,18 +9,36 @@ import { InventoryImportExport } from '../../components/admin/InventoryImportExp
 export const Sightseeing: React.FC = () => {
   const { user } = useAuth();
   const allDestinations = adminService.getDestinationsSync();
-  const allActivities = adminService.getActivities();
+  const [allActivities, setAllActivities] = useState<Activity[]>(adminService.getActivitiesSync());
   
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
   const showCost = user?.role !== UserRole.AGENT;
 
-  const displayedActivities = user?.role === UserRole.OPERATOR 
-    ? allActivities.filter(a => a.createdBy === user.id)
-    : allActivities;
+  // Refresh on load
+  useEffect(() => {
+      refreshData();
+  }, []);
+
+  const refreshData = async () => {
+      const fresh = await adminService.getActivities();
+      setAllActivities(fresh);
+  };
+
+  const displayedActivities = useMemo(() => {
+      if (user?.role === UserRole.OPERATOR) {
+          return allActivities.filter(a => a.createdBy === user.id);
+      }
+      return allActivities;
+  }, [allActivities, user]);
 
   const [activities, setActivities] = useState<Activity[]>(displayedActivities);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  
+  // Update local state when source changes
+  useEffect(() => {
+      setActivities(displayedActivities);
+  }, [displayedActivities]);
   
   // Filters
   const [search, setSearch] = useState('');
@@ -54,11 +73,11 @@ export const Sightseeing: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.activityName || !formData.destinationId) return;
 
-    adminService.saveActivity({
+    await adminService.saveActivity({
       id: editingActivity?.id || '',
       activityName: formData.activityName!,
       destinationId: formData.destinationId!,
@@ -80,14 +99,14 @@ export const Sightseeing: React.FC = () => {
       validTo: formData.validTo
     });
 
-    setActivities(adminService.getActivities());
+    await refreshData();
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Delete this activity?')) {
-      adminService.deleteActivity(id);
-      setActivities(adminService.getActivities());
+      await adminService.deleteActivity(id);
+      await refreshData();
     }
   };
 
@@ -113,7 +132,7 @@ export const Sightseeing: React.FC = () => {
                     data={displayedActivities}
                     headers={['id', 'activityName', 'destinationId', 'activityType', 'costAdult', 'costChild', 'currency', 'isActive']}
                     filename="activities"
-                    onImport={() => setActivities(adminService.getActivities())}
+                    onImport={() => refreshData()}
                 />
                 <button onClick={() => handleOpenModal()} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition shadow-lg shadow-brand-200 font-medium">
                     <Plus size={20} /> Add Activity
@@ -165,7 +184,7 @@ export const Sightseeing: React.FC = () => {
             <tr>
               <th className="px-6 py-4 w-16">Image</th>
               <th className="px-6 py-4">Activity Name</th>
-              <th className="px-6 py-4">Location</th>
+              <th className="px-6 py-4">Description</th>
               <th className="px-6 py-4">Validity</th>
               {showCost && <th className="px-6 py-4">Net Cost (Ad/Ch)</th>}
               <th className="px-6 py-4">Inclusions</th>
@@ -192,11 +211,14 @@ export const Sightseeing: React.FC = () => {
                       {activity.activityName}
                     </div>
                     <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                       <span className="flex items-center gap-1"><MapPin size={10}/> {dest?.city}</span>
                        <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-medium">{activity.activityType}</span>
                        <span className="flex items-center gap-1"><Clock size={10}/> {activity.duration || '-'}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-slate-700 font-medium">{dest?.city}</td>
+                  <td className="px-6 py-4 text-slate-500 text-xs max-w-xs truncate">
+                    {activity.description || '-'}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
                         <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase w-fit ${activity.season === 'Peak' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
@@ -257,7 +279,7 @@ export const Sightseeing: React.FC = () => {
             </div>
             
             <form onSubmit={handleSave} className="p-6 space-y-8">
-              
+              {/* Form content remains same as previous */}
               {/* SECTION 1: BASICS */}
               <div className="space-y-4">
                 <div>
