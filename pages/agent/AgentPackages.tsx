@@ -5,7 +5,7 @@ import { adminService } from '../../services/adminService';
 import { agentService } from '../../services/agentService';
 import { useAuth } from '../../context/AuthContext';
 import { FixedPackage, Quote, ItineraryItem } from '../../types';
-import { Package, Calendar, MapPin, CheckCircle, ArrowRight, Loader2, Info } from 'lucide-react';
+import { Package, Calendar, MapPin, CheckCircle, ArrowRight, Loader2, Info, X, User } from 'lucide-react';
 
 export const AgentPackages: React.FC = () => {
   const { user } = useAuth();
@@ -13,7 +13,17 @@ export const AgentPackages: React.FC = () => {
   const [packages, setPackages] = useState<FixedPackage[]>([]);
   const [destinations, setDestinations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  
+  // Booking Modal State
+  const [selectedPkg, setSelectedPkg] = useState<FixedPackage | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [bookingForm, setBookingForm] = useState({
+      date: '',
+      guestName: '',
+      adults: 2,
+      children: 0
+  });
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -30,73 +40,102 @@ export const AgentPackages: React.FC = () => {
     load();
   }, []);
 
-  const handleCreateQuote = async (pkg: FixedPackage) => {
-    if (!user) return;
-    setProcessingId(pkg.id);
+  const openBookingModal = (pkg: FixedPackage) => {
+      setSelectedPkg(pkg);
+      // Pre-select first valid future date
+      const nextDate = pkg.validDates
+        .map(d => new Date(d))
+        .sort((a,b) => a.getTime() - b.getTime())
+        .find(d => d.getTime() >= new Date().setHours(0,0,0,0));
+      
+      setBookingForm({
+          date: nextDate ? nextDate.toISOString().split('T')[0] : '',
+          guestName: '',
+          adults: pkg.basePax || 2,
+          children: 0
+      });
+      setIsModalOpen(true);
+  };
+
+  const handleCreateQuote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !selectedPkg || !bookingForm.date || !bookingForm.guestName) return;
+    
+    setIsCreating(true);
 
     try {
-        // 1. Find next valid date
-        const nextDate = pkg.validDates
-            .map(d => new Date(d))
-            .sort((a,b) => a.getTime() - b.getTime())
-            .find(d => d.getTime() >= new Date().setHours(0,0,0,0));
-            
-        const travelDate = nextDate ? nextDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-        
-        // 2. Resolve City Name
+        const pkg = selectedPkg;
         const dest = destinations.find(d => d.id === pkg.destinationId);
         const destName = dest ? `${dest.city}, ${dest.country}` : 'Fixed Package Trip';
 
-        // 3. Create Base Quote
+        // 1. Create Base Quote
         const newQuote = await agentService.createQuote(
             user,
             destName,
-            travelDate,
-            2, // Default 2 pax
-            'Valued Client'
+            bookingForm.date,
+            Number(bookingForm.adults) + Number(bookingForm.children),
+            bookingForm.guestName
         );
 
-        // 4. Construct Itinerary from Package Data
-        const itinerary: ItineraryItem[] = [];
-        for(let i=1; i<=pkg.nights; i++) {
+        // 2. Construct Itinerary
+        // Use the defined itinerary from the package if available, else fallback to shell
+        let itinerary: ItineraryItem[] = [];
+        
+        if (pkg.itinerary && pkg.itinerary.length > 0) {
+            itinerary = pkg.itinerary;
+        } else {
+            // Fallback Generator
+            for(let i=1; i<=pkg.nights; i++) {
+                itinerary.push({
+                    day: i,
+                    title: i===1 ? `Arrival in ${dest?.city || 'Destination'}` : `Day ${i} - ${pkg.packageName}`,
+                    description: i===1 ? 'Welcome to your fixed departure tour. Transfer to hotel.' : 'Enjoy the planned activities for this package.',
+                    inclusions: pkg.inclusions.slice(0, 2),
+                    services: [] 
+                });
+            }
+            // Add Departure Day
             itinerary.push({
-                day: i,
-                title: i===1 ? `Arrival in ${dest?.city || 'Destination'}` : `Day ${i} - ${pkg.packageName}`,
-                description: i===1 ? 'Welcome to your fixed departure tour. Transfer to hotel.' : 'Enjoy the planned activities for this package.',
-                inclusions: pkg.inclusions.slice(0, 2), // Add first 2 inclusions as sample
-                services: [] // Services would ideally be mapped if package had detailed structure, for now empty
+                day: pkg.nights + 1,
+                title: 'Departure',
+                description: 'Transfer to airport.',
+                inclusions: ['Breakfast']
             });
         }
-        // Add Departure Day
-        itinerary.push({
-            day: pkg.nights + 1,
-            title: 'Departure',
-            description: 'Transfer to airport.',
-            inclusions: ['Breakfast']
-        });
 
-        // 5. Update Quote with Package Specifics
+        // 3. Update Quote with Package Specifics
+        const totalPax = Number(bookingForm.adults) + Number(bookingForm.children);
+        // Basic Price Logic: Fixed Price is per person usually in these packages?
+        // Or Fixed Price is for the BASE PAX? 
+        // Let's assume Fixed Price is Per Person for simplicity in this module, 
+        // OR Fixed Price is Total for Base Pax.
+        // Let's go with: Fixed Price is Per Person.
+        const totalPrice = pkg.fixedPrice * totalPax;
+
         const updatedQuote: Quote = {
             ...newQuote,
-            serviceDetails: `Fixed Package: ${pkg.packageName} (${pkg.nights} Nights)`,
+            serviceDetails: `Fixed Package: ${pkg.packageName} (${pkg.nights} Nights). Hotel: ${pkg.hotelDetails || 'Standard'}`,
             itinerary: itinerary,
-            price: pkg.fixedPrice, // Net Price for Agent
-            sellingPrice: pkg.fixedPrice, // Suggest same selling initially
+            price: totalPrice, // Net Price for Agent
+            sellingPrice: totalPrice, // Suggest same selling initially
             currency: 'INR',
             status: 'DRAFT',
-            isLocked: false
+            isLocked: false,
+            // Store pax breakdown
+            childCount: Number(bookingForm.children)
         };
 
         await agentService.updateQuote(updatedQuote);
         
-        // 6. Navigate
+        // 4. Navigate
         navigate(`/quote/${newQuote.id}`);
 
     } catch (error) {
         console.error("Error creating quote from package", error);
         alert("Could not create quote. Please try again.");
     } finally {
-        setProcessingId(null);
+        setIsCreating(false);
+        setIsModalOpen(false);
     }
   };
 
@@ -147,7 +186,8 @@ export const AgentPackages: React.FC = () => {
                             <div className="flex items-center gap-2 text-xs text-brand-600 font-bold mb-1 uppercase tracking-wide">
                                 <MapPin size={12} /> {getDestinationName(pkg.destinationId)}
                             </div>
-                            <h3 className="font-bold text-lg text-slate-900 mb-2">{pkg.packageName}</h3>
+                            <h3 className="font-bold text-lg text-slate-900 mb-1">{pkg.packageName}</h3>
+                            {pkg.hotelDetails && <p className="text-xs text-slate-500 mb-2 font-medium"><span className="text-slate-400">Hotel:</span> {pkg.hotelDetails}</p>}
                             <p className="text-xs text-slate-500 line-clamp-2 mb-4 flex-1">{pkg.description || 'No description available.'}</p>
                             
                             <div className="bg-slate-50 p-3 rounded-lg text-xs space-y-2 mb-4">
@@ -169,12 +209,10 @@ export const AgentPackages: React.FC = () => {
                                     <p className="text-xl font-bold text-slate-900">₹ {pkg.fixedPrice.toLocaleString()}</p>
                                 </div>
                                 <button 
-                                    onClick={() => handleCreateQuote(pkg)}
-                                    disabled={!!processingId}
-                                    className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-700 transition flex items-center gap-2 disabled:opacity-70"
+                                    onClick={() => openBookingModal(pkg)}
+                                    className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-brand-700 transition flex items-center gap-2"
                                 >
-                                    {processingId === pkg.id ? <Loader2 size={16} className="animate-spin"/> : <ArrowRight size={16} />}
-                                    Create Quote
+                                    <ArrowRight size={16} /> Create Quote
                                 </button>
                             </div>
                         </div>
@@ -188,6 +226,85 @@ export const AgentPackages: React.FC = () => {
                 </div>
             )}
         </div>
+      )}
+
+      {/* CONFIG MODAL */}
+      {isModalOpen && selectedPkg && (
+          <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="font-bold text-lg text-slate-900">Configure Trip</h3>
+                      <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                  </div>
+
+                  <form onSubmit={handleCreateQuote} className="space-y-4">
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Select Departure Date</label>
+                          <select 
+                            required
+                            className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white"
+                            value={bookingForm.date}
+                            onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
+                          >
+                              <option value="">-- Choose Date --</option>
+                              {selectedPkg.validDates.map(d => (
+                                  <option key={d} value={d}>{new Date(d).toLocaleDateString()}</option>
+                              ))}
+                          </select>
+                      </div>
+
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lead Traveler Name</label>
+                          <div className="relative">
+                              <User size={16} className="absolute left-3 top-3 text-slate-400" />
+                              <input 
+                                required
+                                type="text"
+                                className="w-full pl-9 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                                placeholder="Mr. John Doe"
+                                value={bookingForm.guestName}
+                                onChange={e => setBookingForm({...bookingForm, guestName: e.target.value})}
+                              />
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Adults</label>
+                              <input 
+                                type="number" 
+                                min="1" 
+                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" 
+                                value={bookingForm.adults}
+                                onChange={e => setBookingForm({...bookingForm, adults: Number(e.target.value)})}
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Children</label>
+                              <input 
+                                type="number" 
+                                min="0" 
+                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" 
+                                value={bookingForm.children}
+                                onChange={e => setBookingForm({...bookingForm, children: Number(e.target.value)})}
+                              />
+                          </div>
+                      </div>
+
+                      <div className="pt-4 flex justify-end gap-3">
+                          <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium">Cancel</button>
+                          <button 
+                            type="submit" 
+                            disabled={isCreating}
+                            className="bg-brand-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-brand-700 transition flex items-center gap-2 disabled:opacity-70"
+                          >
+                              {isCreating ? <Loader2 size={16} className="animate-spin"/> : <ArrowRight size={16} />}
+                              Generate Quote
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
       )}
     </div>
   );

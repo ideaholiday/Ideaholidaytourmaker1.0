@@ -449,6 +449,12 @@ export interface FixedPackage {
   description?: string;
   imageUrl?: string;
   category?: string; // e.g. "Honeymoon", "Family"
+  
+  // New Fields for Detailed Itinerary
+  hotelDetails?: string;
+  basePax?: number; // No of adults base
+  itinerary?: ItineraryItem[];
+  notes?: string;
 }
 
 // --- System ---
