@@ -90,7 +90,7 @@ export interface Message {
 export interface ItineraryService {
   id: string;
   inventory_id?: string; // New: Link to source inventory item
-  type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER' | 'OTHER';
+  type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER' | 'VISA' | 'OTHER'; // Added VISA
   name: string; // SNAPSHOT: Name at time of booking
   cost: number; // SNAPSHOT: Net Cost at time of booking
   price: number; // SNAPSHOT: Selling Price at time of booking
@@ -455,6 +455,7 @@ export interface FixedPackage {
   basePax?: number; // No of adults base
   itinerary?: ItineraryItem[];
   notes?: string;
+  dateType?: 'SPECIFIC' | 'DAILY';
 }
 
 // --- System ---

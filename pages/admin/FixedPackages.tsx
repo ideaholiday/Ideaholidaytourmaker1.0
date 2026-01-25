@@ -55,7 +55,8 @@ export const FixedPackages: React.FC = () => {
         ...pkg,
         inclusionsText: pkg.inclusions.join('\n'),
         exclusionsText: pkg.exclusions.join('\n'),
-        datesText: pkg.validDates.join(', ')
+        datesText: pkg.validDates.join(', '),
+        dateType: pkg.dateType || 'SPECIFIC'
       });
     } else {
       setEditingPkg(null);
@@ -74,7 +75,8 @@ export const FixedPackages: React.FC = () => {
         itinerary: [],
         inclusionsText: '',
         exclusionsText: '',
-        datesText: ''
+        datesText: '',
+        dateType: 'SPECIFIC'
       });
     }
     setIsModalOpen(true);
@@ -90,7 +92,6 @@ export const FixedPackages: React.FC = () => {
 
     // Ensure itinerary has correct number of days based on nights
     // Typically Itinerary Days = Nights + 1 (Departure)
-    // If user didn't build itinerary, we might leave it empty or auto-gen blank
     let finalItinerary = formData.itinerary || [];
     
     // Save
@@ -111,7 +112,8 @@ export const FixedPackages: React.FC = () => {
       notes: formData.notes,
       itinerary: finalItinerary,
       isActive: formData.isActive || false,
-      createdBy: editingPkg?.createdBy || user?.id
+      createdBy: editingPkg?.createdBy || user?.id,
+      dateType: formData.dateType || 'SPECIFIC'
     });
 
     await refreshData();
@@ -235,15 +237,19 @@ export const FixedPackages: React.FC = () => {
                     <span className="block text-[10px] text-slate-400">per person (base {pkg.basePax || 2} pax)</span>
                   </td>
                   <td className="px-6 py-4">
-                     {nextDate ? (
-                         <div className="flex flex-col">
-                             <span className="text-green-700 font-bold text-sm flex items-center gap-1">
-                                 <Calendar size={12}/> {nextDate.toLocaleDateString()}
-                             </span>
-                             {pkg.validDates.length > 1 && <span className="text-xs text-slate-400">+{pkg.validDates.length - 1} more dates</span>}
-                         </div>
+                     {pkg.dateType === 'DAILY' ? (
+                         <span className="text-green-700 font-bold text-xs bg-green-50 px-2 py-1 rounded border border-green-100">Daily Departure</span>
                      ) : (
-                         <span className="text-red-400 text-xs italic">No future dates</span>
+                         nextDate ? (
+                             <div className="flex flex-col">
+                                 <span className="text-slate-700 font-bold text-sm flex items-center gap-1">
+                                     <Calendar size={12}/> {nextDate.toLocaleDateString()}
+                                 </span>
+                                 {pkg.validDates.length > 1 && <span className="text-xs text-slate-400">+{pkg.validDates.length - 1} more dates</span>}
+                             </div>
+                         ) : (
+                             <span className="text-red-400 text-xs italic">No future dates</span>
+                         )
                      )}
                   </td>
                   <td className="px-6 py-4">
@@ -467,16 +473,53 @@ export const FixedPackages: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Departure Dates (Comma Separated YYYY-MM-DD)</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="2023-10-15, 2023-11-20"
-                                    value={formData.datesText}
-                                    onChange={e => setFormData({...formData, datesText: e.target.value})}
-                                    className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none font-mono"
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1">Example: 2023-11-15, 2023-12-01</p>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Departure Configuration</label>
+                                
+                                <div className="flex gap-4 mb-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="dateType" 
+                                            value="SPECIFIC"
+                                            checked={formData.dateType === 'SPECIFIC'}
+                                            onChange={() => setFormData({...formData, dateType: 'SPECIFIC'})}
+                                            className="text-brand-600 focus:ring-brand-500"
+                                        />
+                                        <span className="text-sm font-medium text-slate-700">Specific Dates (Fixed)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="dateType" 
+                                            value="DAILY"
+                                            checked={formData.dateType === 'DAILY'}
+                                            onChange={() => setFormData({...formData, dateType: 'DAILY'})}
+                                            className="text-brand-600 focus:ring-brand-500"
+                                        />
+                                        <span className="text-sm font-medium text-slate-700">Daily / Flexible</span>
+                                    </label>
+                                </div>
+
+                                {formData.dateType === 'SPECIFIC' && (
+                                    <div className="animate-in fade-in">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Departure Dates (Comma Separated YYYY-MM-DD)</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="2023-10-15, 2023-11-20"
+                                            value={formData.datesText}
+                                            onChange={e => setFormData({...formData, datesText: e.target.value})}
+                                            className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none font-mono"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-1">Example: 2023-11-15, 2023-12-01</p>
+                                    </div>
+                                )}
+                                
+                                {formData.dateType === 'DAILY' && (
+                                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1 animate-in fade-in">
+                                        <Check size={12} /> Agents can select any date for this package.
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

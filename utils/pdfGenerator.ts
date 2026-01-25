@@ -19,6 +19,36 @@ interface BrandingOptions {
   primaryColorHex: string;
 }
 
+// --- TEXT SANITIZATION HELPER ---
+// jsPDF standard fonts do not support Emojis or advanced Unicode symbols. 
+// This function strips them or replaces them with ASCII equivalents to prevent garbled text.
+const cleanText = (text: string | undefined | null): string => {
+    if (!text) return '';
+    
+    let clean = text;
+
+    // 1. Replace common symbols with ASCII approximations
+    clean = clean.replace(/→/g, '->')
+                 .replace(/←/g, '<-')
+                 .replace(/↔/g, '<->')
+                 .replace(/•/g, '-')
+                 .replace(/—/g, '-')
+                 .replace(/–/g, '-')
+                 .replace(/…/g, '...')
+                 .replace(/“/g, '"')
+                 .replace(/”/g, '"')
+                 .replace(/‘/g, "'")
+                 .replace(/’/g, "'");
+
+    // 2. Remove Emojis and Pictographs (Ranges for common emojis)
+    // This prevents the 'ð' and other mojibake characters in the PDF
+    const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
+    clean = clean.replace(emojiRegex, '');
+
+    // 3. Normalize spacing
+    return clean.replace(/\s+/g, ' ').trim();
+};
+
 // Helper: Resolve Branding
 const resolveBranding = (role: UserRole, agentProfile?: User | null): BrandingOptions => {
     // 1. If Agent Profile is provided (Public View or Agent Context), use STRICTLY Agent Branding
@@ -100,7 +130,7 @@ export const generateQuotePDF = (
   doc.text("TRAVEL ITINERARY", 195, 20, { align: 'right' });
   
   doc.setFontSize(10);
-  doc.text(`Ref: ${quote.uniqueRefNo}`, 195, 28, { align: 'right' });
+  doc.text(`Ref: ${cleanText(quote.uniqueRefNo)}`, 195, 28, { align: 'right' });
   doc.text(`Date: ${new Date().toLocaleDateString()}`, 195, 33, { align: 'right' });
 
   // --- AGENCY CONTACT INFO (Under Header) ---
@@ -108,23 +138,24 @@ export const generateQuotePDF = (
   doc.setFontSize(16);
   doc.setTextColor(SECONDARY[0], SECONDARY[1], SECONDARY[2]); // Slate Dark
   doc.setFont("times", "bold");
-  doc.text(branding.companyName, 15, yPos);
+  doc.text(cleanText(branding.companyName), 15, yPos);
   
   doc.setFontSize(10);
   doc.setFont("times", "normal");
   doc.setTextColor(100, 100, 100);
   yPos += 5;
   if(branding.address) {
-      const splitAddr = doc.splitTextToSize(branding.address, 90);
+      const cleanAddress = cleanText(branding.address);
+      const splitAddr = doc.splitTextToSize(cleanAddress, 90);
       doc.text(splitAddr, 15, yPos);
       yPos += (splitAddr.length * 5) + 2;
   }
   
-  doc.text(`Email: ${branding.email}`, 15, yPos);
+  doc.text(`Email: ${cleanText(branding.email)}`, 15, yPos);
   yPos += 5;
-  if(branding.phone) doc.text(`Phone: ${branding.phone}`, 15, yPos);
+  if(branding.phone) doc.text(`Phone: ${cleanText(branding.phone)}`, 15, yPos);
   yPos += 5;
-  if(branding.website) doc.text(`Web: ${branding.website}`, 15, yPos);
+  if(branding.website) doc.text(`Web: ${cleanText(branding.website)}`, 15, yPos);
 
   // --- TRIP DETAILS (Right Side Box) ---
   yPos = 50; // Reset for right column
@@ -140,11 +171,11 @@ export const generateQuotePDF = (
   
   doc.setFont("times", "normal");
   doc.setFontSize(10);
-  const city = quote.destination || 'Multiple Cities';
+  const city = cleanText(quote.destination || 'Multiple Cities');
   doc.text(`Destination: ${city}`, 125, yPos + 8);
   doc.text(`Travel Date: ${new Date(quote.travelDate).toLocaleDateString()}`, 125, yPos + 14);
   doc.text(`Guests: ${quote.paxCount} Pax`, 125, yPos + 20);
-  if(quote.leadGuestName) doc.text(`Guest Name: ${quote.leadGuestName}`, 125, yPos + 26);
+  if(quote.leadGuestName) doc.text(`Guest Name: ${cleanText(quote.leadGuestName)}`, 125, yPos + 26);
 
   yPos = 100; // Start of Table
 
@@ -160,8 +191,10 @@ export const generateQuotePDF = (
       const dateStr = currentDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', weekday: 'short' });
 
       // Group Row (Day Header)
+      const dayTitleClean = cleanText(item.title);
+      
       tableBody.push([{ 
-          content: `Day ${item.day} | ${dateStr} | ${item.title}`, 
+          content: `Day ${item.day} | ${dateStr} | ${dayTitleClean}`, 
           colSpan: 2, 
           styles: { 
               fontStyle: 'bold', 
@@ -175,7 +208,7 @@ export const generateQuotePDF = (
       // Description
       if(item.description) {
           tableBody.push([{ 
-              content: item.description, 
+              content: cleanText(item.description), 
               colSpan: 2, 
               styles: { fontStyle: 'italic', textColor: 80, fontSize: 10 } 
           }]);
@@ -199,9 +232,13 @@ export const generateQuotePDF = (
                   details += `${svc.meta.description}`;
               }
 
+              // Sanitize details content
+              const sanitizedName = cleanText(svc.name);
+              const sanitizedDetails = cleanText(details);
+
               tableBody.push([
                   { content: typeLabel, styles: { fontSize: 9, fontStyle: 'bold', textColor: primaryRGB, valign: 'top' } },
-                  { content: `${svc.name}\n${details}`, styles: { fontSize: 10, valign: 'top' } }
+                  { content: `${sanitizedName}\n${sanitizedDetails}`, styles: { fontSize: 10, valign: 'top' } }
               ]);
           });
       }
@@ -283,7 +320,7 @@ export const generateQuotePDF = (
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     // Use the Branding Company Name instead of platform hardcode
-    doc.text(`Prepared by ${branding.companyName}`, 15, 286);
+    doc.text(`Prepared by ${cleanText(branding.companyName)}`, 15, 286);
     doc.text(`Page ${i} of ${pageCount}`, 195, 286, { align: 'right' });
   }
 

@@ -1,7 +1,9 @@
 
-import { Quote, User, UserRole, Message, OperationalDetails } from '../types';
+import { Quote, User, UserRole, Message, OperationalDetails, Visa, Booking } from '../types';
 import { dbHelper } from './firestoreHelper';
 import { auditLogService } from './auditLogService';
+import { companyService } from './companyService';
+import { bookingService } from './bookingService';
 
 const COLLECTION = 'quotes';
 
@@ -40,6 +42,77 @@ class AgentService {
     
     await dbHelper.save(COLLECTION, newQuote);
     return newQuote;
+  }
+
+  // --- NEW: DIRECT VISA REQUEST ---
+  async createVisaRequest(agent: User, visa: Visa, travelDate: string, pax: number, guestName: string): Promise<Booking> {
+      const defaultCompany = await companyService.getDefaultCompany();
+      const totalAmount = visa.cost * pax;
+      const advanceAmount = totalAmount; // Visas usually prepaid
+
+      const newBooking: Booking = {
+          id: `visa_req_${Date.now()}`,
+          quoteId: 'DIRECT_VISA', // No quote linked
+          uniqueRefNo: `VISA-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
+          status: 'REQUESTED', // Triggers Admin Alert
+
+          destination: visa.country,
+          travelDate: travelDate,
+          paxCount: pax,
+          travelers: [{ firstName: guestName, lastName: '', title: 'Mr', type: 'ADULT' }], // Placeholder traveler
+          
+          itinerary: [{
+              day: 1,
+              title: `Visa Processing - ${visa.country}`,
+              description: `Direct application request for ${visa.visaType}.`,
+              services: [{
+                  id: `svc_visa_${Date.now()}`,
+                  type: 'VISA',
+                  name: `${visa.country} - ${visa.visaType}`,
+                  cost: visa.cost,
+                  price: visa.cost, // Net = Selling for base request, agent markup added later if needed
+                  currency: 'INR',
+                  quantity: pax,
+                  duration_nights: 1,
+                  meta: { processingTime: visa.processingTime, entryType: visa.entryType }
+              }]
+          }],
+
+          netCost: totalAmount,
+          sellingPrice: totalAmount,
+          currency: 'INR',
+
+          paymentStatus: 'PENDING',
+          totalAmount: totalAmount,
+          advanceAmount: advanceAmount,
+          paidAmount: 0,
+          balanceAmount: totalAmount,
+          payments: [],
+
+          agentId: agent.id,
+          agentName: agent.name,
+          staffId: null,
+          operatorId: null,
+          operatorName: null,
+          companyId: defaultCompany.id,
+
+          comments: [{
+              id: `msg_${Date.now()}`,
+              senderId: agent.id,
+              senderName: agent.name,
+              senderRole: UserRole.AGENT,
+              content: `New Visa Application Request for ${visa.country}. Please process.`,
+              timestamp: new Date().toISOString(),
+              isSystem: true
+          }],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+      };
+
+      await dbHelper.save('bookings', newBooking);
+      bookingService.syncAllBookings(); // Update global cache for notifications
+
+      return newBooking;
   }
   
   async updateQuote(quote: Quote) {

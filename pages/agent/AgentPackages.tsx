@@ -42,14 +42,28 @@ export const AgentPackages: React.FC = () => {
 
   const openBookingModal = (pkg: FixedPackage) => {
       setSelectedPkg(pkg);
-      // Pre-select first valid future date
-      const nextDate = pkg.validDates
-        .map(d => new Date(d))
-        .sort((a,b) => a.getTime() - b.getTime())
-        .find(d => d.getTime() >= new Date().setHours(0,0,0,0));
+      
+      let defaultDate = '';
+      
+      if (pkg.dateType === 'DAILY') {
+          // Default to tomorrow for daily
+          const tmrw = new Date();
+          tmrw.setDate(tmrw.getDate() + 1);
+          defaultDate = tmrw.toISOString().split('T')[0];
+      } else {
+          // Pre-select first valid future date for specific
+          const nextDate = pkg.validDates
+            .map(d => new Date(d))
+            .sort((a,b) => a.getTime() - b.getTime())
+            .find(d => d.getTime() >= new Date().setHours(0,0,0,0));
+          
+          if (nextDate) {
+              defaultDate = nextDate.toISOString().split('T')[0];
+          }
+      }
       
       setBookingForm({
-          date: nextDate ? nextDate.toISOString().split('T')[0] : '',
+          date: defaultDate,
           guestName: '',
           adults: pkg.basePax || 2,
           children: 0
@@ -105,11 +119,7 @@ export const AgentPackages: React.FC = () => {
 
         // 3. Update Quote with Package Specifics
         const totalPax = Number(bookingForm.adults) + Number(bookingForm.children);
-        // Basic Price Logic: Fixed Price is per person usually in these packages?
-        // Or Fixed Price is for the BASE PAX? 
-        // Let's assume Fixed Price is Per Person for simplicity in this module, 
-        // OR Fixed Price is Total for Base Pax.
-        // Let's go with: Fixed Price is Per Person.
+        // Fixed Price logic
         const totalPrice = pkg.fixedPrice * totalPax;
 
         const updatedQuote: Quote = {
@@ -144,6 +154,8 @@ export const AgentPackages: React.FC = () => {
       return d ? d.city : 'Unknown';
   };
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -160,7 +172,7 @@ export const AgentPackages: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {packages.map(pkg => {
-                 // Calculate Next Date
+                 // Calculate Next Date for Display
                  const nextDate = pkg.validDates
                     .map(d => new Date(d))
                     .sort((a,b) => a.getTime() - b.getTime())
@@ -194,13 +206,18 @@ export const AgentPackages: React.FC = () => {
                                 <div className="flex justify-between">
                                     <span className="text-slate-500">Next Departure:</span>
                                     <span className="font-bold text-slate-800">
-                                        {nextDate ? nextDate.toLocaleDateString() : 'Sold Out'}
+                                        {pkg.dateType === 'DAILY' 
+                                            ? <span className="text-green-600">Daily Available</span> 
+                                            : (nextDate ? nextDate.toLocaleDateString() : 'Sold Out')
+                                        }
                                     </span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Available Dates:</span>
-                                    <span className="font-bold text-slate-800">{pkg.validDates.length}</span>
-                                </div>
+                                {pkg.dateType !== 'DAILY' && (
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Available Dates:</span>
+                                        <span className="font-bold text-slate-800">{pkg.validDates.length}</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex justify-between items-center border-t border-slate-100 pt-4">
@@ -240,17 +257,33 @@ export const AgentPackages: React.FC = () => {
                   <form onSubmit={handleCreateQuote} className="space-y-4">
                       <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Select Departure Date</label>
-                          <select 
-                            required
-                            className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white"
-                            value={bookingForm.date}
-                            onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
-                          >
-                              <option value="">-- Choose Date --</option>
-                              {selectedPkg.validDates.map(d => (
-                                  <option key={d} value={d}>{new Date(d).toLocaleDateString()}</option>
-                              ))}
-                          </select>
+                          
+                          {selectedPkg.dateType === 'DAILY' ? (
+                              <div className="relative">
+                                  <Calendar className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                                  <input 
+                                    required
+                                    type="date"
+                                    min={todayStr}
+                                    className="w-full pl-10 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                                    value={bookingForm.date}
+                                    onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
+                                  />
+                                  <p className="text-[10px] text-green-600 mt-1">Daily departures available.</p>
+                              </div>
+                          ) : (
+                              <select 
+                                required
+                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white"
+                                value={bookingForm.date}
+                                onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
+                              >
+                                  <option value="">-- Choose Date --</option>
+                                  {selectedPkg.validDates.map(d => (
+                                      <option key={d} value={d}>{new Date(d).toLocaleDateString()}</option>
+                                  ))}
+                              </select>
+                          )}
                       </div>
 
                       <div>

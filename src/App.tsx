@@ -1,4 +1,4 @@
-import React, { useMemo, Component, ReactNode, ErrorInfo } from 'react';
+import React, { useMemo, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
@@ -61,6 +61,9 @@ import { BookingDetail } from '../pages/agent/BookingDetail';
 import { Branding } from '../pages/agent/Branding';
 import { AgentPLReport } from '../pages/agent/PLReport'; 
 import { GuideBook } from '../pages/agent/GuideBook'; 
+import { AgentPackages } from '../pages/agent/AgentPackages';
+import { AgentTemplates } from '../pages/agent/AgentTemplates';
+import { AgentVisa } from '../pages/agent/AgentVisa';
 
 // Operator Panel Imports
 import { OperatorDashboard } from '../pages/operator/OperatorDashboard';
@@ -89,7 +92,7 @@ interface ErrorBoundaryState {
 }
 
 // --- ERROR BOUNDARY ---
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -99,7 +102,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Uncaught Error:", error, errorInfo);
   }
 
@@ -154,7 +157,8 @@ const BookingRouter = () => {
         case UserRole.OPERATOR: return <OperatorBookingView />;
         case UserRole.ADMIN:
         case UserRole.STAFF: 
-            return <Navigate to="/admin/bookings" replace />;
+            // Allow Admins/Staff to view the detailed booking page
+            return <BookingDetail />;
         default: return <Navigate to="/dashboard" replace />;
     }
 };
@@ -238,6 +242,9 @@ const App: React.FC = () => {
                       <Route path="/agent/branding" element={<Branding />} />
                       <Route path="/agent/reports" element={<AgentPLReport />} />
                       <Route path="/agent/guidebook" element={<GuideBook />} />
+                      <Route path="/agent/packages" element={<AgentPackages />} />
+                      <Route path="/agent/templates" element={<AgentTemplates />} />
+                      <Route path="/agent/visa" element={<AgentVisa />} />
                   </Route>
 
                   {/* Operator Specific */}
