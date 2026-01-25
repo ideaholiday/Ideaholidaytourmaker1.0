@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService'; 
 import { inventoryService } from '../../services/inventoryService';
-import { X, Search, Hotel, Camera, Car, Plus, ShieldCheck, User, MapPin, Globe, PenTool, CheckCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { X, Search, Hotel, Camera, Car, Plus, ShieldCheck, User, MapPin, Globe, PenTool, CheckCircle, Image as ImageIcon, Loader2, Moon } from 'lucide-react';
 import { BuilderService } from './ItineraryBuilderContext';
 import { ItineraryService } from '../../types';
 
@@ -14,13 +14,119 @@ interface Props {
   type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER';
   destinationId: string;
   currentServices?: (BuilderService | ItineraryService)[]; 
+  defaultNights?: number;
 }
 
-export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, type, destinationId, currentServices = [] }) => {
+// Inner Component for Item Row to manage local state (e.g. Nights)
+const InventoryItemRow: React.FC<{
+    item: any;
+    type: string;
+    onAdd: (item: any, nights: number) => void;
+    isAdded: boolean;
+    defaultNights: number;
+    getCityName: (id: string) => string;
+}> = ({ item, type, onAdd, isAdded, defaultNights, getCityName }) => {
+    const [nights, setNights] = useState(defaultNights);
+    const name = item.name || item.activityName || item.transferName;
+    const isPartner = !!item.operatorId;
+    const cost = item.cost || item.costAdult || item.costPrice || 0;
+    const locationName = getCityName(item.destinationId || item.location_id);
+    const image = item.imageUrl;
+
+    return (
+        <div className={`group flex flex-col md:flex-row bg-white border rounded-xl overflow-hidden transition-all duration-200 ${isAdded ? 'border-emerald-300 ring-1 ring-emerald-100' : 'border-slate-200 hover:border-brand-300 hover:shadow-md'}`}>
+            {/* Image Section */}
+            <div className="w-full md:w-32 h-32 md:h-auto bg-slate-100 shrink-0 relative overflow-hidden">
+                {image ? (
+                    <img src={image} alt={name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-300">
+                        <ImageIcon size={24} />
+                    </div>
+                )}
+                {isAdded && (
+                    <div className="absolute inset-0 bg-emerald-900/60 flex items-center justify-center backdrop-blur-[2px]">
+                        <span className="text-white font-bold text-xs flex items-center gap-1"><CheckCircle size={14} /> Added</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Details Section */}
+            <div className="flex-1 p-4 flex flex-col justify-between">
+                <div>
+                    <div className="flex justify-between items-start mb-1">
+                        <h4 className="font-bold text-slate-800 text-base">{name}</h4>
+                        <div className="flex gap-1 shrink-0 ml-2">
+                            {isPartner ? (
+                                <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 font-bold flex items-center gap-1">
+                                    <User size={10} /> Partner
+                                </span>
+                            ) : (
+                                <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 font-bold flex items-center gap-1">
+                                    <ShieldCheck size={10} /> System
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mb-2 text-xs">
+                        <span className="text-slate-500 flex items-center gap-1">
+                            <MapPin size={12} className="text-slate-400" /> {locationName}
+                        </span>
+                        {type === 'HOTEL' && (
+                            <>
+                                <span className="text-slate-300">•</span>
+                                <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{item.roomType || 'Standard'}</span>
+                                <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{item.mealPlan || 'RO'}</span>
+                            </>
+                        )}
+                    </div>
+                    
+                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                        {item.description || 'No detailed description available for this item.'}
+                    </p>
+                </div>
+
+                <div className="flex justify-between items-end mt-4 pt-3 border-t border-slate-50">
+                    <div className="text-left">
+                        <p className="text-[10px] text-slate-400 uppercase font-bold">Net Cost</p>
+                        <p className="font-mono text-base font-bold text-slate-700">{item.currency || 'INR'} {cost.toLocaleString()}</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                         {type === 'HOTEL' && !isAdded && (
+                             <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden">
+                                 <div className="bg-slate-50 px-2 py-1.5 border-r border-slate-300">
+                                     <Moon size={12} className="text-slate-500" />
+                                 </div>
+                                 <input 
+                                     type="number" 
+                                     min="1" 
+                                     max="30" 
+                                     value={nights}
+                                     onChange={(e) => setNights(Number(e.target.value))}
+                                     className="w-12 py-1 text-center text-sm font-bold text-slate-700 outline-none"
+                                 />
+                             </div>
+                         )}
+                         <button 
+                            onClick={() => onAdd(item, nights)}
+                            className={`${isAdded ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' : 'bg-slate-900 text-white hover:bg-brand-600 shadow-md'} px-5 py-2 rounded-lg transition text-xs font-bold flex items-center gap-1.5`}
+                        >
+                            {isAdded ? <><CheckCircle size={14} /> Added</> : <><Plus size={14} /> Add</>}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, type, destinationId, currentServices = [], defaultNights = 1 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [items, setItems] = useState<any[]>([]);
   const [allDestinations, setAllDestinations] = useState<any[]>([]);
-  const [showAllLocations, setShowAllLocations] = useState(false);
+  const [filterCityId, setFilterCityId] = useState(destinationId || '');
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -29,9 +135,10 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
 
   useEffect(() => {
     if (isOpen) {
+        setFilterCityId(destinationId || ''); // Reset filter when opening new context
         loadItems();
     }
-  }, [isOpen, type, destinationId, showAllLocations]);
+  }, [isOpen, type, destinationId]);
 
   const loadItems = async () => {
     setLoading(true);
@@ -51,7 +158,6 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
         mergedItems = [...systemItems];
 
         // 2. Fetch Approved Partner Inventory
-        // Ensure inventory is synced before filtering
         const allItems = await inventoryService.getAllItems();
         if (allItems.length === 0) {
             await inventoryService.syncFromCloud();
@@ -59,14 +165,6 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
 
         const partnerItems = (await inventoryService.getApprovedItems()).filter(i => i.type === type);
         mergedItems = [...mergedItems, ...partnerItems];
-
-        // 3. Filter by Destination ID (Strictly enforce city suggestions)
-        if (destinationId && !showAllLocations) {
-            mergedItems = mergedItems.filter(i => {
-                const itemDestId = i.destinationId || i.location_id; 
-                return itemDestId === destinationId;
-            });
-        }
 
         setItems(mergedItems);
     } catch (e) {
@@ -78,7 +176,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
 
   if (!isOpen) return null;
 
-  const handleAddItem = (item: any) => {
+  const handleAddItem = (item: any, selectedNights: number) => {
       const service: BuilderService = {
           id: `svc_${Date.now()}`,
           inventory_id: item.id,
@@ -88,11 +186,10 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
           estimated_cost: item.cost || item.costAdult || item.costPrice || 0,
           currency: item.currency || 'INR',
           quantity: 1, 
-          nights: type === 'HOTEL' ? 1 : undefined,
+          nights: type === 'HOTEL' ? selectedNights : undefined,
           meta: type === 'HOTEL' ? { roomType: item.roomType, mealPlan: item.mealPlan, imageUrl: item.imageUrl } : { imageUrl: item.imageUrl }
       };
       onSelect(service);
-      // We don't close immediately to allow adding multiple items
   };
 
   const handleAddCustom = () => {
@@ -118,9 +215,17 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
       return d ? d.city : 'General';
   };
 
-  const filteredItems = items.filter(i => 
-    (i.name || i.activityName || i.transferName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItems = items.filter(i => {
+    const matchesSearch = (i.name || i.activityName || i.transferName || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    let matchesCity = true;
+    if (filterCityId && filterCityId !== 'ALL') {
+         const itemDestId = i.destinationId || i.location_id; 
+         matchesCity = itemDestId === filterCityId;
+    }
+
+    return matchesSearch && matchesCity;
+  });
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -136,7 +241,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                     Add {type === 'HOTEL' ? 'Accommodation' : type === 'ACTIVITY' ? 'Activity' : 'Transfer'}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                    {destinationId ? `Showing items for ${getCityName(destinationId)}` : 'Select items from inventory'}
+                    {destinationId ? `Viewing items for ${getCityName(destinationId)}` : 'Select items from inventory'}
                 </p>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition"><X size={20} className="text-slate-500"/></button>
@@ -157,16 +262,18 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                     />
                 </div>
                 <div className="flex gap-2">
-                    <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium cursor-pointer transition select-none ${showAllLocations ? 'bg-brand-50 border-brand-200 text-brand-700' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
-                        <Globe size={16} />
-                        <input 
-                            type="checkbox" 
-                            className="hidden"
-                            checked={showAllLocations} 
-                            onChange={e => setShowAllLocations(e.target.checked)} 
-                        />
-                        All Cities
-                    </label>
+                    <div className="relative">
+                        <select 
+                            value={filterCityId} 
+                            onChange={(e) => setFilterCityId(e.target.value)}
+                            className="appearance-none pl-9 pr-8 py-2.5 border border-slate-300 rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-brand-500 outline-none cursor-pointer hover:border-brand-300 transition shadow-sm w-40"
+                        >
+                            <option value="ALL">All Cities</option>
+                            {allDestinations.map(d => <option key={d.id} value={d.id}>{d.city}</option>)}
+                        </select>
+                        <Globe size={16} className="absolute left-3 top-3 text-slate-400 pointer-events-none" />
+                    </div>
+
                     <button 
                         onClick={() => setShowCustomForm(!showCustomForm)}
                         className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition border ${showCustomForm ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
@@ -249,87 +356,17 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                 <>
                     {/* Inventory List Grid */}
                     <div className="grid grid-cols-1 gap-3">
-                        {filteredItems.map(item => {
-                            const name = item.name || item.activityName || item.transferName;
-                            const isPartner = !!item.operatorId;
-                            const cost = item.cost || item.costAdult || item.costPrice || 0;
-                            const locationName = getCityName(item.destinationId || item.location_id);
-                            const image = item.imageUrl;
-                            
-                            // Check if already added
-                            const isAdded = currentServices.some((s: any) => s.inventory_id === item.id);
-
-                            return (
-                                <div key={item.id} className={`group flex flex-col md:flex-row bg-white border rounded-xl overflow-hidden transition-all duration-200 ${isAdded ? 'border-emerald-300 ring-1 ring-emerald-100' : 'border-slate-200 hover:border-brand-300 hover:shadow-md'}`}>
-                                    {/* Image Section */}
-                                    <div className="w-full md:w-32 h-32 md:h-auto bg-slate-100 shrink-0 relative overflow-hidden">
-                                        {image ? (
-                                            <img src={image} alt={name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-slate-300">
-                                                <ImageIcon size={24} />
-                                            </div>
-                                        )}
-                                        {isAdded && (
-                                            <div className="absolute inset-0 bg-emerald-900/60 flex items-center justify-center backdrop-blur-[2px]">
-                                                <span className="text-white font-bold text-xs flex items-center gap-1"><CheckCircle size={14} /> Added</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Details Section */}
-                                    <div className="flex-1 p-4 flex flex-col justify-between">
-                                        <div>
-                                            <div className="flex justify-between items-start mb-1">
-                                                <h4 className="font-bold text-slate-800 text-base">{name}</h4>
-                                                <div className="flex gap-1 shrink-0 ml-2">
-                                                    {isPartner ? (
-                                                        <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 font-bold flex items-center gap-1">
-                                                            <User size={10} /> Partner
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 font-bold flex items-center gap-1">
-                                                            <ShieldCheck size={10} /> System
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex items-center gap-2 mb-2 text-xs">
-                                                <span className="text-slate-500 flex items-center gap-1">
-                                                    <MapPin size={12} className="text-slate-400" /> {locationName}
-                                                </span>
-                                                {type === 'HOTEL' && (
-                                                    <>
-                                                        <span className="text-slate-300">•</span>
-                                                        <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{item.roomType || 'Standard'}</span>
-                                                        <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{item.mealPlan || 'RO'}</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                            
-                                            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                                                {item.description || 'No detailed description available for this item.'}
-                                            </p>
-                                        </div>
-
-                                        <div className="flex justify-between items-end mt-4 pt-3 border-t border-slate-50">
-                                            <div className="text-left">
-                                                <p className="text-[10px] text-slate-400 uppercase font-bold">Net Cost</p>
-                                                <p className="font-mono text-base font-bold text-slate-700">{item.currency || 'INR'} {cost.toLocaleString()}</p>
-                                            </div>
-                                            
-                                            <button 
-                                                onClick={() => handleAddItem(item)}
-                                                className={`${isAdded ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' : 'bg-slate-900 text-white hover:bg-brand-600 shadow-md'} px-5 py-2 rounded-lg transition text-xs font-bold flex items-center gap-1.5`}
-                                            >
-                                                {isAdded ? <><CheckCircle size={14} /> Added</> : <><Plus size={14} /> Add to Day</>}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {filteredItems.map(item => (
+                            <InventoryItemRow 
+                                key={item.id}
+                                item={item}
+                                type={type}
+                                onAdd={handleAddItem}
+                                isAdded={currentServices.some((s: any) => s.inventory_id === item.id)}
+                                defaultNights={defaultNights}
+                                getCityName={getCityName}
+                            />
+                        ))}
                     </div>
                     
                     {filteredItems.length === 0 && !showCustomForm && (
@@ -337,14 +374,14 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                             <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <Search size={32} className="text-slate-400" />
                             </div>
-                            <h3 className="text-slate-900 font-bold mb-1">No items found for this city</h3>
-                            <p className="text-slate-500 text-sm mb-6">Try browsing all locations or add a custom item.</p>
+                            <h3 className="text-slate-900 font-bold mb-1">No items found</h3>
+                            <p className="text-slate-500 text-sm mb-6">Try selecting a different city or add a custom item.</p>
                             <div className="flex justify-center gap-3">
                                 <button 
-                                    onClick={() => setShowAllLocations(true)}
+                                    onClick={() => setFilterCityId('ALL')}
                                     className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
                                 >
-                                    Browse All Locations
+                                    Browse All Cities
                                 </button>
                                 <button 
                                     onClick={() => setShowCustomForm(true)}

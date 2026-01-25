@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ItineraryItem, ItineraryService } from '../types';
 import { adminService } from '../services/adminService';
@@ -201,6 +202,18 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   const activeDay = itinerary[activeDayIndex];
   const activeCityId = activeDay?.cityId || '';
   const perPersonPrice = pax > 0 ? Math.round(financials.selling / pax) : 0;
+
+  // Calculate consecutive nights in the current city (for Hotel default duration)
+  let suggestedNights = 1;
+  if (activeCityId) {
+      for (let i = activeDayIndex + 1; i < itinerary.length; i++) {
+          if (itinerary[i].cityId === activeCityId) {
+              suggestedNights++;
+          } else {
+              break;
+          }
+      }
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-40px)] bg-slate-50 rounded-xl overflow-hidden border border-slate-200 shadow-2xl fixed inset-0 z-50 m-4 md:m-5">
@@ -489,6 +502,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                 destinationId={activeCityId} 
                 onSelect={handleAddService}
                 currentServices={activeDay?.services || []} 
+                defaultNights={suggestedNights}
             />
         )}
     </div>
