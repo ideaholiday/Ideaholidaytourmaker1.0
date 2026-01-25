@@ -2,9 +2,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole, Activity, Destination } from '../../types';
-import { Edit2, Trash2, Plus, X, Camera, Clock, Image as ImageIcon, Search, DollarSign, Check, MapPin, Calendar, Loader2 } from 'lucide-react';
+import { UserRole, Activity, Destination, ActivityTransferOptions } from '../../types';
+import { Edit2, Trash2, Plus, X, Camera, Clock, Image as ImageIcon, Search, DollarSign, Check, MapPin, Calendar, Loader2, Bus, Car, Ticket } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
+
+const DEFAULT_OPTIONS: ActivityTransferOptions = {
+    sic: { enabled: false, costPerPerson: 0 },
+    pvt: { enabled: false, costPerVehicle: 0, vehicleCapacity: 4 }
+};
 
 export const Sightseeing: React.FC = () => {
   const { user } = useAuth();
@@ -64,11 +69,15 @@ export const Sightseeing: React.FC = () => {
   const [filterSeason, setFilterSeason] = useState('ALL');
   
   const [formData, setFormData] = useState<Partial<Activity>>({});
+  
+  // Separate state for deep nested pricing
+  const [transferOpts, setTransferOpts] = useState<ActivityTransferOptions>(DEFAULT_OPTIONS);
 
   const handleOpenModal = (activity?: Activity) => {
     if (activity) {
       setEditingActivity(activity);
-      setFormData({ ...activity }); // Clone to avoid direct mutation
+      setFormData({ ...activity }); 
+      setTransferOpts(activity.transferOptions || DEFAULT_OPTIONS);
     } else {
       setEditingActivity(null);
       // Initialize with safe defaults
@@ -77,10 +86,6 @@ export const Sightseeing: React.FC = () => {
         destinationId: allDestinations.length > 0 ? allDestinations[0].id : '',
         activityName: '',
         activityType: 'City Tour',
-        ticketIncluded: false,
-        transferIncluded: false,
-        costAdult: 0,
-        costChild: 0,
         currency: 'INR', // Enforced INR
         description: '',
         notes: '',
@@ -88,9 +93,12 @@ export const Sightseeing: React.FC = () => {
         startTime: 'Flexible',
         imageUrl: '',
         season: 'All Year',
+        costAdult: 0,
+        costChild: 0,
         validFrom: new Date().toISOString().split('T')[0],
         validTo: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
       });
+      setTransferOpts(DEFAULT_OPTIONS);
     }
     setIsModalOpen(true);
   };
@@ -116,13 +124,16 @@ export const Sightseeing: React.FC = () => {
             destinationId: formData.destinationId,
             activityType: (formData.activityType || 'City Tour') as any,
             
-            // Safe Number Conversion (Handle empty strings or undefined)
+            // Base Ticket Cost (Required)
             costAdult: Number(formData.costAdult) || 0,
             costChild: Number(formData.costChild) || 0,
             
+            // Transfer Pricing Structure
+            transferOptions: transferOpts,
+            
             currency: 'INR',
-            ticketIncluded: !!formData.ticketIncluded,
-            transferIncluded: !!formData.transferIncluded,
+            ticketIncluded: true, // Generally true for activities
+            transferIncluded: false, // Legacy flag logic - now handled by transferOptions
             isActive: formData.isActive !== undefined ? formData.isActive : true,
             
             createdBy: editingActivity?.createdBy || user?.id,
@@ -159,6 +170,20 @@ export const Sightseeing: React.FC = () => {
           alert("Failed to delete activity.");
       }
     }
+  };
+
+  const updateSic = (field: string, value: any) => {
+      setTransferOpts(prev => ({
+          ...prev,
+          sic: { ...prev.sic, [field]: value }
+      }));
+  };
+
+  const updatePvt = (field: string, value: any) => {
+      setTransferOpts(prev => ({
+          ...prev,
+          pvt: { ...prev.pvt, [field]: value }
+      }));
   };
 
   const filteredData = useMemo(() => {
@@ -248,8 +273,8 @@ export const Sightseeing: React.FC = () => {
                     <th className="px-6 py-4">Activity Name</th>
                     <th className="px-6 py-4">Description</th>
                     <th className="px-6 py-4">Validity</th>
-                    {showCost && <th className="px-6 py-4">Net Cost (Ad/Ch)</th>}
-                    <th className="px-6 py-4">Inclusions</th>
+                    {showCost && <th className="px-6 py-4">Base Ticket</th>}
+                    <th className="px-6 py-4">Transfer Opts</th>
                     <th className="px-6 py-4">Status</th>
                     {canEdit && <th className="px-6 py-4 text-right">Actions</th>}
                     </tr>
@@ -257,6 +282,8 @@ export const Sightseeing: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                     {filteredData.map((activity) => {
                     const dest = allDestinations.find(d => d.id === activity.destinationId);
+                    const opts = activity.transferOptions || DEFAULT_OPTIONS;
+                    
                     return (
                         <tr key={activity.id} className="hover:bg-brand-50/30 transition-colors group">
                         <td className="px-6 py-4">
@@ -293,13 +320,16 @@ export const Sightseeing: React.FC = () => {
                         </td>
                         {showCost && (
                             <td className="px-6 py-4 text-slate-900 font-mono font-medium">
-                                {activity.currency || 'INR'} {activity.costAdult} <span className="text-slate-400 mx-1">/</span> {activity.costChild}
+                                {activity.currency || 'INR'} {activity.costAdult.toLocaleString()}
                             </td>
                         )}
-                        <td className="px-6 py-4 text-xs space-y-1">
-                            {activity.ticketIncluded && <span className="flex items-center gap-1 text-green-700 font-medium"><Check size={10} strokeWidth={3}/> Ticket</span>}
-                            {activity.transferIncluded && <span className="flex items-center gap-1 text-blue-700 font-medium"><Check size={10} strokeWidth={3}/> Transfer</span>}
-                            {!activity.ticketIncluded && !activity.transferIncluded && <span className="text-slate-400">-</span>}
+                        <td className="px-6 py-4 text-xs">
+                             <div className="flex gap-1">
+                                 {/* Base Ticket Always Included */}
+                                 <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200" title="Ticket Only">TKT</span>
+                                 {opts.sic.enabled && <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100" title="Shared Transfer">SIC</span>}
+                                 {opts.pvt.enabled && <span className="bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded border border-purple-100" title="Private Transfer">PVT</span>}
+                             </div>
                         </td>
                         <td className="px-6 py-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${activity.isActive ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
@@ -336,7 +366,7 @@ export const Sightseeing: React.FC = () => {
 
       {isModalOpen && canEdit && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-0 overflow-hidden transform scale-100 transition-all max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-0 overflow-hidden transform scale-100 transition-all max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10 backdrop-blur-md">
               <h2 className="text-xl font-bold text-slate-900">{editingActivity ? 'Edit Activity' : 'New Activity'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition"><X size={24}/></button>
@@ -395,27 +425,95 @@ export const Sightseeing: React.FC = () => {
 
               <hr className="border-slate-100" />
 
-              {/* SECTION 2: PRICING */}
+              {/* SECTION 2: PRICING & OPTIONS (Rayna Style) */}
               <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                  <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <DollarSign size={14} /> Pricing & Currency
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <DollarSign size={14} /> Pricing Configuration
                   </h3>
-                  <div className="grid grid-cols-3 gap-5">
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Currency</label>
-                        {/* ENFORCED INR CURRENCY - NO DROPDOWN */}
-                        <div className="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-600">
-                           INR
-                        </div>
+                  
+                  {/* Option 1: Base Ticket (Always Active) */}
+                  <div className={`p-4 rounded-lg border mb-4 bg-white border-brand-300 shadow-sm transition-all`}>
+                      <div className="flex items-center justify-between mb-3">
+                          <label className="flex items-center gap-2">
+                             <div className="bg-brand-100 text-brand-600 p-1.5 rounded">
+                                  <Ticket size={18}/>
+                              </div>
+                              <span className="font-bold text-slate-800">Base Ticket (Without Transfer)</span>
+                          </label>
                       </div>
-                      <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Adult Cost</label>
-                          <input required type="number" min="0" value={formData.costAdult || ''} onChange={e => setFormData({...formData, costAdult: Number(e.target.value)})} className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
+                      
+                      <div className="grid grid-cols-2 gap-4 pl-0">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Adult Price (INR)</label>
+                              <input type="number" min="0" value={formData.costAdult} onChange={e => setFormData({...formData, costAdult: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Child Price (INR)</label>
+                              <input type="number" min="0" value={formData.costChild} onChange={e => setFormData({...formData, costChild: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
+                          </div>
                       </div>
-                      <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Child Cost</label>
-                          <input required type="number" min="0" value={formData.costChild || ''} onChange={e => setFormData({...formData, costChild: Number(e.target.value)})} className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white font-mono font-bold" />
+                  </div>
+
+                  {/* Option 2: Shared Transfers (SIC) */}
+                  <div className={`p-4 rounded-lg border mb-4 transition-all ${transferOpts.sic.enabled ? 'bg-white border-blue-300 shadow-sm' : 'bg-slate-100 border-slate-200 opacity-75'}`}>
+                      <div className="flex items-center justify-between mb-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                              <input 
+                                  type="checkbox" 
+                                  checked={transferOpts.sic.enabled} 
+                                  onChange={e => updateSic('enabled', e.target.checked)} 
+                                  className="rounded text-blue-600 focus:ring-blue-500" 
+                              />
+                              <div className="flex items-center gap-2">
+                                  <Bus size={18} className="text-blue-500"/>
+                                  <span className="font-bold text-slate-800">Shared Transfer (SIC) Add-on</span>
+                              </div>
+                          </label>
                       </div>
+                      
+                      {transferOpts.sic.enabled && (
+                          <div className="grid grid-cols-1 gap-4 pl-6 animate-in fade-in">
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cost Per Person (INR)</label>
+                                  <input type="number" min="0" value={transferOpts.sic.costPerPerson} onChange={e => updateSic('costPerPerson', Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
+                                  <p className="text-[10px] text-slate-400 mt-1">This cost is added to the Base Ticket for each Pax.</p>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+
+                  {/* Option 3: Private Transfers (PVT) */}
+                  <div className={`p-4 rounded-lg border transition-all ${transferOpts.pvt.enabled ? 'bg-white border-purple-300 shadow-sm' : 'bg-slate-100 border-slate-200 opacity-75'}`}>
+                      <div className="flex items-center justify-between mb-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                              <input 
+                                  type="checkbox" 
+                                  checked={transferOpts.pvt.enabled} 
+                                  onChange={e => updatePvt('enabled', e.target.checked)} 
+                                  className="rounded text-purple-600 focus:ring-purple-500" 
+                              />
+                              <div className="flex items-center gap-2">
+                                  <Car size={18} className="text-purple-500"/>
+                                  <span className="font-bold text-slate-800">Private Transfer (PVT) Add-on</span>
+                              </div>
+                          </label>
+                      </div>
+                      
+                      {transferOpts.pvt.enabled && (
+                          <div className="grid grid-cols-2 gap-4 pl-6 animate-in fade-in">
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cost Per Vehicle (INR)</label>
+                                  <input type="number" min="0" value={transferOpts.pvt.costPerVehicle} onChange={e => updatePvt('costPerVehicle', Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehicle Capacity</label>
+                                  <input type="number" min="1" value={transferOpts.pvt.vehicleCapacity} onChange={e => updatePvt('vehicleCapacity', Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
+                              </div>
+                              <div className="col-span-2">
+                                  <p className="text-[10px] text-slate-400 mt-1">System calculates vehicles needed: Ceil(Total Pax / Capacity). Total = (Ticket * Pax) + (Vehicles * Vehicle Cost).</p>
+                              </div>
+                          </div>
+                      )}
                   </div>
               </div>
 
@@ -471,25 +569,9 @@ export const Sightseeing: React.FC = () => {
               </div>
 
               <div className="flex gap-6 pt-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                 <label className="flex items-center gap-3 cursor-pointer group">
-                    <div className="relative flex items-center">
-                        <input type="checkbox" checked={formData.ticketIncluded || false} onChange={e => setFormData({...formData, ticketIncluded: e.target.checked})} className="peer h-5 w-5 cursor-pointer appearance-none rounded border-2 border-slate-300 checked:bg-brand-600 checked:border-brand-600 transition-all" />
-                        <Check size={14} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100" strokeWidth={4} />
-                    </div>
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">Ticket Included</span>
-                 </label>
-                 
-                 <label className="flex items-center gap-3 cursor-pointer group">
-                    <div className="relative flex items-center">
-                        <input type="checkbox" checked={formData.transferIncluded || false} onChange={e => setFormData({...formData, transferIncluded: e.target.checked})} className="peer h-5 w-5 cursor-pointer appearance-none rounded border-2 border-slate-300 checked:bg-brand-600 checked:border-brand-600 transition-all" />
-                        <Check size={14} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100" strokeWidth={4} />
-                    </div>
-                    <span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">Transfer Included</span>
-                 </label>
-
                  <label className="flex items-center gap-3 cursor-pointer group ml-auto">
                     <div className="relative flex items-center">
-                        <input type="checkbox" checked={formData.isActive || false} onChange={e => setFormData({...formData, isActive: e.target.checked})} className="peer h-5 w-5 cursor-pointer appearance-none rounded border-2 border-slate-300 checked:bg-green-600 checked:border-green-600 transition-all" />
+                        <input type="checkbox" checked={formData.isActive !== undefined ? formData.isActive : true} onChange={e => setFormData({...formData, isActive: e.target.checked})} className="peer h-5 w-5 cursor-pointer appearance-none rounded border-2 border-slate-300 checked:bg-green-600 checked:border-green-600 transition-all" />
                         <Check size={14} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100" strokeWidth={4} />
                     </div>
                     <span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">Active</span>

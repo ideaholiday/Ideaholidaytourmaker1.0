@@ -1,3 +1,4 @@
+
 import { LedgerEntry, GSTRecord, GSTCreditNote, PaymentEntry, Booking } from '../types';
 import { gstService } from './gstService';
 import { bookingService } from './bookingService';
@@ -100,7 +101,7 @@ class LedgerExportService {
     allBookings.forEach(booking => {
         if (companyId && booking.companyId !== companyId) return;
 
-        booking.payments.forEach(pay => {
+        booking.payments?.forEach(pay => {
             const pDate = new Date(pay.date);
             if (pDate >= startDate && pDate < endDate && pay.type !== 'REFUND') {
                 const bankLedger = pay.mode === 'CASH' ? 'Cash Account' : 'Bank Account (Main)'; 

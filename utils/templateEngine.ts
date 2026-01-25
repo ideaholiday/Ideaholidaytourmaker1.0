@@ -19,7 +19,8 @@ export const generateItineraryFromTemplate = (
   return template.days.map((dayPlan) => {
     const generatedServices: ItineraryService[] = [];
 
-    dayPlan.slots.forEach((slot) => {
+    // Safely iterate slots
+    dayPlan.slots?.forEach((slot) => {
       const match = findBestMatch(slot, inventory);
       if (match) {
         generatedServices.push(createServiceFromMatch(match, slot.type, pax));

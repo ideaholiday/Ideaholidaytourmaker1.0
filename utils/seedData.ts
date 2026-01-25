@@ -205,6 +205,13 @@ export const seedInternationalInventory = async () => {
         const destId = destMap[a.city];
         if (!destId) continue; 
         const existingItem = existingActivities.find(ea => ea.activityName === a.name && ea.destinationId === destId);
+        
+        // Define default transfer options for seeded data
+        const transferOptions = {
+            sic: { enabled: false, costPerPerson: 0 },
+            pvt: { enabled: false, costPerVehicle: 0, vehicleCapacity: 4 }
+        };
+
         const activityPayload: Activity = {
             id: existingItem ? existingItem.id : '',
             activityName: a.name,
@@ -222,7 +229,8 @@ export const seedInternationalInventory = async () => {
             validFrom: new Date().toISOString().split('T')[0],
             validTo: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
             duration: '4 Hours',
-            startTime: '09:00 AM'
+            startTime: '09:00 AM',
+            transferOptions: transferOptions
         };
         await adminService.saveActivity(activityPayload);
         updatedActivities++;
@@ -270,10 +278,6 @@ export const seedInternationalInventory = async () => {
     // 5. Fixed Packages
     const existingPackages = await adminService.getFixedPackages();
     for (const p of PACKAGES_DATA) {
-        // Resolve a destination ID for the package (e.g. first city in that country found in map)
-        // Simple heuristic: find a city that matches name or assume user manually fixes.
-        // For Seed, let's pick a known city ID if available, or skip destination link.
-        // Better: We added destinations above. Let's try to map by package name context.
         let destId = '';
         if (p.packageName.includes('Vietnam')) destId = destMap['Hanoi'];
         else if (p.packageName.includes('Bali')) destId = destMap['Bali'];
@@ -310,7 +314,6 @@ export const seedInternationalInventory = async () => {
     }
 
     // 7. Quick Quote Templates
-    // Note: requires QuickQuoteTemplateService access
     const existingQuick = await quickQuoteTemplateService.getSystemTemplates();
     for (const q of QUICK_QUOTES_DATA) {
         if (!existingQuick.find(eq => eq.name === q.name)) {

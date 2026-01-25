@@ -304,6 +304,7 @@ export interface Destination {
   currency: string;
   timezone: string;
   isActive: boolean;
+  imageUrl?: string; // Enhanced
   createdBy?: string;
 }
 
@@ -345,15 +346,38 @@ export interface Hotel {
   createdAt?: string; // Added for expiry calculation
 }
 
+// --- ENHANCED ACTIVITY TRANSFER LOGIC ---
+export interface SicOptions {
+  enabled: boolean;
+  costPerPerson: number;
+}
+
+export interface PvtOptions {
+  enabled: boolean;
+  costPerVehicle: number;
+  vehicleCapacity: number;
+}
+
+export interface ActivityTransferOptions {
+  sic: SicOptions;
+  pvt: PvtOptions;
+}
+
 export interface Activity {
   id: string;
   activityName: string;
   destinationId: string;
   activityType: 'City Tour' | 'Adventure' | 'Cruise' | 'Show' | 'Theme Park' | 'Other';
+  
+  // SPLIT PRICING
   costAdult: number;
   costChild: number;
+  
+  // TRANSFER CONFIG
+  transferOptions: ActivityTransferOptions;
+
   ticketIncluded: boolean;
-  transferIncluded: boolean;
+  transferIncluded: boolean; // Legacy flag
   isActive: boolean;
   createdBy?: string;
   currency?: string;
@@ -727,10 +751,13 @@ export interface OperatorInventoryItem {
   transferType?: 'PVT' | 'SIC';
   maxPassengers?: number;
   costBasis?: 'Per Vehicle' | 'Per Person';
+  luggageCapacity?: number;
   
   // Activity Specific
   activityType?: string;
+  costAdult?: number;
   costChild?: number;
+  transferOptions?: ActivityTransferOptions;
   
   // Approval Workflow
   status: InventoryStatus;

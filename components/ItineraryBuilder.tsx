@@ -59,6 +59,9 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   // --- SERVICE ACTIONS ---
 
   const handleAddService = (item: any) => {
+      // Logic for cost:
+      // InventoryModal now returns a calculated 'estimated_cost' in the item object.
+      // We rely on that primarily.
       const rawCost = item.estimated_cost || item.cost || item.costPrice || item.price || 0;
       
       const newService: ItineraryService = {
@@ -67,7 +70,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
           type: item.type,
           name: item.name,
           cost: Number(rawCost),
-          price: Number(rawCost),
+          price: Number(rawCost), // Will be recalculated by builder logic
           currency: item.currency || 'INR',
           quantity: Number(item.quantity) || 1,
           duration_nights: Number(item.nights) || 1,
@@ -428,9 +431,40 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                                     )}
                                                     <div>
                                                         <p className="font-bold text-slate-800 text-sm truncate">{svc.name}</p>
+                                                        
+                                                        {/* Hotel Details */}
                                                         {svc.type === 'HOTEL' && (
                                                             <p className="text-xs text-slate-500 mt-0.5">
-                                                                {svc.duration_nights} Nights x {svc.quantity} Rooms
+                                                                {svc.duration_nights} Nights • {svc.quantity} Rooms
+                                                            </p>
+                                                        )}
+
+                                                        {/* Activity Details (Enhanced) */}
+                                                        {svc.type === 'ACTIVITY' && (
+                                                            <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-3 gap-y-1 items-center">
+                                                                {svc.meta?.paxDetails && (
+                                                                    <span title="Passengers">
+                                                                        Adults: {svc.meta.paxDetails.adult}
+                                                                        {svc.meta.paxDetails.child > 0 && `, Kids: ${svc.meta.paxDetails.child}`}
+                                                                    </span>
+                                                                )}
+                                                                {svc.meta?.transferMode && (
+                                                                    <span className={`px-1.5 py-0.5 rounded border ${
+                                                                        svc.meta.transferMode === 'PVT' ? 'bg-purple-50 text-purple-700 border-purple-100' :
+                                                                        svc.meta.transferMode === 'SIC' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                                        'bg-slate-100 text-slate-600 border-slate-200'
+                                                                    }`}>
+                                                                        {svc.meta.transferMode === 'PVT' ? 'Private Transfer' : 
+                                                                         svc.meta.transferMode === 'SIC' ? 'Shared Transfer' : 'Ticket Only'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Transfer Details */}
+                                                        {svc.type === 'TRANSFER' && svc.meta?.vehicle && (
+                                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                                Vehicle: {svc.meta.vehicle}
                                                             </p>
                                                         )}
                                                     </div>
@@ -441,9 +475,8 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                                             <div className="flex items-center gap-6 pt-2">
                                                 <div className="text-right">
                                                     <p className="font-mono font-bold text-slate-700 text-sm">
-                                                        {svc.currency || 'INR'} {(svc.cost * (svc.quantity||1) * (svc.duration_nights||1)).toLocaleString()}
+                                                        {svc.currency || 'INR'} {svc.cost.toLocaleString()}
                                                     </p>
-                                                    {svc.cost === 0 && <span className="text-[10px] text-red-500 font-bold flex items-center justify-end gap-1"><Info size={10}/> No Price</span>}
                                                 </div>
                                                 
                                                 <div className="flex flex-col gap-1 border-l border-slate-100 pl-3">
@@ -503,6 +536,7 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                 onSelect={handleAddService}
                 currentServices={activeDay?.services || []} 
                 defaultNights={suggestedNights}
+                paxCount={pax} // PASS PAX COUNT HERE
             />
         )}
     </div>

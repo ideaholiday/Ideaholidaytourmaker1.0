@@ -1,3 +1,4 @@
+
 import { User, ExportLog } from '../types';
 import { gstService } from './gstService';
 import { bookingService } from './bookingService';
@@ -24,7 +25,7 @@ class AccountingExportService {
 
     const payments: any[] = [];
     bookings.forEach(b => {
-        b.payments.forEach(p => {
+        b.payments?.forEach(p => {
             const d = new Date(p.date);
             if (d >= startDate && d <= endDate) {
                 // Attach agent name temporarily for CSV builder
@@ -63,7 +64,7 @@ class AccountingExportService {
 
   /**
    * Generates Zoho CSV Files (Multiple)
-   * Note: In a real app we'd Zip these. Here we trigger multiple downloads.
+   * Note: In a real app, we'd Zip these. Here we trigger multiple downloads.
    */
   async generateZohoExport(from: string, to: string, user: User): Promise<void> {
     const { invoices, payments, creditNotes } = await this.getData(new Date(from), new Date(to));

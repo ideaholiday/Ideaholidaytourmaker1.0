@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService'; 
 import { inventoryService } from '../../services/inventoryService';
-import { X, Search, Hotel, Camera, Car, Plus, ShieldCheck, User, MapPin, Globe, PenTool, CheckCircle, Image as ImageIcon, Loader2, Moon } from 'lucide-react';
+import { X, Search, Hotel, Camera, Car, Plus, ShieldCheck, User, MapPin, Globe, PenTool, CheckCircle, Image as ImageIcon, Loader2, Moon, Calendar, Bus, Ticket, Info, Briefcase, Users } from 'lucide-react';
 import { BuilderService } from './ItineraryBuilderContext';
-import { ItineraryService } from '../../types';
+import { ItineraryService, ActivityTransferOptions } from '../../types';
 
 interface Props {
   isOpen: boolean;
@@ -15,32 +15,127 @@ interface Props {
   destinationId: string;
   currentServices?: (BuilderService | ItineraryService)[]; 
   defaultNights?: number;
+  paxCount?: number; // Added to support calculation
 }
 
-// Inner Component for Item Row to manage local state (e.g. Nights)
+const DEFAULT_ACTIVITY_OPTS: ActivityTransferOptions = {
+    sic: { enabled: false, costPerPerson: 0 },
+    pvt: { enabled: false, costPerVehicle: 0, vehicleCapacity: 4 }
+};
+
+// Inner Component for Item Row to manage local state (e.g. Nights, Pax, Transfer Mode)
 const InventoryItemRow: React.FC<{
     item: any;
     type: string;
-    onAdd: (item: any, nights: number) => void;
+    onAdd: (item: any, nights: number, quantity: number, customMeta?: any, customCost?: number) => void;
     isAdded: boolean;
     defaultNights: number;
+    defaultPax: number;
     getCityName: (id: string) => string;
-}> = ({ item, type, onAdd, isAdded, defaultNights, getCityName }) => {
+}> = ({ item, type, onAdd, isAdded, defaultNights, defaultPax, getCityName }) => {
+    
+    // Config State
     const [nights, setNights] = useState(defaultNights);
+    // Pax state defaulting to itinerary total, but editable per activity row for flexibility
+    const [pax, setPax] = useState({ adult: defaultPax, child: 0 }); 
+    
+    // Transfer Option State (Rayna Style)
+    // TICKET_ONLY, SIC, PVT
+    const [transferMode, setTransferMode] = useState<'TICKET_ONLY' | 'SIC' | 'PVT'>('TICKET_ONLY');
+
     const name = item.name || item.activityName || item.transferName;
     const isPartner = !!item.operatorId;
-    const cost = item.cost || item.costAdult || item.costPrice || 0;
     const locationName = getCityName(item.destinationId || item.location_id);
     const image = item.imageUrl;
+
+    // Pricing Logic
+    let displayCost = 0;
+    
+    // Extract Transfer Options safely
+    const transferOpts: ActivityTransferOptions = item.transferOptions || DEFAULT_ACTIVITY_OPTS;
+
+    // Calculate dynamic cost based on selection
+    const calculateTotal = () => {
+        // --- TRANSFER LOGIC ---
+        if (type === 'TRANSFER') {
+            const totalPax = pax.adult + pax.child;
+            const capacity = item.maxPassengers || 4; // Default sedan capacity
+            const vehiclesNeeded = Math.max(1, Math.ceil(totalPax / capacity));
+            // For transfers, cost in DB is per vehicle
+            const unitCost = item.cost || item.costPrice || 0;
+            return unitCost * vehiclesNeeded;
+        }
+
+        // --- ACTIVITY LOGIC ---
+        if (type === 'ACTIVITY') {
+            // Base Ticket Cost
+            const baseTicketCost = (item.costAdult * pax.adult) + (item.costChild * pax.child);
+
+            if (transferMode === 'TICKET_ONLY') {
+                return baseTicketCost;
+            } 
+            
+            if (transferMode === 'SIC' && transferOpts.sic.enabled) {
+                // SIC = Base Ticket + (SIC Cost * Total Pax)
+                const totalPax = pax.adult + pax.child;
+                const transferCost = totalPax * transferOpts.sic.costPerPerson;
+                return baseTicketCost + transferCost;
+            } 
+            
+            if (transferMode === 'PVT' && transferOpts.pvt.enabled) {
+                // PVT = Base Ticket + (Vehicles * Vehicle Cost)
+                const totalPax = pax.adult + pax.child;
+                const capacity = transferOpts.pvt.vehicleCapacity || 4; 
+                const vehiclesNeeded = Math.ceil(totalPax / capacity);
+                const transferCost = vehiclesNeeded * transferOpts.pvt.costPerVehicle;
+                
+                return baseTicketCost + transferCost;
+            }
+            return baseTicketCost;
+        }
+
+        // --- HOTEL LOGIC ---
+        return item.cost || item.costPrice || 0;
+    };
+
+    displayCost = calculateTotal();
+
+    const handleAddClick = () => {
+        const customMeta: any = { paxDetails: pax };
+        let quantity = 1;
+        let finalUnitCost = displayCost; // Default behavior: Cost is Total, Qty is 1
+
+        if (type === 'ACTIVITY') {
+             customMeta.transferMode = transferMode;
+             // For Activity, we usually pass total cost as unit cost and qty 1 because pricing is complex (adult/child mix)
+             finalUnitCost = displayCost;
+             quantity = 1;
+        }
+
+        if (type === 'TRANSFER') {
+            const totalPax = pax.adult + pax.child;
+            const capacity = item.maxPassengers || 4;
+            const vehicles = Math.max(1, Math.ceil(totalPax / capacity));
+            
+            quantity = vehicles;
+            // For Transfer, we pass UNIT cost per vehicle, and QTY as number of vehicles
+            // This ensures the Builder calculates: Unit * Qty
+            finalUnitCost = item.cost || item.costPrice || 0;
+            customMeta.vehicleCapacity = capacity;
+            customMeta.paxCount = totalPax;
+        }
+        
+        onAdd(item, nights, quantity, customMeta, finalUnitCost);
+    };
 
     return (
         <div className={`group flex flex-col md:flex-row bg-white border rounded-xl overflow-hidden transition-all duration-200 ${isAdded ? 'border-emerald-300 ring-1 ring-emerald-100' : 'border-slate-200 hover:border-brand-300 hover:shadow-md'}`}>
             {/* Image Section */}
-            <div className="w-full md:w-32 h-32 md:h-auto bg-slate-100 shrink-0 relative overflow-hidden">
+            <div className="w-full md:w-36 h-auto bg-slate-100 shrink-0 relative overflow-hidden flex flex-col justify-center">
                 {image ? (
-                    <img src={image} alt={name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <img src={image} alt={name} className="w-full h-full object-cover min-h-[140px] transition-transform duration-500 group-hover:scale-105" />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-300">
+                    <div className="w-full h-32 flex items-center justify-center text-slate-300">
                         <ImageIcon size={24} />
                     </div>
                 )}
@@ -57,13 +152,9 @@ const InventoryItemRow: React.FC<{
                     <div className="flex justify-between items-start mb-1">
                         <h4 className="font-bold text-slate-800 text-base">{name}</h4>
                         <div className="flex gap-1 shrink-0 ml-2">
-                            {isPartner ? (
+                            {isPartner && (
                                 <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 font-bold flex items-center gap-1">
                                     <User size={10} /> Partner
-                                </span>
-                            ) : (
-                                <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 font-bold flex items-center gap-1">
-                                    <ShieldCheck size={10} /> System
                                 </span>
                             )}
                         </div>
@@ -80,17 +171,102 @@ const InventoryItemRow: React.FC<{
                                 <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{item.mealPlan || 'RO'}</span>
                             </>
                         )}
+                        {type === 'TRANSFER' && (
+                            <>
+                                <span className="text-slate-300">•</span>
+                                <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">{item.vehicleType}</span>
+                                <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1" title="Max Capacity"><User size={10}/> {item.maxPassengers}</span>
+                                {item.luggageCapacity && <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1"><Briefcase size={10}/> {item.luggageCapacity}</span>}
+                            </>
+                        )}
                     </div>
                     
-                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                        {item.description || 'No detailed description available for this item.'}
-                    </p>
+                    {/* Activity Config (Rayna Style) */}
+                    {type === 'ACTIVITY' && (
+                        <div className="mt-2 bg-slate-50 p-3 rounded-lg border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs mb-3">
+                             <div className="md:col-span-2">
+                                 <label className="block text-slate-500 font-bold mb-1">Transfer Option</label>
+                                 <div className="flex flex-wrap gap-2">
+                                     <button 
+                                        onClick={() => setTransferMode('TICKET_ONLY')}
+                                        className={`px-2 py-1.5 rounded border transition ${transferMode === 'TICKET_ONLY' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-100'}`}
+                                     >
+                                         Without Transfer
+                                     </button>
+
+                                     {transferOpts.sic.enabled && (
+                                         <button 
+                                            onClick={() => setTransferMode('SIC')}
+                                            className={`px-2 py-1.5 rounded border transition flex items-center gap-1 ${transferMode === 'SIC' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-100'}`}
+                                         >
+                                             <Bus size={10} /> Sharing Transfer
+                                         </button>
+                                     )}
+
+                                     {transferOpts.pvt.enabled && (
+                                         <button 
+                                            onClick={() => setTransferMode('PVT')}
+                                            className={`px-2 py-1.5 rounded border transition flex items-center gap-1 ${transferMode === 'PVT' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-100'}`}
+                                         >
+                                             <Car size={10} /> Private Transfer
+                                         </button>
+                                     )}
+                                 </div>
+                             </div>
+                             
+                             <div className="flex items-center gap-2">
+                                 <label className="text-slate-500 font-bold whitespace-nowrap">Adults:</label>
+                                 <input type="number" min="1" value={pax.adult} onChange={e => setPax({...pax, adult: Math.max(1, Number(e.target.value))})} className="w-12 border border-slate-300 rounded p-1 text-center font-bold" />
+                             </div>
+                             <div className="flex items-center gap-2">
+                                 <label className="text-slate-500 font-bold whitespace-nowrap">Children:</label>
+                                 <input type="number" min="0" value={pax.child} onChange={e => setPax({...pax, child: Math.max(0, Number(e.target.value))})} className="w-12 border border-slate-300 rounded p-1 text-center font-bold" />
+                             </div>
+                        </div>
+                    )}
+
+                    {/* Transfer Config (New) */}
+                    {type === 'TRANSFER' && (
+                         <div className="mt-2 bg-blue-50 p-3 rounded-lg border border-blue-100 flex flex-wrap gap-4 text-xs mb-3">
+                             <div className="flex items-center gap-2">
+                                 <label className="text-blue-800 font-bold whitespace-nowrap">Adults:</label>
+                                 <input type="number" min="1" value={pax.adult} onChange={e => setPax({...pax, adult: Math.max(1, Number(e.target.value))})} className="w-12 border border-blue-200 rounded p-1 text-center font-bold text-blue-900" />
+                             </div>
+                             <div className="flex items-center gap-2">
+                                 <label className="text-blue-800 font-bold whitespace-nowrap">Children:</label>
+                                 <input type="number" min="0" value={pax.child} onChange={e => setPax({...pax, child: Math.max(0, Number(e.target.value))})} className="w-12 border border-blue-200 rounded p-1 text-center font-bold text-blue-900" />
+                             </div>
+                             <div className="flex items-center gap-2 ml-auto">
+                                 <Car size={14} className="text-blue-600"/>
+                                 <span className="text-blue-800 font-medium">
+                                     Vehicles Needed: <strong>{Math.ceil((pax.adult + pax.child) / (item.maxPassengers || 4))}</strong>
+                                 </span>
+                             </div>
+                         </div>
+                    )}
+
+                    {/* Enhanced Description & Notes Display */}
+                    <div className="space-y-2 mt-2">
+                        {item.description && (
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                                {item.description}
+                            </p>
+                        )}
+                        {item.notes && (
+                            <div className="flex gap-2 items-start text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-100">
+                                <Info size={14} className="shrink-0 mt-0.5" /> 
+                                <span className="font-medium">{item.notes}</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex justify-between items-end mt-4 pt-3 border-t border-slate-50">
                     <div className="text-left">
-                        <p className="text-[10px] text-slate-400 uppercase font-bold">Net Cost</p>
-                        <p className="font-mono text-base font-bold text-slate-700">{item.currency || 'INR'} {cost.toLocaleString()}</p>
+                        <p className="text-[10px] text-slate-400 uppercase font-bold">Total Net</p>
+                        <p className="font-mono text-base font-bold text-slate-700">
+                            {item.currency || 'INR'} {displayCost.toLocaleString()}
+                        </p>
                     </div>
                     
                     <div className="flex items-center gap-2">
@@ -110,7 +286,7 @@ const InventoryItemRow: React.FC<{
                              </div>
                          )}
                          <button 
-                            onClick={() => onAdd(item, nights)}
+                            onClick={handleAddClick}
                             className={`${isAdded ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' : 'bg-slate-900 text-white hover:bg-brand-600 shadow-md'} px-5 py-2 rounded-lg transition text-xs font-bold flex items-center gap-1.5`}
                         >
                             {isAdded ? <><CheckCircle size={14} /> Added</> : <><Plus size={14} /> Add</>}
@@ -122,7 +298,7 @@ const InventoryItemRow: React.FC<{
     );
 };
 
-export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, type, destinationId, currentServices = [], defaultNights = 1 }) => {
+export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, type, destinationId, currentServices = [], defaultNights = 1, paxCount = 1 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [items, setItems] = useState<any[]>([]);
   const [allDestinations, setAllDestinations] = useState<any[]>([]);
@@ -135,7 +311,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
 
   useEffect(() => {
     if (isOpen) {
-        setFilterCityId(destinationId || ''); // Reset filter when opening new context
+        setFilterCityId(destinationId || ''); 
         loadItems();
     }
   }, [isOpen, type, destinationId]);
@@ -143,13 +319,10 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
   const loadItems = async () => {
     setLoading(true);
     try {
-        // Ensure destinations are loaded for mapping
         const dests = await adminService.getDestinations();
         setAllDestinations(dests);
 
         let mergedItems: any[] = [];
-
-        // 1. Fetch System Inventory (Async to ensure data)
         let systemItems: any[] = [];
         if (type === 'HOTEL') systemItems = await adminService.getHotels();
         else if (type === 'ACTIVITY') systemItems = await adminService.getActivities();
@@ -157,7 +330,6 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
         
         mergedItems = [...systemItems];
 
-        // 2. Fetch Approved Partner Inventory
         const allItems = await inventoryService.getAllItems();
         if (allItems.length === 0) {
             await inventoryService.syncFromCloud();
@@ -176,18 +348,28 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
 
   if (!isOpen) return null;
 
-  const handleAddItem = (item: any, selectedNights: number) => {
+  const handleAddItem = (item: any, selectedNights: number, quantity: number, customMeta?: any, customCost?: number) => {
+      // Use passed custom cost (Total for all pax/nights) or base cost
+      const finalCost = customCost !== undefined ? customCost : (item.cost || item.costAdult || item.costPrice || 0);
+
       const service: BuilderService = {
           id: `svc_${Date.now()}`,
           inventory_id: item.id,
           type: type,
           name: item.name || item.activityName || item.transferName,
           description: item.description,
-          estimated_cost: item.cost || item.costAdult || item.costPrice || 0,
+          estimated_cost: finalCost,
           currency: item.currency || 'INR',
-          quantity: 1, 
+          quantity: quantity || 1, 
           nights: type === 'HOTEL' ? selectedNights : undefined,
-          meta: type === 'HOTEL' ? { roomType: item.roomType, mealPlan: item.mealPlan, imageUrl: item.imageUrl } : { imageUrl: item.imageUrl }
+          meta: { 
+              ...customMeta,
+              roomType: type === 'HOTEL' ? item.roomType : undefined,
+              mealPlan: type === 'HOTEL' ? item.mealPlan : undefined,
+              imageUrl: item.imageUrl,
+              vehicle: type === 'TRANSFER' ? item.vehicleType : undefined,
+              capacity: type === 'TRANSFER' ? item.maxPassengers : undefined
+          }
       };
       onSelect(service);
   };
@@ -206,7 +388,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
           meta: { originalType: type, imageUrl: customItem.imageUrl } 
       };
       onSelect(service);
-      setCustomItem({ name: '', cost: '', desc: '', imageUrl: '' }); // Reset form
+      setCustomItem({ name: '', cost: '', desc: '', imageUrl: '' }); 
       setShowCustomForm(false);
   };
 
@@ -364,6 +546,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
                                 onAdd={handleAddItem}
                                 isAdded={currentServices.some((s: any) => s.inventory_id === item.id)}
                                 defaultNights={defaultNights}
+                                defaultPax={paxCount}
                                 getCityName={getCityName}
                             />
                         ))}

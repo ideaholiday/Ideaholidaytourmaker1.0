@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Destination } from '../../types';
-import { Edit2, Trash2, Plus, X, Map, Globe, Clock, Coins, Check, Search } from 'lucide-react';
+import { Edit2, Trash2, Plus, X, Map, Globe, Clock, Coins, Check, Search, Image as ImageIcon } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 
 export const Destinations: React.FC = () => {
@@ -40,7 +40,7 @@ export const Destinations: React.FC = () => {
       setFormData(dest);
     } else {
       setEditingDest(null);
-      setFormData({ isActive: true, currency: 'INR', timezone: 'GMT+5:30' });
+      setFormData({ isActive: true, currency: 'INR', timezone: 'GMT+5:30', imageUrl: '' });
     }
     setIsModalOpen(true);
   };
@@ -56,6 +56,7 @@ export const Destinations: React.FC = () => {
       currency: 'INR', 
       timezone: formData.timezone || 'GMT',
       isActive: formData.isActive || false,
+      imageUrl: formData.imageUrl || '',
       createdBy: editingDest?.createdBy || user?.id
     });
 
@@ -81,12 +82,9 @@ export const Destinations: React.FC = () => {
             <div className="flex gap-3">
                 <InventoryImportExport 
                     data={displayedDestinations}
-                    headers={['id', 'city', 'country', 'currency', 'timezone', 'isActive']}
+                    headers={['id', 'city', 'country', 'currency', 'timezone', 'isActive', 'imageUrl']}
                     filename="destinations"
-                    onImport={(data) => {
-                         alert("Import processed");
-                         loadDestinations();
-                    }}
+                    onImport={() => loadDestinations()}
                 />
                 <button 
                     onClick={() => handleOpenModal()}
@@ -127,8 +125,12 @@ export const Destinations: React.FC = () => {
               <tr key={dest.id} className="hover:bg-brand-50/30 transition-colors">
                 <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-50 text-brand-600 flex items-center justify-center border border-blue-100">
-                            <Map size={18} />
+                        <div className="w-10 h-10 rounded-lg bg-blue-50 text-brand-600 flex items-center justify-center border border-blue-100 overflow-hidden">
+                            {dest.imageUrl ? (
+                                <img src={dest.imageUrl} alt={dest.city} className="w-full h-full object-cover" />
+                            ) : (
+                                <Map size={18} />
+                            )}
                         </div>
                         <div>
                             <p className="font-bold text-slate-900 text-base">{dest.city}</p>
@@ -209,6 +211,20 @@ export const Destinations: React.FC = () => {
                         onChange={e => setFormData({...formData, country: e.target.value})}
                         className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white text-slate-900 font-medium transition-all shadow-sm"
                         placeholder="e.g. UAE"
+                        />
+                    </div>
+                  </div>
+                  
+                   <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Image URL</label>
+                    <div className="relative">
+                        <ImageIcon size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
+                        <input 
+                        type="text" 
+                        value={formData.imageUrl || ''}
+                        onChange={e => setFormData({...formData, imageUrl: e.target.value})}
+                        className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none bg-white shadow-sm"
+                        placeholder="https://example.com/image.jpg"
                         />
                     </div>
                   </div>

@@ -3,7 +3,7 @@ import React from 'react';
 import { ItineraryItem } from '../types';
 import { 
   CheckCircle, Car, Hotel, Camera, Calendar, 
-  MapPin, Coffee, Utensils, Flag, Clock 
+  MapPin, Coffee, Utensils, Flag, Clock, Users, Briefcase
 } from 'lucide-react';
 
 interface Props {
@@ -122,6 +122,19 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                             <Car size={10} /> {svc.meta.vehicle}
                                                         </span>
                                                     )}
+                                                    {/* Pax Count Badges for Activities & Transfers */}
+                                                    {svc.meta?.paxDetails && (
+                                                        <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100" title="Passengers">
+                                                            <Users size={10} /> {svc.meta.paxDetails.adult}A {svc.meta.paxDetails.child > 0 ? `+ ${svc.meta.paxDetails.child}C` : ''}
+                                                        </span>
+                                                    )}
+                                                    {/* Vehicle Count for Transfers */}
+                                                    {svc.type === 'TRANSFER' && svc.quantity > 1 && (
+                                                        <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
+                                                            <Car size={10} /> {svc.quantity} Vehicles
+                                                        </span>
+                                                    )}
+
                                                     {svc.meta?.type && svc.type === 'ACTIVITY' && (
                                                         <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
                                                             <Camera size={10} /> {svc.meta.type}

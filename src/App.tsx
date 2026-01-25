@@ -1,86 +1,86 @@
-import React, { useMemo, ReactNode, Component, ErrorInfo } from 'react';
+import React, { Component, useMemo, ReactNode, ErrorInfo } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
-import { Footer } from '../components/Footer';
-import { SessionWatcher } from '../components/SessionWatcher';
-import { ProtectedRoute } from '../components/ProtectedRoute';
-import { BrandContext, resolveAgentBranding } from '../context/BrandContext';
+import { Navbar } from './components/Navbar';
+import { Footer } from './components/Footer';
+import { SessionWatcher } from './components/SessionWatcher';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { BrandContext, resolveAgentBranding } from './context/BrandContext';
 
 // Pages
-import { Home } from '../pages/Home';
-import { Login } from '../pages/Login';
-import { Signup } from '../pages/Signup';
-import { ForgotPassword } from '../pages/ForgotPassword'; 
-import { ResetPassword } from '../pages/ResetPassword'; 
-import { VerifyEmail } from '../pages/VerifyEmail';
-import { AuthActionHandler } from '../pages/AuthActionHandler'; 
-import { Unauthorized } from '../pages/Unauthorized';
-import { QuoteDetail } from '../pages/QuoteDetail';
-import { Terms, Privacy, Support, Faq } from '../pages/StaticPages';
-import { AuthProvider, useAuth } from '../context/AuthContext';
-import { UserRole } from '../types';
+import { Home } from './pages/Home';
+import { Login } from './pages/Login';
+import { Signup } from './pages/Signup';
+import { ForgotPassword } from './pages/ForgotPassword'; 
+import { ResetPassword } from './pages/ResetPassword'; 
+import { VerifyEmail } from './pages/VerifyEmail';
+import { AuthActionHandler } from './pages/AuthActionHandler'; 
+import { Unauthorized } from './pages/Unauthorized';
+import { QuoteDetail } from './pages/QuoteDetail';
+import { Terms, Privacy, Support, Faq } from './pages/StaticPages';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { UserRole } from './types';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 // Admin CMS Imports
-import { AdminLayout } from '../pages/admin/AdminLayout';
-import { AdminDashboard } from '../pages/admin/AdminDashboard';
-import { OpsDashboard } from '../pages/admin/OpsDashboard'; 
-import { UserManagement } from '../pages/admin/UserManagement'; 
-import { AgentsList } from '../pages/admin/AgentsList';
-import { AgentProfile } from '../pages/admin/AgentProfile';
-import { OperatorsList } from '../pages/admin/OperatorsList';
-import { OperatorProfile } from '../pages/admin/OperatorProfile';
-import { StaffManagement } from '../pages/admin/StaffManagement';
-import { AuditLogs } from '../pages/admin/AuditLogs'; 
-import { GstDashboard } from '../pages/admin/GstDashboard'; 
-import { CompanyManagement } from '../pages/admin/CompanyManagement'; 
-import { FinancialLedgerExport } from '../pages/admin/FinancialLedgerExport'; 
-import { PaymentReminderSettings } from '../pages/admin/PaymentReminderSettings'; 
-import { PLReports } from '../pages/admin/PLReports'; 
-import { Destinations } from '../pages/admin/Destinations';
-import { Hotels } from '../pages/admin/Hotels';
-import { Sightseeing } from '../pages/admin/Sightseeing';
-import { Transfers } from '../pages/admin/Transfers';
-import { VisaPage } from '../pages/admin/Visa';
-import { FixedPackages } from '../pages/admin/FixedPackages';
-import { SystemTemplates } from '../pages/admin/SystemTemplates';
-import { QuickQuoteTemplateManager } from '../pages/admin/QuickQuoteTemplateManager'; 
-import { BookingManager } from '../pages/admin/BookingManager';
-import { CurrencyManagement } from '../pages/admin/CurrencyManagement';
-import { InventoryApproval } from '../pages/admin/InventoryApproval';
-import { Suppliers } from '../pages/admin/Suppliers'; 
-import { Contracts } from '../pages/admin/Contracts'; 
-import { ContractApproval } from '../pages/admin/ContractApproval'; 
+import { AdminLayout } from './pages/admin/AdminLayout';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { OpsDashboard } from './pages/admin/OpsDashboard'; 
+import { UserManagement } from './pages/admin/UserManagement'; 
+import { AgentsList } from './pages/admin/AgentsList';
+import { AgentProfile } from './pages/admin/AgentProfile';
+import { OperatorsList } from './pages/admin/OperatorsList';
+import { OperatorProfile } from './pages/admin/OperatorProfile';
+import { StaffManagement } from './pages/admin/StaffManagement';
+import { AuditLogs } from './pages/admin/AuditLogs'; 
+import { GstDashboard } from './pages/admin/GstDashboard'; 
+import { CompanyManagement } from './pages/admin/CompanyManagement'; 
+import { FinancialLedgerExport } from './pages/admin/FinancialLedgerExport'; 
+import { PaymentReminderSettings } from './pages/admin/PaymentReminderSettings'; 
+import { PLReports } from './pages/admin/PLReports'; 
+import { Destinations } from './pages/admin/Destinations';
+import { Hotels } from './pages/admin/Hotels';
+import { Sightseeing } from './pages/admin/Sightseeing';
+import { Transfers } from './pages/admin/Transfers';
+import { VisaPage } from './pages/admin/Visa';
+import { FixedPackages } from './pages/admin/FixedPackages';
+import { SystemTemplates } from './pages/admin/SystemTemplates';
+import { QuickQuoteTemplateManager } from './pages/admin/QuickQuoteTemplateManager'; 
+import { BookingManager } from './pages/admin/BookingManager';
+import { CurrencyManagement } from './pages/admin/CurrencyManagement';
+import { InventoryApproval } from './pages/admin/InventoryApproval';
+import { Suppliers } from './pages/admin/Suppliers'; 
+import { Contracts } from './pages/admin/Contracts'; 
+import { ContractApproval } from './pages/admin/ContractApproval'; 
 
 // Agent Panel Imports
-import { AgentDashboard } from '../pages/agent/AgentDashboard';
-import { QuoteList } from '../pages/agent/QuoteList';
-import { QuickQuote } from '../pages/agent/QuickQuote';
-import { SmartBuilder } from '../pages/agent/SmartBuilder';
-import { BookingDetail } from '../pages/agent/BookingDetail';
-import { Branding } from '../pages/agent/Branding';
-import { AgentPLReport } from '../pages/agent/PLReport'; 
-import { GuideBook } from '../pages/agent/GuideBook'; 
-import { AgentPackages } from '../pages/agent/AgentPackages';
-import { AgentTemplates } from '../pages/agent/AgentTemplates';
-import { AgentVisa } from '../pages/agent/AgentVisa';
+import { AgentDashboard } from './pages/agent/AgentDashboard';
+import { QuoteList } from './pages/agent/QuoteList';
+import { QuickQuote } from './pages/agent/QuickQuote';
+import { SmartBuilder } from './pages/agent/SmartBuilder';
+import { BookingDetail } from './pages/agent/BookingDetail';
+import { Branding } from './pages/agent/Branding';
+import { AgentPLReport } from './pages/agent/PLReport'; 
+import { GuideBook } from './pages/agent/GuideBook'; 
+import { AgentPackages } from './pages/agent/AgentPackages';
+import { AgentTemplates } from './pages/agent/AgentTemplates';
+import { AgentVisa } from './pages/agent/AgentVisa';
 
 // Operator Panel Imports
-import { OperatorDashboard } from '../pages/operator/OperatorDashboard';
-import { OperatorBookingView } from '../pages/operator/OperatorBookingView';
-import { AssignedQuotes } from '../pages/operator/AssignedQuotes';
-import { AssignedBookings } from '../pages/operator/AssignedBookings';
-import { WorkQueue } from '../pages/operator/WorkQueue'; 
-import { OperatorGuideBook } from '../pages/operator/OperatorGuideBook'; 
-import { InventoryManager } from '../pages/operator/InventoryManager'; 
-import { OperatorProfilePage } from '../pages/operator/OperatorProfilePage';
+import { OperatorDashboard } from './pages/operator/OperatorDashboard';
+import { OperatorBookingView } from './pages/operator/OperatorBookingView';
+import { AssignedQuotes } from './pages/operator/AssignedQuotes';
+import { AssignedBookings } from './pages/operator/AssignedBookings';
+import { WorkQueue } from './pages/operator/WorkQueue'; 
+import { OperatorGuideBook } from './pages/operator/OperatorGuideBook'; 
+import { InventoryManager } from './pages/operator/InventoryManager'; 
+import { OperatorProfilePage } from './pages/operator/OperatorProfilePage';
 
 // Supplier Panel Imports
-import { SupplierDashboard } from '../pages/supplier/SupplierDashboard';
+import { SupplierDashboard } from './pages/supplier/SupplierDashboard';
 
 // Public View
-import { ClientTripView } from '../pages/public/ClientTripView';
-import { ClientPaymentPage } from '../pages/public/ClientPaymentPage'; 
+import { ClientTripView } from './pages/public/ClientTripView';
+import { ClientPaymentPage } from './pages/public/ClientPaymentPage'; 
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -93,10 +93,7 @@ interface ErrorBoundaryState {
 
 // --- ERROR BOUNDARY ---
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false };
-  }
+  public state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
