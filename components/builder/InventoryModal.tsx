@@ -43,6 +43,11 @@ const InventoryItemRow: React.FC<{
     // TICKET_ONLY, SIC, PVT
     const [transferMode, setTransferMode] = useState<'TICKET_ONLY' | 'SIC' | 'PVT'>('TICKET_ONLY');
 
+    // Sync nights if default changes (e.g. city duration calc)
+    useEffect(() => {
+        setNights(defaultNights);
+    }, [defaultNights]);
+
     const name = item.name || item.activityName || item.transferName;
     const isPartner = !!item.operatorId;
     const locationName = getCityName(item.destinationId || item.location_id);
@@ -248,7 +253,7 @@ const InventoryItemRow: React.FC<{
                     {/* Enhanced Description & Notes Display */}
                     <div className="space-y-2 mt-2">
                         {item.description && (
-                            <p className="text-xs text-slate-600 leading-relaxed">
+                            <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
                                 {item.description}
                             </p>
                         )}
@@ -357,6 +362,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
           inventory_id: item.id,
           type: type,
           name: item.name || item.activityName || item.transferName,
+          // CRITICAL: Ensure description and notes are passed correctly
           description: item.description,
           estimated_cost: finalCost,
           currency: item.currency || 'INR',
@@ -364,6 +370,8 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
           nights: type === 'HOTEL' ? selectedNights : undefined,
           meta: { 
               ...customMeta,
+              description: item.description, // Explicitly pass text fields
+              notes: item.notes,
               roomType: type === 'HOTEL' ? item.roomType : undefined,
               mealPlan: type === 'HOTEL' ? item.mealPlan : undefined,
               imageUrl: item.imageUrl,
@@ -385,7 +393,11 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
           currency: 'INR',
           quantity: 1,
           nights: type === 'HOTEL' ? 1 : undefined,
-          meta: { originalType: type, imageUrl: customItem.imageUrl } 
+          meta: { 
+              originalType: type, 
+              imageUrl: customItem.imageUrl,
+              description: customItem.desc 
+          } 
       };
       onSelect(service);
       setCustomItem({ name: '', cost: '', desc: '', imageUrl: '' }); 

@@ -29,6 +29,23 @@ const BuilderContent: React.FC = () => {
       return { hotels, activities };
   };
 
+  // Logic to calculate suggested hotel nights based on itinerary city sequence
+  const calculateSuggestedNights = (dayId: string, destId: string): number => {
+      const dayIndex = state.days.findIndex(d => d.id === dayId);
+      if (dayIndex === -1) return 1;
+
+      let nights = 1;
+      // Look ahead in the itinerary for consecutive days with the same destination
+      for (let i = dayIndex + 1; i < state.days.length; i++) {
+          if (state.days[i].destination_id === destId) {
+              nights++;
+          } else {
+              break;
+          }
+      }
+      return nights;
+  };
+
   if (state.days.length === 0) {
       return (
           <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
@@ -189,6 +206,8 @@ const BuilderContent: React.FC = () => {
                   dayId={modalConfig.dayId}
                   type={modalConfig.type}
                   destinationId={modalConfig.destId}
+                  // Calculate default nights if Hotel, otherwise default to 1
+                  defaultNights={modalConfig.type === 'HOTEL' ? calculateSuggestedNights(modalConfig.dayId, modalConfig.destId) : 1}
                   // New Prop for visual feedback
                   currentServices={state.days.find(d => d.id === modalConfig.dayId)?.services || []}
               />

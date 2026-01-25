@@ -3,7 +3,7 @@ import React from 'react';
 import { ItineraryItem } from '../types';
 import { 
   CheckCircle, Car, Hotel, Camera, Calendar, 
-  MapPin, Coffee, Utensils, Flag, Clock, Users, Briefcase
+  MapPin, Coffee, Utensils, Flag, Clock, Users, Briefcase, Info
 } from 'lucide-react';
 
 interface Props {
@@ -72,7 +72,7 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                     </div>
 
                     <div className="p-6">
-                        {/* Description */}
+                        {/* Day Description */}
                         {item.description && (
                             <div className="mb-6 text-slate-600 text-sm leading-relaxed whitespace-pre-line border-l-2 border-slate-200 pl-4">
                                 {item.description}
@@ -89,7 +89,7 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                     {item.services.map((svc, sIdx) => (
                                         <div key={sIdx} className="flex items-start p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-brand-200 hover:shadow-sm transition-all group/svc">
                                             {/* Service Icon */}
-                                            <div className={`p-2.5 rounded-xl mr-3 shadow-sm flex items-center justify-center ${
+                                            <div className={`p-2.5 rounded-xl mr-3 shadow-sm shrink-0 flex items-center justify-center ${
                                                 svc.type === 'HOTEL' ? 'bg-white text-indigo-600' :
                                                 svc.type === 'ACTIVITY' ? 'bg-white text-rose-500' :
                                                 svc.type === 'TRANSFER' ? 'bg-white text-sky-600' : 'bg-white text-slate-600'
@@ -106,6 +106,13 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 uppercase tracking-wide shrink-0">{svc.type}</span>
                                                 </div>
                                                 
+                                                {/* Service Description (New) */}
+                                                {svc.meta?.description && (
+                                                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                                                        {svc.meta.description}
+                                                    </p>
+                                                )}
+
                                                 <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
                                                     {svc.meta?.roomType && (
                                                         <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
@@ -122,13 +129,14 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                             <Car size={10} /> {svc.meta.vehicle}
                                                         </span>
                                                     )}
-                                                    {/* Pax Count Badges for Activities & Transfers */}
+                                                    
+                                                    {/* Pax Count Badges for Activities & Transfers (New) */}
                                                     {svc.meta?.paxDetails && (
                                                         <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100" title="Passengers">
                                                             <Users size={10} /> {svc.meta.paxDetails.adult}A {svc.meta.paxDetails.child > 0 ? `+ ${svc.meta.paxDetails.child}C` : ''}
                                                         </span>
                                                     )}
-                                                    {/* Vehicle Count for Transfers */}
+                                                    {/* Vehicle Count for Transfers (New) */}
                                                     {svc.type === 'TRANSFER' && svc.quantity > 1 && (
                                                         <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
                                                             <Car size={10} /> {svc.quantity} Vehicles
@@ -141,6 +149,13 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                         </span>
                                                     )}
                                                 </div>
+
+                                                {/* Internal Note (New) */}
+                                                {svc.meta?.notes && (
+                                                    <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-100">
+                                                        <Info size={10} className="mt-0.5 shrink-0"/> {svc.meta.notes}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

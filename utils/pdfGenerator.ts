@@ -205,7 +205,7 @@ export const generateQuotePDF = (
           } 
       }]);
       
-      // Description
+      // Day Description
       if(item.description) {
           tableBody.push([{ 
               content: cleanText(item.description), 
@@ -220,25 +220,54 @@ export const generateQuotePDF = (
               let typeLabel: string = svc.type;
               
               let details = "";
-              // Basic Meta
+              let extraDetails = "";
+
+              // 1. Core Meta (Room/Meal/Vehicle)
               if (svc.meta?.roomType) details += `Room: ${svc.meta.roomType}`;
               if (svc.meta?.mealPlan) details += ` (${svc.meta.mealPlan})`;
               if (svc.meta?.vehicle) details += `Vehicle: ${svc.meta.vehicle}`;
-              if (svc.meta?.type) details += `Type: ${svc.meta.type}`;
+              if (svc.meta?.type && svc.type === 'ACTIVITY') details += `Type: ${svc.meta.type}`;
               
-              // Rich Description logic if needed
-              if (svc.meta?.description) {
-                  details += details ? `\n` : '';
-                  details += `${svc.meta.description}`;
+              // 2. Quantity Logic for Transfers
+              if (svc.type === 'TRANSFER' && svc.quantity > 1) {
+                  details += details ? ` | ` : '';
+                  details += `${svc.quantity} Vehicles`;
+              }
+              
+              // 3. Pax Details (New)
+              if (svc.meta?.paxDetails) {
+                  const { adult, child } = svc.meta.paxDetails;
+                  let paxStr = `Pax: ${adult} Adults`;
+                  if (child > 0) paxStr += `, ${child} Child`;
+                  
+                  details += details ? ` | ` : '';
+                  details += paxStr;
               }
 
-              // Sanitize details content
+              // 4. Description (New)
+              if (svc.meta?.description) {
+                  extraDetails += `${svc.meta.description}`;
+              }
+
+              // 5. Notes (New)
+              if (svc.meta?.notes) {
+                  extraDetails += extraDetails ? `\n` : '';
+                  extraDetails += `Note: ${svc.meta.notes}`;
+              }
+
+              // Sanitize
               const sanitizedName = cleanText(svc.name);
-              const sanitizedDetails = cleanText(details);
+              const sanitizedMeta = cleanText(details);
+              const sanitizedExtra = cleanText(extraDetails);
+
+              // Construct final cell content
+              let finalContent = sanitizedName;
+              if (sanitizedMeta) finalContent += `\n${sanitizedMeta}`;
+              if (sanitizedExtra) finalContent += `\n\n${sanitizedExtra}`;
 
               tableBody.push([
                   { content: typeLabel, styles: { fontSize: 9, fontStyle: 'bold', textColor: primaryRGB, valign: 'top' } },
-                  { content: `${sanitizedName}\n${sanitizedDetails}`, styles: { fontSize: 10, valign: 'top' } }
+                  { content: finalContent, styles: { fontSize: 10, valign: 'top' } }
               ]);
           });
       }
