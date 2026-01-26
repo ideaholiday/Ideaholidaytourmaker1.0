@@ -1,13 +1,12 @@
-
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { Quote, PricingBreakdown, UserRole, User, Booking, PaymentEntry, GSTRecord, GSTCreditNote } from '../types';
 import { BRANDING } from '../constants';
 
 // --- STYLING CONSTANTS ---
-const DEFAULT_PRIMARY = [14, 165, 233]; // Brand 500 (#0ea5e9)
-const SECONDARY = [15, 23, 42]; // Slate 900
-const TABLE_HEADER_TEXT = [255, 255, 255]; 
+const DEFAULT_PRIMARY: [number, number, number] = [14, 165, 233]; // Brand 500 (#0ea5e9)
+const SECONDARY: [number, number, number] = [15, 23, 42]; // Slate 900
+const TABLE_HEADER_TEXT: [number, number, number] = [255, 255, 255]; 
 
 interface BrandingOptions {
   companyName: string;
@@ -21,7 +20,7 @@ interface BrandingOptions {
 
 // --- TEXT SANITIZATION HELPER ---
 // jsPDF standard fonts do not support Emojis or advanced Unicode symbols. 
-// This function strips them or replaces them with ASCII equivalents to prevent garbled text.
+// We strip unsupported characters but MUST preserve formatting (newlines).
 const cleanText = (text: string | undefined | null): string => {
     if (!text) return '';
     
@@ -45,8 +44,11 @@ const cleanText = (text: string | undefined | null): string => {
     const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
     clean = clean.replace(emojiRegex, '');
 
-    // 3. Normalize spacing
-    return clean.replace(/\s+/g, ' ').trim();
+    // 3. Normalize spacing BUT PRESERVE NEWLINES
+    // Replace multiple horizontal spaces (not newlines) with single space
+    clean = clean.replace(/[ \t\u00A0]+/g, ' '); 
+
+    return clean.trim();
 };
 
 // Helper: Resolve Branding
@@ -82,7 +84,7 @@ const hexToRgb = (hex: string): [number, number, number] => {
         parseInt(result[1], 16),
         parseInt(result[2], 16),
         parseInt(result[3], 16)
-    ] : [DEFAULT_PRIMARY[0], DEFAULT_PRIMARY[1], DEFAULT_PRIMARY[2]];
+    ] : DEFAULT_PRIMARY;
 };
 
 export const generateQuotePDF = (
@@ -219,55 +221,52 @@ export const generateQuotePDF = (
           item.services.forEach(svc => {
               let typeLabel: string = svc.type;
               
-              let details = "";
-              let extraDetails = "";
+              let detailsParts: string[] = [];
 
               // 1. Core Meta (Room/Meal/Vehicle)
-              if (svc.meta?.roomType) details += `Room: ${svc.meta.roomType}`;
-              if (svc.meta?.mealPlan) details += ` (${svc.meta.mealPlan})`;
-              if (svc.meta?.vehicle) details += `Vehicle: ${svc.meta.vehicle}`;
-              if (svc.meta?.type && svc.type === 'ACTIVITY') details += `Type: ${svc.meta.type}`;
+              if (svc.meta?.roomType) detailsParts.push(`Room: ${svc.meta.roomType}`);
+              if (svc.meta?.mealPlan) detailsParts.push(`Meal: ${svc.meta.mealPlan}`);
+              if (svc.meta?.vehicle) detailsParts.push(`Vehicle: ${svc.meta.vehicle}`);
+              if (svc.meta?.type && svc.type === 'ACTIVITY') detailsParts.push(`Type: ${svc.meta.type}`);
               
               // 2. Quantity Logic for Transfers
               if (svc.type === 'TRANSFER' && svc.quantity > 1) {
-                  details += details ? ` | ` : '';
-                  details += `${svc.quantity} Vehicles`;
+                  detailsParts.push(`${svc.quantity} Vehicles`);
               }
               
               // 3. Pax Details (New)
               if (svc.meta?.paxDetails) {
                   const { adult, child } = svc.meta.paxDetails;
-                  let paxStr = `Pax: ${adult} Adults`;
-                  if (child > 0) paxStr += `, ${child} Child`;
-                  
-                  details += details ? ` | ` : '';
-                  details += paxStr;
+                  let paxStr = `Pax: ${adult} Adt` + (child > 0 ? `, ${child} Chd` : '');
+                  detailsParts.push(paxStr);
               }
 
-              // 4. Description (New)
-              if (svc.meta?.description) {
-                  extraDetails += `${svc.meta.description}`;
-              }
-
-              // 5. Notes (New)
-              if (svc.meta?.notes) {
-                  extraDetails += extraDetails ? `\n` : '';
-                  extraDetails += `Note: ${svc.meta.notes}`;
-              }
-
-              // Sanitize
+              // Sanitize Name
               const sanitizedName = cleanText(svc.name);
-              const sanitizedMeta = cleanText(details);
-              const sanitizedExtra = cleanText(extraDetails);
-
-              // Construct final cell content
+              
+              // Construct Body
               let finalContent = sanitizedName;
-              if (sanitizedMeta) finalContent += `\n${sanitizedMeta}`;
-              if (sanitizedExtra) finalContent += `\n\n${sanitizedExtra}`;
+              
+              // Add Meta Line if exists
+              if (detailsParts.length > 0) {
+                  finalContent += `\n[ ${detailsParts.join(' | ')} ]`;
+              }
+              
+              // Add Description (Preserving Newlines)
+              if (svc.meta?.description) {
+                  const desc = cleanText(svc.meta.description);
+                  if (desc) finalContent += `\n\n${desc}`;
+              }
+
+              // Add Notes
+              if (svc.meta?.notes) {
+                  const note = cleanText(svc.meta.notes);
+                  if (note) finalContent += `\n\nNote: ${note}`;
+              }
 
               tableBody.push([
                   { content: typeLabel, styles: { fontSize: 9, fontStyle: 'bold', textColor: primaryRGB, valign: 'top' } },
-                  { content: finalContent, styles: { fontSize: 10, valign: 'top' } }
+                  { content: finalContent, styles: { fontSize: 10, valign: 'top', cellPadding: 4 } }
               ]);
           });
       }
@@ -292,7 +291,8 @@ export const generateQuotePDF = (
           font: 'times', // Apply serif font to table
           cellPadding: 6, 
           overflow: 'linebreak', // Essential for wrapping long text
-          fontSize: 10
+          fontSize: 10,
+          valign: 'top'
       },
       margin: { top: 15, right: 15, bottom: 15, left: 15 }, 
       didParseCell: (data) => {
