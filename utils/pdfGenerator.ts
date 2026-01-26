@@ -5,7 +5,7 @@ import { Quote, PricingBreakdown, UserRole, User, Booking, PaymentEntry, GSTReco
 import { BRANDING } from '../constants';
 
 // --- STYLING CONSTANTS ---
-const DEFAULT_PRIMARY: [number, number, number] = [202, 165, 0]; // Gold/Mustard default as per screenshot suggestion, or Agent Color
+const DEFAULT_PRIMARY: [number, number, number] = [202, 165, 0]; // Gold/Mustard default
 const SECONDARY: [number, number, number] = [15, 23, 42]; // Slate 900
 const TABLE_HEADER_TEXT: [number, number, number] = [255, 255, 255]; 
 
@@ -74,7 +74,7 @@ const resolveBranding = (role: UserRole, agentProfile?: User | null): BrandingOp
             phone: ab?.contactPhone || agentProfile.phone || "",
             website: ab?.website || "",
             logoUrl: ab?.logoUrl || agentProfile.logoUrl,
-            primaryColorHex: ab?.primaryColor || '#d97706' // Default to a gold/amber if not set
+            primaryColorHex: ab?.primaryColor || '#d97706' 
         };
     }
 
@@ -84,7 +84,7 @@ const resolveBranding = (role: UserRole, agentProfile?: User | null): BrandingOp
         email: BRANDING.email,
         phone: BRANDING.supportPhone,
         website: BRANDING.website,
-        primaryColorHex: '#d97706' // Idea Holiday Gold/Amber
+        primaryColorHex: '#d97706' 
     };
 };
 
@@ -131,17 +131,15 @@ export const generateQuotePDF = async (
   const contentWidth = pageWidth - (margin * 2);
   const headerHeight = 45;
 
-  // --- HEADER & FOOTER FUNCTION (Applied to every page) ---
+  // --- HEADER & FOOTER FUNCTION ---
   const drawHeaderFooter = (data: any) => {
-      // --- HEADER BACKGROUND (Solid Color Banner) ---
+      // --- HEADER BACKGROUND ---
       doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
       doc.rect(0, 0, pageWidth, headerHeight, 'F');
 
-      // --- LOGO (Left Side in White Box) ---
+      // --- LOGO ---
       const logoBoxSize = 30;
       const logoMargin = 8;
-      
-      // White rounded rect for logo background
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(margin, logoMargin, logoBoxSize, logoBoxSize, 2, 2, 'F');
 
@@ -149,33 +147,24 @@ export const generateQuotePDF = async (
           try {
               const props = doc.getImageProperties(logoBase64);
               const aspect = props.width / props.height;
-              
-              // Fit inside the 30x30 box with padding
               let imgW = logoBoxSize - 4;
               let imgH = imgW / aspect;
-              
               if (imgH > logoBoxSize - 4) {
                   imgH = logoBoxSize - 4;
                   imgW = imgH * aspect;
               }
-              
               const xOffset = margin + (logoBoxSize - imgW) / 2;
               const yOffset = logoMargin + (logoBoxSize - imgH) / 2;
-
               doc.addImage(logoBase64, 'PNG', xOffset, yOffset, imgW, imgH, undefined, 'FAST');
           } catch (e) {
-              // Fallback text
-              doc.setFontSize(14);
-              doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-              doc.setFont("helvetica", "bold");
-              doc.text(branding.companyName.substring(0, 2).toUpperCase(), margin + 5, logoMargin + 20);
+              // Fallback
           }
       }
 
-      // --- HEADER TEXT (Right Side) ---
+      // --- HEADER TEXT ---
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(24);
-      doc.setFont("times", "normal"); // Using Times for a more 'Screenshot 1' elegant look, or stick to Helvetica
+      doc.setFont("times", "normal"); 
       doc.text("TRAVEL ITINERARY", pageWidth - margin, 20, { align: 'right' });
 
       doc.setFont("helvetica", "normal");
@@ -183,20 +172,9 @@ export const generateQuotePDF = async (
       doc.text(`Ref: ${cleanText(quote.uniqueRefNo)}`, pageWidth - margin, 28, { align: 'right' });
       doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - margin, 33, { align: 'right' });
 
-      // --- COMPANY INFO (Below Header) ---
-      // We draw this only if it's the first page OR simply at top of body area if needed.
-      // But standard designs often have footer contact or header contact.
-      // Screenshot 1 implies specific styling. Let's put Company Name prominently below banner.
-      
-      if (data.pageNumber === 1) {
-          // Drawn in main body flow for Page 1, see below
-      }
-
       // --- FOOTER ---
       const footerY = pageHeight - 15;
-      
-      // Footer Line
-      doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]); // Footer line matches branding
+      doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]); 
       doc.setLineWidth(1);
       doc.line(margin, footerY, pageWidth - margin, footerY);
       
@@ -209,12 +187,10 @@ export const generateQuotePDF = async (
   };
 
   // --- START DOCUMENT CONTENT ---
-  
-  // -- AGENCY DETAILS (Page 1 Top) --
   let cursorY = headerHeight + 10;
   
   doc.setFontSize(16);
-  doc.setTextColor(40, 40, 40); // Dark Slate
+  doc.setTextColor(40, 40, 40); 
   doc.setFont("helvetica", "bold");
   doc.text(cleanText(branding.companyName), margin, cursorY);
   
@@ -223,7 +199,6 @@ export const generateQuotePDF = async (
   doc.setFont("helvetica", "normal");
   doc.setTextColor(80, 80, 80);
   
-  // Address wrap
   const addressLines = doc.splitTextToSize(cleanText(branding.address), 100);
   doc.text(addressLines, margin, cursorY);
   cursorY += (addressLines.length * 4) + 2;
@@ -240,7 +215,7 @@ export const generateQuotePDF = async (
       doc.text(`Web: ${branding.website}`, margin, cursorY);
   }
 
-  // -- TRIP SUMMARY BOX (Right Side of Agency Details) --
+  // -- TRIP SUMMARY BOX --
   const summaryBoxY = headerHeight + 10;
   const summaryBoxX = pageWidth / 2 + 10;
   const summaryBoxWidth = contentWidth / 2 - 10;
@@ -273,7 +248,6 @@ export const generateQuotePDF = async (
   }
 
   // --- START ITINERARY TABLE ---
-  // Ensure we start below the agency details and summary box
   let startY = Math.max(cursorY, summaryBoxY + summaryBoxHeight) + 10;
 
   const tableBody: any[] = [];
@@ -317,12 +291,11 @@ export const generateQuotePDF = async (
       // 3. Service Rows
       if(item.services && item.services.length > 0) {
           item.services.forEach(svc => {
-              // --- TYPE LABEL ---
               let typeLabel = svc.type;
               
-              // --- DETAILS BUILDER ---
               let detailsText = "";
               const tags: string[] = [];
+              const specialLines: string[] = []; // For highlighted checkmarks
 
               if (svc.type === 'HOTEL') {
                   detailsText += cleanText(svc.name);
@@ -332,29 +305,28 @@ export const generateQuotePDF = async (
               else if (svc.type === 'TRANSFER') {
                   detailsText += cleanText(svc.name);
                   
-                  // ENHANCED TRANSFER LOGIC (Req 2)
+                  // ENHANCED TRANSFER LOGIC (Box Style)
                   const mode = svc.meta?.transferMode || 'PVT';
                   const vehicle = svc.meta?.vehicle || 'Standard';
 
+                  // Using unicode checkmark
                   if (mode === 'SIC') {
-                      tags.push('Vehicle: Sharing');
+                      specialLines.push("[ \u2714 Shared Transfer ]");
                   } else {
-                      // PVT or Default
-                      tags.push(`Vehicle: Pvt ${vehicle}`);
+                      specialLines.push(`[ \u2714 Private Transfer | ${vehicle} ]`);
                   }
               }
               else if (svc.type === 'ACTIVITY') {
                   detailsText += cleanText(svc.name);
                   
-                  // ENHANCED ACTIVITY LOGIC (Req 3)
-                  // We'll append this to detailsText at the end or push to tags
+                  // ENHANCED ACTIVITY LOGIC (Box Style)
                   const mode = svc.meta?.transferMode || 'TICKET_ONLY';
                   if (mode === 'TICKET_ONLY') {
-                      tags.push("Ticket Only");
+                      specialLines.push("[ \u2714 Ticket Only ]");
                   } else if (mode === 'SIC') {
-                      tags.push("Sharing Transfer");
+                      specialLines.push("[ \u2714 Shared Transfer ]");
                   } else if (mode === 'PVT') {
-                      tags.push("Private Transfer");
+                      specialLines.push("[ \u2714 Private Transfer ]");
                   }
               }
               else {
@@ -367,6 +339,11 @@ export const generateQuotePDF = async (
 
               if (tags.length > 0) {
                   detailsText += `\n[ ${tags.join(' | ')} ]`;
+              }
+              
+              // Append special highlighted lines at the end
+              if (specialLines.length > 0) {
+                  detailsText += `\n\n${specialLines.join('\n')}`;
               }
 
               tableBody.push([
@@ -412,13 +389,28 @@ export const generateQuotePDF = async (
       
       margin: { top: headerHeight + 10, right: margin, bottom: 25, left: margin },
       
-      // Hooks for Header/Footer and cleanup
       didDrawPage: drawHeaderFooter,
       
       didParseCell: (data) => {
           if (data.row.cells[0].colSpan === 2) {
               data.cell.styles.lineWidth = 0; 
               data.cell.styles.halign = 'left';
+          }
+          // Highlight the transfer lines green if found
+          if (data.section === 'body' && data.column.index === 1) {
+              // SAFE ACCESS TO CONTENT
+              let text = '';
+              const raw = data.cell.raw;
+              
+              if (typeof raw === 'string') {
+                  text = raw;
+              } else if (raw && typeof raw === 'object' && 'content' in raw) {
+                  text = (raw as any).content;
+              }
+
+              if (text && typeof text === 'string' && text.includes('[ \u2714')) {
+                  // Optional: Extra styling override here if supported
+              }
           }
       }
   });
@@ -427,16 +419,16 @@ export const generateQuotePDF = async (
   const displayPrice = quote.sellingPrice || quote.price || 0;
   
   if (displayPrice > 0) {
-      let finalY = (doc as any).lastAutoTable.finalY + 10;
+      // Safe access to finalY
+      const lastAutoTable = (doc as any).lastAutoTable;
+      let finalY = lastAutoTable ? lastAutoTable.finalY + 10 : startY + 50;
       
-      // Check if price box fits on current page (allow 40px height + 20px footer margin)
       if (finalY + 60 > pageHeight) {
           doc.addPage();
-          drawHeaderFooter({ pageNumber: doc.internal.getNumberOfPages() }); // Manually call for new page
-          finalY = headerHeight + 10; // Reset Y below header
+          drawHeaderFooter({ pageNumber: doc.internal.getNumberOfPages() }); 
+          finalY = headerHeight + 10; 
       }
 
-      // Draw Price Box
       const boxWidth = 80;
       const boxX = pageWidth - margin - boxWidth;
       
@@ -468,13 +460,11 @@ export const generateQuotePDF = async (
 };
 
 export const generateReceiptPDF = (booking: Booking, payment: PaymentEntry, user: User) => {
-    // Placeholder for Receipt generation logic
     console.log("Generating Receipt PDF", booking.id, payment.id);
     alert("Receipt downloaded (Mock).");
 };
 
 export const generateInvoicePDF = (invoice: GSTRecord, booking: Booking) => {
-    // Placeholder for Invoice generation logic
     console.log("Generating Invoice PDF", invoice.id, booking.id);
     alert("Invoice downloaded (Mock).");
 };

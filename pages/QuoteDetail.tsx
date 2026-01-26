@@ -222,9 +222,9 @@ export const QuoteDetail: React.FC = () => {
       setIsGeneratingPdf(true);
       try {
           await generateQuotePDF(quote, null, user.role, user);
-      } catch (e) {
+      } catch (e: any) {
           console.error("PDF Gen Error", e);
-          alert("Failed to generate PDF. Check console.");
+          alert(`Failed to generate PDF: ${e.message}`);
       } finally {
           setIsGeneratingPdf(false);
       }

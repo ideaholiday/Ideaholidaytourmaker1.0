@@ -3,7 +3,7 @@ import React from 'react';
 import { ItineraryItem } from '../types';
 import { 
   CheckCircle, Car, Hotel, Camera, Calendar, 
-  MapPin, Coffee, Utensils, Flag, Clock, Users, Briefcase, Info
+  MapPin, Utensils, Flag, Clock, Users, Info, CheckSquare
 } from 'lucide-react';
 
 interface Props {
@@ -24,6 +24,12 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
       const date = new Date(startDate);
       date.setDate(date.getDate() + (dayNum - 1));
       return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', weekday: 'long' }); // e.g. Fri, Oct 12
+  };
+
+  const getTransferModeLabel = (mode: string) => {
+      if (mode === 'SIC') return 'Shared Transfer';
+      if (mode === 'PVT') return 'Private Transfer';
+      return 'Ticket Only';
   };
 
   return (
@@ -131,33 +137,37 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                             <Utensils size={10} /> {svc.meta.mealPlan}
                                                         </span>
                                                     )}
-                                                    {svc.meta?.vehicle && (
-                                                        <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
-                                                            <Car size={10} /> {svc.meta.vehicle}
-                                                        </span>
-                                                    )}
                                                     
-                                                    {/* Pax Count Badges for Activities & Transfers (New) */}
+                                                    {/* Pax Count Badges */}
                                                     {svc.meta?.paxDetails && (
                                                         <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100" title="Passengers">
                                                             <Users size={10} /> {svc.meta.paxDetails.adult}A {svc.meta.paxDetails.child > 0 ? `+ ${svc.meta.paxDetails.child}C` : ''}
                                                         </span>
                                                     )}
-                                                    {/* Vehicle Count for Transfers (New) */}
-                                                    {svc.type === 'TRANSFER' && svc.quantity > 1 && (
-                                                        <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
-                                                            <Car size={10} /> {svc.quantity} Vehicles
-                                                        </span>
+
+                                                    {/* HIGHLIGHTED TRANSFER TYPE BOX */}
+                                                    {svc.meta?.transferMode && (
+                                                        <div className="w-full mt-1.5">
+                                                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
+                                                                <CheckSquare size={12} className="text-emerald-600" /> 
+                                                                [ {getTransferModeLabel(svc.meta.transferMode)} ]
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* TRANSFER VEHICLE HIGHLIGHT */}
+                                                    {svc.type === 'TRANSFER' && svc.meta?.vehicle && (
+                                                         <div className="w-full mt-1.5">
+                                                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
+                                                                <CheckSquare size={12} className="text-emerald-600" /> 
+                                                                [ Private Transfer - {svc.meta.vehicle} ]
+                                                            </span>
+                                                        </div>
                                                     )}
 
-                                                    {svc.meta?.type && svc.type === 'ACTIVITY' && (
-                                                        <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
-                                                            <Camera size={10} /> {svc.meta.type}
-                                                        </span>
-                                                    )}
                                                 </div>
 
-                                                {/* Internal Note (New) */}
+                                                {/* Internal Note */}
                                                 {svc.meta?.notes && (
                                                     <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-100">
                                                         <Info size={10} className="mt-0.5 shrink-0"/> {svc.meta.notes}

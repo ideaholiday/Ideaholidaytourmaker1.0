@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -85,7 +86,7 @@ export const SmartBuilder: React.FC = () => {
                 title: title,
                 description: description,
                 cityId: visit.cityId,
-                inclusions: isArrivalDay && cityIdx === 0 ? [] : ['Breakfast'],
+                inclusions: [], // Defaults to empty. Added only if Meal Plan selected later.
                 services: services as any
             });
             dayCount++;
@@ -98,7 +99,7 @@ export const SmartBuilder: React.FC = () => {
         title: 'Departure',
         description: 'Check-out and transfer to airport for your onward journey.',
         cityId: selectedCities[selectedCities.length - 1].cityId,
-        inclusions: ['Breakfast'],
+        inclusions: [], // Defaults to empty
         services: [{
              id: `tr_dep_${dayCount}`, type: 'TRANSFER', name: 'Airport Departure Transfer',
              cost: 0, price: 0, currency: 'INR', meta: { vehicle: 'Sedan' }
