@@ -88,17 +88,23 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {item.services.map((svc, sIdx) => (
                                         <div key={sIdx} className="flex items-start p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-brand-200 hover:shadow-sm transition-all group/svc">
-                                            {/* Service Icon */}
-                                            <div className={`p-2.5 rounded-xl mr-3 shadow-sm shrink-0 flex items-center justify-center ${
-                                                svc.type === 'HOTEL' ? 'bg-white text-indigo-600' :
-                                                svc.type === 'ACTIVITY' ? 'bg-white text-rose-500' :
-                                                svc.type === 'TRANSFER' ? 'bg-white text-sky-600' : 'bg-white text-slate-600'
-                                            }`}>
-                                                {svc.type === 'HOTEL' && <Hotel size={18} strokeWidth={2.5} />}
-                                                {svc.type === 'ACTIVITY' && <Camera size={18} strokeWidth={2.5} />}
-                                                {svc.type === 'TRANSFER' && <Car size={18} strokeWidth={2.5} />}
-                                                {svc.type === 'OTHER' && <Flag size={18} strokeWidth={2.5} />}
-                                            </div>
+                                            {/* Service Icon or Image */}
+                                            {svc.meta?.imageUrl ? (
+                                                <div className="w-16 h-16 rounded-lg mr-3 shadow-sm shrink-0 overflow-hidden border border-slate-200">
+                                                     <img src={svc.meta.imageUrl} alt={svc.name} className="w-full h-full object-cover" />
+                                                </div>
+                                            ) : (
+                                                <div className={`p-2.5 rounded-xl mr-3 shadow-sm shrink-0 flex items-center justify-center ${
+                                                    svc.type === 'HOTEL' ? 'bg-white text-indigo-600' :
+                                                    svc.type === 'ACTIVITY' ? 'bg-white text-rose-500' :
+                                                    svc.type === 'TRANSFER' ? 'bg-white text-sky-600' : 'bg-white text-slate-600'
+                                                }`}>
+                                                    {svc.type === 'HOTEL' && <Hotel size={18} strokeWidth={2.5} />}
+                                                    {svc.type === 'ACTIVITY' && <Camera size={18} strokeWidth={2.5} />}
+                                                    {svc.type === 'TRANSFER' && <Car size={18} strokeWidth={2.5} />}
+                                                    {svc.type === 'OTHER' && <Flag size={18} strokeWidth={2.5} />}
+                                                </div>
+                                            )}
                                             
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start gap-2">

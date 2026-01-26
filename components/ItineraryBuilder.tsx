@@ -530,14 +530,16 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
             <InventoryModal 
                 isOpen={isModalOpen} 
                 onClose={() => setIsModalOpen(false)}
-                type={modalType}
-                dayId={activeDayIndex.toString()}
-                destinationId={activeCityId} 
                 onSelect={handleAddService}
-                onRemove={(svcId) => handleRemoveService(activeDayIndex, svcId)} // Pass remove callback
-                currentServices={activeDay?.services || []} 
-                defaultNights={suggestedNights}
-                paxCount={pax} 
+                onRemove={(svcId) => handleRemoveService(activeDayIndex, svcId)}
+                dayId={activeDayIndex.toString()}
+                type={modalType}
+                destinationId={activeCityId}
+                // Calculate default nights if Hotel, otherwise default to 1
+                defaultNights={modalType === 'HOTEL' ? suggestedNights : 1}
+                paxCount={pax}
+                // New Prop for visual feedback
+                currentServices={activeDay?.services || []}
             />
         )}
     </div>

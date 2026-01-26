@@ -9,11 +9,18 @@ const COLLECTION = 'quotes';
 
 class AgentService {
   
+  // Fetch quotes for a specific agent
   async fetchQuotes(agentId: string): Promise<Quote[]> {
       return await dbHelper.getWhere<Quote>(COLLECTION, 'agentId', '==', agentId);
   }
 
-  // Backwards compatibility for components not yet async
+  // Admin: Fetch ALL quotes in the system
+  async getAllQuotes(): Promise<Quote[]> {
+      return await dbHelper.getAll<Quote>(COLLECTION);
+  }
+
+  // Legacy sync placeholder - removed in favor of async calls above, 
+  // but kept returning empty array to prevent TS errors in legacy components if any
   getQuotes(agentId: string): Quote[] { 
       return []; 
   } 

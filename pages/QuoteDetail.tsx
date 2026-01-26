@@ -16,6 +16,7 @@ import { ItineraryBuilder } from '../components/ItineraryBuilder';
 import { generateQuotePDF } from '../utils/pdfGenerator';
 import { formatWhatsAppQuote } from '../utils/whatsappFormatter';
 import { AssignOperatorModal } from '../components/booking/AssignOperatorModal';
+import { dbHelper } from '../../services/firestoreHelper';
 
 export const QuoteDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -44,25 +45,26 @@ export const QuoteDetail: React.FC = () => {
     setIsLoading(true);
 
     try {
-        const allQuotes = await agentService.fetchQuotes(user.id);
-        const found = allQuotes.find(q => q.id === id);
+        // Direct DB fetch to bypass Agent-only filters if Admin
+        const found = await dbHelper.getById<Quote>('quotes', id);
 
         if (found) {
-            setQuote(found);
-            initPricingEngine(found);
-            if (found.operationalDetails) {
-                setAdminPaymentStatus(found.operationalDetails.paymentStatus || 'PENDING');
-                setAdminPaymentNote(found.operationalDetails.paymentNotes || '');
+            // Security: If Agent, check ownership
+            if (user.role === UserRole.AGENT && found.agentId !== user.id) {
+                setQuote(null); // Deny access
+            } 
+            // Security: If Operator, check assignment
+            else if (user.role === UserRole.OPERATOR && found.operatorId !== user.id) {
+                 setQuote(null);
             }
-        } else {
-            // Fallback logic
-             const storedQuotes = localStorage.getItem('iht_agent_quotes');
-             const parsedQuotes: Quote[] = storedQuotes ? JSON.parse(storedQuotes) : [];
-             const localFound = parsedQuotes.find(q => q.id === id);
-             if(localFound) {
-                 setQuote(localFound);
-                 initPricingEngine(localFound);
-             }
+            else {
+                setQuote(found);
+                initPricingEngine(found);
+                if (found.operationalDetails) {
+                    setAdminPaymentStatus(found.operationalDetails.paymentStatus || 'PENDING');
+                    setAdminPaymentNote(found.operationalDetails.paymentNotes || '');
+                }
+            }
         }
     } catch (e) {
         console.error("Error loading quote:", e);
@@ -118,7 +120,12 @@ export const QuoteDetail: React.FC = () => {
       if (window.confirm(`⚠️ DANGER ZONE ⚠️\n\nAre you sure you want to DELETE Quote #${quote.uniqueRefNo}?`)) {
           try {
               await agentService.deleteQuote(quote.id);
-              navigate('/agent/quotes');
+              if (isAdminOrStaff) {
+                  // Admin goes back to agent profile or dashboard
+                  navigate(-1);
+              } else {
+                  navigate('/agent/quotes');
+              }
           } catch (e: any) {
               alert("Delete failed: " + e.message);
           }
@@ -230,6 +237,7 @@ export const QuoteDetail: React.FC = () => {
                         <span>{quote.paxCount} Pax</span>
                         <span>•</span>
                         <span>{new Date(quote.travelDate).toLocaleDateString()}</span>
+                        {isAdminOrStaff && quote.agentName && <span className="bg-blue-50 text-blue-700 px-2 rounded-full text-xs">Agent: {quote.agentName}</span>}
                     </div>
                 </div>
 
@@ -246,7 +254,7 @@ export const QuoteDetail: React.FC = () => {
                     )}
 
                     {/* BOOK BUTTON */}
-                    {!isBooked && hasValidPrice && isAgent && (
+                    {!isBooked && hasValidPrice && (isAgent || isAdminOrStaff) && (
                         <button 
                             onClick={handleBook} 
                             className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg shadow-sm font-bold transition transform hover:-translate-y-0.5"
@@ -263,7 +271,7 @@ export const QuoteDetail: React.FC = () => {
                     )}
 
                     {/* Versioning if Locked */}
-                    {quote.isLocked && isAgent && !isBooked && (
+                    {quote.isLocked && (isAgent || isAdminOrStaff) && !isBooked && (
                         <button onClick={handleCreateRevision} className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 text-sm font-bold transition">
                             <GitBranch size={16} /> New Version
                         </button>

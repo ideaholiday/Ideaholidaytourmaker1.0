@@ -1,4 +1,5 @@
 
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   STAFF = 'STAFF',
@@ -204,6 +205,7 @@ export interface Quote {
   type?: QuoteType;
   quickQuoteInputs?: QuickQuoteInputs;
   templateId?: string; // If created from a template
+  createdAt?: string; // Creation timestamp for sorting/filtering
 }
 
 export type BookingStatus = 'REQUESTED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED_NO_REFUND' | 'CANCELLED_WITH_REFUND' | 'CANCELLATION_REQUESTED' | 'ON_HOLD' | 'REJECTED';
