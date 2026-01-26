@@ -299,6 +299,31 @@ export const QuoteDetail: React.FC = () => {
             </div>
         </div>
 
+        {/* PRICE WARNING BANNER */}
+        {!hasValidPrice && !isEditingItinerary && (
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+                <div className="flex gap-3">
+                    <div className="bg-amber-100 p-2 rounded-full h-fit text-amber-600">
+                        <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-amber-900 text-sm">Price Calculation Required</h3>
+                        <p className="text-sm text-amber-800 mt-1 max-w-2xl">
+                            Price not calculated. Please edit the itinerary and save to generate a price.
+                        </p>
+                    </div>
+                </div>
+                {(isAgent || isAdminOrStaff) && !quote.isLocked && (
+                    <button 
+                        onClick={() => setIsEditingItinerary(true)}
+                        className="bg-white border border-amber-200 text-amber-800 px-5 py-2 rounded-lg text-sm font-bold hover:bg-amber-100 transition whitespace-nowrap shadow-sm flex items-center gap-2"
+                    >
+                        <Edit2 size={14} /> Edit & Calculate
+                    </button>
+                )}
+            </div>
+        )}
+
         {isEditingItinerary ? (
             <ItineraryBuilder 
                 initialItinerary={quote.itinerary} 
