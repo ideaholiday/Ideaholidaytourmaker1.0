@@ -9,7 +9,7 @@ import { ItineraryView } from '../../components/ItineraryView';
 import { BookingStatusTimeline } from '../../components/booking/BookingStatusTimeline';
 import { PaymentPanel } from '../../components/booking/PaymentPanel';
 import { CancellationRequestModal } from '../../components/booking/CancellationRequestModal';
-import { ArrowLeft, MapPin, Calendar, Users, DollarSign, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Users, DollarSign, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText, Loader2 } from 'lucide-react';
 import { generateQuotePDF, generateInvoicePDF } from '../../utils/pdfGenerator';
 
 export const BookingDetail: React.FC = () => {
@@ -19,6 +19,7 @@ export const BookingDetail: React.FC = () => {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [hasInvoice, setHasInvoice] = useState(false);
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -39,7 +40,8 @@ export const BookingDetail: React.FC = () => {
   const backLink = isAdminOrStaff ? '/admin/bookings' : '/agent/dashboard';
   const backLabel = isAdminOrStaff ? 'Back to Booking Manager' : 'Back to Dashboard';
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
+      setIsPdfLoading(true);
       const mockQuote: any = {
           ...booking,
           uniqueRefNo: booking.uniqueRefNo,
@@ -51,7 +53,13 @@ export const BookingDetail: React.FC = () => {
           perPersonPrice: booking.sellingPrice / booking.paxCount
       };
       
-      generateQuotePDF(mockQuote, breakdown, user.role, user);
+      try {
+        await generateQuotePDF(mockQuote, breakdown, user.role, user);
+      } catch (e) {
+          alert('Error generating PDF');
+      } finally {
+        setIsPdfLoading(false);
+      }
   };
 
   const handleDownloadInvoice = async () => {
@@ -130,8 +138,9 @@ export const BookingDetail: React.FC = () => {
                         <XCircle size={16} /> Cancel Booking
                     </button>
                 )}
-                <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition">
-                    <Printer size={16} /> Download Voucher
+                <button onClick={handleDownloadPDF} disabled={isPdfLoading} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition disabled:opacity-50">
+                    {isPdfLoading ? <Loader2 size={16} className="animate-spin"/> : <Printer size={16} />} 
+                    Download Voucher
                 </button>
             </div>
         </div>
