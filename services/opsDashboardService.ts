@@ -1,7 +1,9 @@
+
 import { OperatorInventoryItem, Hotel, SystemAlert, ExpiringRate, OpsStats } from '../types';
 import { inventoryService } from './inventoryService';
 import { adminService } from './adminService';
 import { contractService } from './contractService';
+import { bookingService } from './bookingService';
 
 class OpsDashboardService {
 
@@ -73,6 +75,21 @@ class OpsDashboardService {
       const alerts: SystemAlert[] = [];
       const stats = this.getOverviewStats();
       const today = new Date();
+      
+      // 0. New Booking Requests (Highest Priority)
+      const bookings = bookingService.getAllBookingsSync();
+      const pendingBookings = bookings.filter(b => b.status === 'REQUESTED');
+      
+      if (pendingBookings.length > 0) {
+          alerts.push({
+              id: 'alert_new_bookings',
+              type: 'CRITICAL',
+              title: 'New Booking Requests',
+              description: `${pendingBookings.length} bookings waiting for confirmation. Action immediately.`,
+              actionLink: '/admin/bookings?status=REQUESTED',
+              createdAt: today.toISOString()
+          });
+      }
 
       // 1. Pending Approval Bottleneck
       if (stats.pendingInventory > 10) {

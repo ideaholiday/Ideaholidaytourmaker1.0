@@ -26,6 +26,7 @@ export const QuoteDetail: React.FC = () => {
   const [isEditingItinerary, setIsEditingItinerary] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isBookingProcessing, setIsBookingProcessing] = useState(false);
   
   // PDF State
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -102,15 +103,32 @@ export const QuoteDetail: React.FC = () => {
 
   const handleBook = async () => {
       if (!quote || !user) return;
-      if (window.confirm(`Are you sure you want to book Quote #${quote.uniqueRefNo}?\n\nThis will lock the itinerary and generate a booking request for the Operations team.`)) {
+      if (quote.status === 'BOOKED') {
+          alert("This quote is already booked.");
+          return;
+      }
+
+      const confirmMsg = `Are you sure you want to confirm Booking for Quote #${quote.uniqueRefNo}?\n\n` + 
+                         `• This will lock the itinerary.\n` +
+                         `• A notification will be sent to the Admin Operations team.\n` +
+                         `• You will be redirected to the Booking Management page.`;
+
+      if (window.confirm(confirmMsg)) {
+          setIsBookingProcessing(true);
           try {
+              // Create Booking & Update Quote Status
               const newBooking = await bookingService.createBookingFromQuote(quote, user);
-              await agentService.bookQuote(quote.id, user);
-              alert("Booking Created Successfully! Redirecting to booking details...");
-              navigate(`/booking/${newBooking.id}`);
+              
+              // Slight delay to ensure DB propagation
+              setTimeout(() => {
+                  alert("✅ Booking Request Created Successfully!");
+                  navigate(`/booking/${newBooking.id}`);
+              }, 500);
+
           } catch (e: any) {
               console.error(e);
               alert("Booking failed: " + e.message);
+              setIsBookingProcessing(false);
           }
       }
   };
@@ -256,10 +274,12 @@ export const QuoteDetail: React.FC = () => {
                     {/* BOOK BUTTON */}
                     {!isBooked && hasValidPrice && (isAgent || isAdminOrStaff) && (
                         <button 
-                            onClick={handleBook} 
-                            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg shadow-sm font-bold transition transform hover:-translate-y-0.5"
+                            onClick={handleBook}
+                            disabled={isBookingProcessing} 
+                            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg shadow-sm font-bold transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <CheckCircle size={18} /> Book Now
+                            {isBookingProcessing ? <Loader2 size={18} className="animate-spin"/> : <CheckCircle size={18} />} 
+                            {isBookingProcessing ? 'Confirming...' : 'Book Now'}
                         </button>
                     )}
 
