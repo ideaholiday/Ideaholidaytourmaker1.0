@@ -147,6 +147,23 @@ const PACKAGES_DATA: FixedPackage[] = [
   { id: '', packageName: 'Dubai & Abu Dhabi', destinationId: '', category: 'Family', nights: 5, fixedPrice: 42000, inclusions: ['4 Star Hotel', 'Desert Safari', 'Burj Khalifa', 'Ferrari World'], exclusions: ['Tourism Dirham'], validDates: ['2024-11-10', '2024-12-05'], isActive: true, imageUrl: '', createdBy: 'admin' },
   { id: '', packageName: 'Singapore & Malaysia', destinationId: '', category: 'Best Seller', nights: 6, fixedPrice: 55000, inclusions: ['3 Star Hotel', 'Universal Studios', 'Genting Highlands', 'Transfers'], exclusions: ['Flights', 'Visa'], validDates: ['2024-10-20'], isActive: true, imageUrl: '', createdBy: 'admin' },
   { id: '', packageName: 'Phuket & Krabi', destinationId: '', category: 'Beach', nights: 5, fixedPrice: 28000, inclusions: ['4 Star Hotel', 'Phi Phi Tour', '4 Island Tour'], exclusions: ['National Park Fees'], validDates: ['2024-11-01'], isActive: true, imageUrl: '', createdBy: 'admin' },
+  { 
+      id: '', 
+      packageName: 'Phuket Island Getaway', 
+      destinationId: '', 
+      category: 'Beach', 
+      nights: 4, 
+      basePax: 2,
+      fixedPrice: 12599, 
+      inclusions: ['Airport Transfer', 'Phi Phi Island Tour', '4 island Krabi Tour'], 
+      exclusions: ['Flights', 'Visa', 'Hotel'], 
+      validDates: ['2024-12-20', '2025-01-15'], 
+      isActive: true, 
+      description: "Experience the best of Phuket's islands and culture.",
+      notes: "Tour operates daily.",
+      imageUrl: 'https://images.unsplash.com/photo-1589394815804-989b33841a07',
+      createdBy: 'admin' 
+  },
 ];
 
 const SYSTEM_TEMPLATES_DATA = [
