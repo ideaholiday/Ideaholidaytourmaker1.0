@@ -1,3 +1,4 @@
+
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { Quote, PricingBreakdown, UserRole, User, Booking, PaymentEntry, GSTRecord, GSTCreditNote } from '../types';
@@ -26,6 +27,14 @@ const cleanText = (text: string | undefined | null): string => {
     
     let clean = text;
 
+    // 0. Handle HTML Tags for Rich Text
+    // Replace <br>, <div>, <p> with newlines to preserve structure
+    clean = clean.replace(/<br\s*\/?>/gi, '\n');
+    clean = clean.replace(/<\/p>/gi, '\n');
+    clean = clean.replace(/<\/div>/gi, '\n');
+    // Strip remaining tags
+    clean = clean.replace(/<[^>]*>?/gm, '');
+
     // 1. Replace common symbols with ASCII approximations
     clean = clean.replace(/→/g, '->')
                  .replace(/←/g, '<-')
@@ -47,6 +56,12 @@ const cleanText = (text: string | undefined | null): string => {
     // 3. Normalize spacing BUT PRESERVE NEWLINES
     // Replace multiple horizontal spaces (not newlines) with single space
     clean = clean.replace(/[ \t\u00A0]+/g, ' '); 
+
+    // 4. Decode HTML Entities (Basic)
+    clean = clean.replace(/&nbsp;/g, ' ')
+                 .replace(/&amp;/g, '&')
+                 .replace(/&lt;/g, '<')
+                 .replace(/&gt;/g, '>');
 
     return clean.trim();
 };
@@ -239,6 +254,17 @@ export const generateQuotePDF = (
                   const { adult, child } = svc.meta.paxDetails;
                   let paxStr = `Pax: ${adult} Adt` + (child > 0 ? `, ${child} Chd` : '');
                   detailsParts.push(paxStr);
+              }
+
+              // 4. Transfer Mode for Activities
+              if (svc.meta?.transferMode) {
+                  const mapMode: Record<string, string> = {
+                      'TICKET_ONLY': 'Ticket Only',
+                      'SIC': 'Sharing Transfer',
+                      'PVT': 'Private Transfer'
+                  };
+                  const label = mapMode[svc.meta.transferMode] || svc.meta.transferMode;
+                  detailsParts.push(label);
               }
 
               // Sanitize Name

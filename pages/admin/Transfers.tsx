@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole, Transfer, Destination } from '../../types';
 import { Edit2, Trash2, Plus, X, Car, MapPin, Image as ImageIcon, Search, DollarSign, Calendar, Check, Loader2 } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
 export const Transfers: React.FC = () => {
   const { user } = useAuth();
@@ -168,6 +169,12 @@ export const Transfers: React.FC = () => {
     });
   }, [transfers, search, filterDest, filterType]);
 
+  const stripHtml = (html: string) => {
+    const tmp = document.createElement("DIV");
+    tmp.innerHTML = html || '';
+    return tmp.textContent || tmp.innerText || '';
+  };
+
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
@@ -276,7 +283,7 @@ export const Transfers: React.FC = () => {
                             </div>
                         </td>
                         <td className="px-6 py-4 text-slate-500 text-xs max-w-xs truncate">
-                            {transfer.description || '-'}
+                            {stripHtml(transfer.description || '-')}
                         </td>
                         <td className="px-6 py-4 text-slate-600">
                             <p className="font-bold text-slate-800 text-sm">{transfer.vehicleType}</p>
@@ -385,12 +392,10 @@ export const Transfers: React.FC = () => {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Description</label>
-                    <textarea 
-                        rows={2}
-                        value={formData.description || ''} 
-                        onChange={e => setFormData({...formData, description: e.target.value})} 
-                        className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white shadow-sm transition"
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Description (Supports Rich Text)</label>
+                    <RichTextEditor
+                        value={formData.description || ''}
+                        onChange={(val) => setFormData({...formData, description: val})}
                         placeholder="Details about the transfer..."
                     />
                 </div>

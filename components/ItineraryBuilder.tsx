@@ -534,9 +534,10 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                 dayId={activeDayIndex.toString()}
                 destinationId={activeCityId} 
                 onSelect={handleAddService}
+                onRemove={(svcId) => handleRemoveService(activeDayIndex, svcId)} // Pass remove callback
                 currentServices={activeDay?.services || []} 
                 defaultNights={suggestedNights}
-                paxCount={pax} // PASS PAX COUNT HERE
+                paxCount={pax} 
             />
         )}
     </div>

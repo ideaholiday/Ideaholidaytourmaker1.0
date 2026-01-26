@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole, Activity, Destination, ActivityTransferOptions } from '../../types';
 import { Edit2, Trash2, Plus, X, Camera, Clock, Image as ImageIcon, Search, DollarSign, Check, MapPin, Calendar, Loader2, Bus, Car, Ticket } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
 const DEFAULT_OPTIONS: ActivityTransferOptions = {
     sic: { enabled: false, costPerPerson: 0 },
@@ -195,6 +196,13 @@ export const Sightseeing: React.FC = () => {
     });
   }, [activities, search, filterDest, filterSeason]);
 
+  // Strip HTML tags for list view preview
+  const stripHtml = (html: string) => {
+    const tmp = document.createElement("DIV");
+    tmp.innerHTML = html || '';
+    return tmp.textContent || tmp.innerText || '';
+  };
+
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
@@ -306,7 +314,7 @@ export const Sightseeing: React.FC = () => {
                             </div>
                         </td>
                         <td className="px-6 py-4 text-slate-500 text-xs max-w-xs truncate">
-                            {activity.description || '-'}
+                            {stripHtml(activity.description || '-')}
                         </td>
                         <td className="px-6 py-4">
                             <div className="flex flex-col gap-1">
@@ -558,13 +566,11 @@ export const Sightseeing: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Description</label>
-                <textarea 
-                  rows={2}
-                  value={formData.description || ''} 
-                  onChange={e => setFormData({...formData, description: e.target.value})} 
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white shadow-sm transition"
-                  placeholder="Details about the tour..."
+                <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">Description (Supports Rich Text)</label>
+                <RichTextEditor
+                    value={formData.description || ''}
+                    onChange={(val) => setFormData({...formData, description: val})}
+                    placeholder="Details about the tour..."
                 />
               </div>
 

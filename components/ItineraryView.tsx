@@ -74,8 +74,8 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                     <div className="p-6">
                         {/* Day Description */}
                         {item.description && (
-                            <div className="mb-6 text-slate-600 text-sm leading-relaxed whitespace-pre-line border-l-2 border-slate-200 pl-4">
-                                {item.description}
+                            <div className="mb-6 text-slate-600 text-sm leading-relaxed border-l-2 border-slate-200 pl-4">
+                                <div dangerouslySetInnerHTML={{ __html: item.description }} />
                             </div>
                         )}
 
@@ -106,11 +106,12 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 uppercase tracking-wide shrink-0">{svc.type}</span>
                                                 </div>
                                                 
-                                                {/* Service Description (New) */}
+                                                {/* Service Description (Rich Text Support) */}
                                                 {svc.meta?.description && (
-                                                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                                                        {svc.meta.description}
-                                                    </p>
+                                                    <div 
+                                                      className="text-xs text-slate-500 mt-1 line-clamp-3 leading-relaxed"
+                                                      dangerouslySetInnerHTML={{ __html: svc.meta.description }}
+                                                    />
                                                 )}
 
                                                 <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
