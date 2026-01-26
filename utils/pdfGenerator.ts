@@ -28,10 +28,21 @@ const cleanText = (text: string | undefined | null): string => {
     let clean = text;
 
     // 0. Handle HTML Tags for Rich Text
-    // Replace <br>, <div>, <p> with newlines to preserve structure
+    // List Items: <li>Item</li> -> "\n• Item"
+    clean = clean.replace(/<li[^>]*>/gi, '\n• ');
+    clean = clean.replace(/<\/li>/gi, '');
+    clean = clean.replace(/<ul[^>]*>/gi, '');
+    clean = clean.replace(/<\/ul>/gi, '\n');
+    clean = clean.replace(/<ol[^>]*>/gi, '');
+    clean = clean.replace(/<\/ol>/gi, '\n');
+
+    // Structural Tags
     clean = clean.replace(/<br\s*\/?>/gi, '\n');
-    clean = clean.replace(/<\/p>/gi, '\n');
+    clean = clean.replace(/<\/p>/gi, '\n\n');
     clean = clean.replace(/<\/div>/gi, '\n');
+    clean = clean.replace(/<h[1-6][^>]*>/gi, '\n\n');
+    clean = clean.replace(/<\/h[1-6]>/gi, '\n');
+
     // Strip remaining tags
     clean = clean.replace(/<[^>]*>?/gm, '');
 
@@ -55,7 +66,10 @@ const cleanText = (text: string | undefined | null): string => {
 
     // 3. Normalize spacing BUT PRESERVE NEWLINES
     // Replace multiple horizontal spaces (not newlines) with single space
-    clean = clean.replace(/[ \t\u00A0]+/g, ' '); 
+    clean = clean.replace(/[ \t\u00A0]+/g, ' ');
+    
+    // Trim excessive newlines (more than 2)
+    clean = clean.replace(/\n{3,}/g, '\n\n');
 
     // 4. Decode HTML Entities (Basic)
     clean = clean.replace(/&nbsp;/g, ' ')

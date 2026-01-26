@@ -74,7 +74,7 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                     <div className="p-6">
                         {/* Day Description */}
                         {item.description && (
-                            <div className="mb-6 text-slate-600 text-sm leading-relaxed border-l-2 border-slate-200 pl-4">
+                            <div className="mb-6 text-slate-600 text-sm leading-relaxed border-l-2 border-slate-200 pl-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_h3]:font-bold [&_h3]:text-slate-800 [&_h3]:mt-2">
                                 <div dangerouslySetInnerHTML={{ __html: item.description }} />
                             </div>
                         )}
@@ -109,7 +109,7 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                 {/* Service Description (Rich Text Support) */}
                                                 {svc.meta?.description && (
                                                     <div 
-                                                      className="text-xs text-slate-500 mt-1 line-clamp-3 leading-relaxed"
+                                                      className="text-xs text-slate-500 mt-1 line-clamp-3 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4"
                                                       dangerouslySetInnerHTML={{ __html: svc.meta.description }}
                                                     />
                                                 )}
