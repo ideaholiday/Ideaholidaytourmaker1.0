@@ -5,6 +5,8 @@ import { Footer } from './components/Footer';
 import { SessionWatcher } from './components/SessionWatcher';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { BrandContext, resolveAgentBranding } from './context/BrandContext';
+import { notificationService } from './services/notificationService';
+import { Toast, ToastType } from './components/ui/Toast';
 
 // Pages
 import { Home } from './pages/Home';
@@ -166,12 +168,38 @@ const Layout = () => {
   // Resolve Branding for Agents
   const agentForBranding = user?.role === UserRole.AGENT ? user : null;
   const branding = useMemo(() => resolveAgentBranding(agentForBranding), [agentForBranding]);
+  
+  // Notification State
+  const [toast, setToast] = React.useState<{ msg: string, type: ToastType } | null>(null);
+
+  React.useEffect(() => {
+    // Listen for foreground FCM messages
+    const unsubscribe = notificationService.onMessageListener((payload: any) => {
+        setToast({ 
+            msg: `${payload.notification.title}: ${payload.notification.body}`, 
+            type: 'info' 
+        });
+    });
+    return () => {
+        if(unsubscribe) unsubscribe();
+    };
+  }, []);
 
   return (
     <BrandContext.Provider value={{ branding, isPlatformDefault: !agentForBranding }}>
       <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
         <Navbar />
         <SessionWatcher />
+        
+        {toast && (
+            <Toast 
+                message={toast.msg} 
+                type={toast.type} 
+                isVisible={!!toast} 
+                onClose={() => setToast(null)} 
+            />
+        )}
+
         <div className="flex-1 flex flex-col">
             <React.Suspense fallback={<div className="p-4 flex justify-center"><RefreshCw className="animate-spin text-brand-600"/></div>}>
                 <Outlet />
