@@ -122,7 +122,8 @@ export const generateQuotePDF = async (
   
   const logoBase64 = branding.logoUrl ? await getLogoBase64(branding.logoUrl) : null;
 
-  doc.setFont("helvetica", "normal");
+  // Use Times New Roman for a premium, editorial feel
+  doc.setFont("times", "normal");
 
   // --- CONFIG ---
   const pageWidth = doc.internal.pageSize.width;
@@ -163,40 +164,43 @@ export const generateQuotePDF = async (
 
       // --- HEADER TEXT ---
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
-      doc.setFont("times", "normal"); 
-      doc.text("TRAVEL ITINERARY", pageWidth - margin, 20, { align: 'right' });
+      doc.setFontSize(28);
+      doc.setFont("times", "bold"); 
+      doc.text("ITINERARY", pageWidth - margin, 22, { align: 'right' });
 
-      doc.setFont("helvetica", "normal");
+      doc.setFont("times", "normal");
       doc.setFontSize(10);
-      doc.text(`Ref: ${cleanText(quote.uniqueRefNo)}`, pageWidth - margin, 28, { align: 'right' });
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - margin, 33, { align: 'right' });
+      doc.text(`Reference: ${cleanText(quote.uniqueRefNo)}`, pageWidth - margin, 30, { align: 'right' });
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - margin, 35, { align: 'right' });
 
       // --- FOOTER ---
       const footerY = pageHeight - 15;
       doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]); 
-      doc.setLineWidth(1);
+      doc.setLineWidth(0.5);
       doc.line(margin, footerY, pageWidth - margin, footerY);
       
-      doc.setFontSize(8);
+      doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
-      doc.text(`${cleanText(branding.companyName)} | ${branding.phone}`, margin, footerY + 6);
+      doc.setFont("times", "italic");
+      doc.text(`${cleanText(branding.companyName)}  |  ${branding.phone}`, margin, footerY + 6);
       
+      doc.setFont("times", "normal");
+      doc.setFontSize(8);
       const pageNum = "Page " + data.pageNumber;
       doc.text(pageNum, pageWidth - margin, footerY + 6, { align: 'right' });
   };
 
   // --- START DOCUMENT CONTENT ---
-  let cursorY = headerHeight + 10;
+  let cursorY = headerHeight + 12;
   
-  doc.setFontSize(16);
+  doc.setFontSize(18);
   doc.setTextColor(40, 40, 40); 
-  doc.setFont("helvetica", "bold");
+  doc.setFont("times", "bold");
   doc.text(cleanText(branding.companyName), margin, cursorY);
   
   cursorY += 6;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setFont("times", "normal");
   doc.setTextColor(80, 80, 80);
   
   const addressLines = doc.splitTextToSize(cleanText(branding.address), 100);
@@ -216,25 +220,24 @@ export const generateQuotePDF = async (
   }
 
   // -- TRIP SUMMARY BOX --
-  const summaryBoxY = headerHeight + 10;
+  const summaryBoxY = headerHeight + 12;
   const summaryBoxX = pageWidth / 2 + 10;
   const summaryBoxWidth = contentWidth / 2 - 10;
   const summaryBoxHeight = 45;
 
-  doc.setDrawColor(200, 200, 200);
+  doc.setDrawColor(220, 220, 220);
   doc.setLineWidth(0.1);
-  doc.setFillColor(250, 250, 250);
-  doc.rect(summaryBoxX, summaryBoxY, summaryBoxWidth, summaryBoxHeight, 'F');
-  doc.rect(summaryBoxX, summaryBoxY, summaryBoxWidth, summaryBoxHeight, 'S');
+  doc.setFillColor(252, 252, 252);
+  doc.roundedRect(summaryBoxX, summaryBoxY, summaryBoxWidth, summaryBoxHeight, 2, 2, 'FD');
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFont("times", "bold");
+  doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
-  doc.text("Trip Summary", summaryBoxX + 5, summaryBoxY + 8);
+  doc.text("Trip Overview", summaryBoxX + 5, summaryBoxY + 8);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(50, 50, 50);
+  doc.setFont("times", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
 
   let sumTextY = summaryBoxY + 16;
   doc.text(`Destination: ${cleanText(quote.destination)}`, summaryBoxX + 5, sumTextY);
@@ -244,11 +247,11 @@ export const generateQuotePDF = async (
   doc.text(`Guests: ${quote.paxCount} Pax`, summaryBoxX + 5, sumTextY);
   sumTextY += 6;
   if (quote.leadGuestName) {
-      doc.text(`Guest Name: ${cleanText(quote.leadGuestName)}`, summaryBoxX + 5, sumTextY);
+      doc.text(`Guest: ${cleanText(quote.leadGuestName)}`, summaryBoxX + 5, sumTextY);
   }
 
   // --- START ITINERARY TABLE ---
-  let startY = Math.max(cursorY, summaryBoxY + summaryBoxHeight) + 10;
+  let startY = Math.max(cursorY, summaryBoxY + summaryBoxHeight) + 15;
 
   const tableBody: any[] = [];
   
@@ -265,12 +268,13 @@ export const generateQuotePDF = async (
           content: `Day ${item.day}  |  ${dateStr}  |  ${cleanText(item.title)}`, 
           colSpan: 2, 
           styles: { 
-              fillColor: [245, 247, 250], 
+              fillColor: [240, 242, 245], 
               textColor: [30, 41, 59],
               fontStyle: 'bold',
-              fontSize: 10,
+              font: 'times',
+              fontSize: 11,
               halign: 'left',
-              cellPadding: { top: 4, bottom: 4, left: 3 }
+              cellPadding: { top: 6, bottom: 6, left: 5 }
           } 
       }]);
       
@@ -281,9 +285,9 @@ export const generateQuotePDF = async (
               colSpan: 2, 
               styles: { 
                   fontStyle: 'italic', 
-                  textColor: [80, 80, 80],
-                  fontSize: 9,
-                  cellPadding: { top: 2, bottom: 4, left: 3 }
+                  textColor: [70, 70, 70],
+                  fontSize: 10,
+                  cellPadding: { top: 4, bottom: 8, left: 5 }
               } 
           }]);
       }
@@ -295,7 +299,7 @@ export const generateQuotePDF = async (
               
               let detailsText = "";
               const tags: string[] = [];
-              const specialLines: string[] = []; // For highlighted checkmarks
+              const specialLines: string[] = []; 
 
               if (svc.type === 'HOTEL') {
                   detailsText += cleanText(svc.name);
@@ -305,21 +309,22 @@ export const generateQuotePDF = async (
               else if (svc.type === 'TRANSFER') {
                   detailsText += cleanText(svc.name);
                   
-                  // ENHANCED TRANSFER LOGIC (Box Style)
                   const mode = svc.meta?.transferMode || 'PVT';
                   const vehicle = svc.meta?.vehicle || 'Standard';
 
-                  // Using unicode checkmark
+                  // Show Vehicle in details
+                  if (vehicle) detailsText += `\nVehicle: ${vehicle}`;
+
                   if (mode === 'SIC') {
                       specialLines.push("[ \u2714 Shared Transfer ]");
                   } else {
-                      specialLines.push(`[ \u2714 Private Transfer | ${vehicle} ]`);
+                      // CLEAN TAG AS REQUESTED
+                      specialLines.push(`[ \u2714 Private Transfer ]`);
                   }
               }
               else if (svc.type === 'ACTIVITY') {
                   detailsText += cleanText(svc.name);
                   
-                  // ENHANCED ACTIVITY LOGIC (Box Style)
                   const mode = svc.meta?.transferMode || 'TICKET_ONLY';
                   if (mode === 'TICKET_ONLY') {
                       specialLines.push("[ \u2714 Ticket Only ]");
@@ -338,7 +343,7 @@ export const generateQuotePDF = async (
               }
 
               if (tags.length > 0) {
-                  detailsText += `\n[ ${tags.join(' | ')} ]`;
+                  detailsText += `\n${tags.join(' | ')}`;
               }
               
               // Append special highlighted lines at the end
@@ -347,12 +352,12 @@ export const generateQuotePDF = async (
               }
 
               tableBody.push([
-                  { content: typeLabel, styles: { fontStyle: 'bold', textColor: primaryRGB, fontSize: 8, valign: 'top' } },
-                  { content: detailsText, styles: { fontSize: 9, textColor: [50, 50, 50], valign: 'top' } }
+                  { content: typeLabel, styles: { fontStyle: 'bold', textColor: primaryRGB, fontSize: 9, valign: 'top' } },
+                  { content: detailsText, styles: { fontSize: 10, textColor: [50, 50, 50], valign: 'top', cellPadding: { top: 4, bottom: 6 } } }
               ]);
           });
       } else {
-           tableBody.push([{ content: "Free day at leisure.", colSpan: 2, styles: { textColor: [150, 150, 150], fontStyle: 'italic', fontSize: 9 } }]);
+           tableBody.push([{ content: "Free day at leisure.", colSpan: 2, styles: { textColor: [150, 150, 150], fontStyle: 'italic', fontSize: 10 } }]);
       }
     });
   } else {
@@ -370,24 +375,26 @@ export const generateQuotePDF = async (
           fillColor: primaryRGB, 
           textColor: TABLE_HEADER_TEXT, 
           fontStyle: 'bold',
-          fontSize: 10,
-          halign: 'left'
+          font: 'times',
+          fontSize: 11,
+          halign: 'left',
+          cellPadding: 6
       },
       
       columnStyles: {
-          0: { cellWidth: 30 }, 
+          0: { cellWidth: 35 }, 
           1: { cellWidth: 'auto' }
       },
       
       styles: { 
-          font: 'helvetica',
+          font: 'times',
           overflow: 'linebreak',
-          cellPadding: 3,
+          cellPadding: 4,
           lineWidth: 0.1,
           lineColor: [230, 230, 230]
       },
       
-      margin: { top: headerHeight + 10, right: margin, bottom: 25, left: margin },
+      margin: { top: headerHeight + 15, right: margin, bottom: 25, left: margin },
       
       didDrawPage: drawHeaderFooter,
       
@@ -395,22 +402,6 @@ export const generateQuotePDF = async (
           if (data.row.cells[0].colSpan === 2) {
               data.cell.styles.lineWidth = 0; 
               data.cell.styles.halign = 'left';
-          }
-          // Highlight the transfer lines green if found
-          if (data.section === 'body' && data.column.index === 1) {
-              // SAFE ACCESS TO CONTENT
-              let text = '';
-              const raw = data.cell.raw;
-              
-              if (typeof raw === 'string') {
-                  text = raw;
-              } else if (raw && typeof raw === 'object' && 'content' in raw) {
-                  text = (raw as any).content;
-              }
-
-              if (text && typeof text === 'string' && text.includes('[ \u2714')) {
-                  // Optional: Extra styling override here if supported
-              }
           }
       }
   });
@@ -421,38 +412,38 @@ export const generateQuotePDF = async (
   if (displayPrice > 0) {
       // Safe access to finalY
       const lastAutoTable = (doc as any).lastAutoTable;
-      let finalY = lastAutoTable ? lastAutoTable.finalY + 10 : startY + 50;
+      let finalY = lastAutoTable ? lastAutoTable.finalY + 15 : startY + 50;
       
       if (finalY + 60 > pageHeight) {
           doc.addPage();
           drawHeaderFooter({ pageNumber: doc.internal.getNumberOfPages() }); 
-          finalY = headerHeight + 10; 
+          finalY = headerHeight + 15; 
       }
 
-      const boxWidth = 80;
+      const boxWidth = 90;
       const boxX = pageWidth - margin - boxWidth;
       
-      doc.setFillColor(248, 250, 252); 
+      doc.setFillColor(250, 250, 252); 
       doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
       doc.setLineWidth(0.5);
-      doc.roundedRect(boxX, finalY, boxWidth, 30, 2, 2, 'FD');
+      doc.roundedRect(boxX, finalY, boxWidth, 35, 3, 3, 'FD');
       
       doc.setTextColor(80, 80, 80);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text("Total Package Cost", boxX + 5, finalY + 8);
+      doc.setFontSize(11);
+      doc.setFont("times", "normal");
+      doc.text("Total Package Cost", boxX + 6, finalY + 10);
       
       doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setFont("times", "bold");
       const currency = quote.currency || 'INR';
-      doc.text(`${currency} ${displayPrice.toLocaleString()}`, boxX + 5, finalY + 18);
+      doc.text(`${currency} ${displayPrice.toLocaleString()}`, boxX + 6, finalY + 22);
       
       if (breakdown?.perPersonPrice) {
-          doc.setTextColor(100, 100, 100);
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "normal");
-          doc.text(`(~ ${currency} ${breakdown.perPersonPrice.toLocaleString()} per person)`, boxX + 5, finalY + 24);
+          doc.setTextColor(120, 120, 120);
+          doc.setFontSize(9);
+          doc.setFont("times", "italic");
+          doc.text(`(Approx. ${currency} ${breakdown.perPersonPrice.toLocaleString()} per person)`, boxX + 6, finalY + 29);
       }
   }
 
