@@ -1,8 +1,10 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Transfer, Destination } from '../../types';
+import { permissionService } from '../../services/permissionService';
 import { Edit2, Trash2, Plus, X, Car, MapPin, Image as ImageIcon, Search, DollarSign, Calendar, Check, Loader2 } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 import { RichTextEditor } from '../../components/ui/RichTextEditor';
@@ -15,7 +17,12 @@ export const Transfers: React.FC = () => {
   const [allTransfers, setAllTransfers] = useState<Transfer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.HOTEL_PARTNER;
+  const canEdit = 
+    user?.role === UserRole.ADMIN || 
+    (user?.role === UserRole.STAFF && permissionService.hasPermission(user, 'MANAGE_INVENTORY')) || 
+    user?.role === UserRole.OPERATOR || 
+    user?.role === UserRole.HOTEL_PARTNER;
+
   const showCost = user?.role !== UserRole.AGENT;
 
   // Refresh on load

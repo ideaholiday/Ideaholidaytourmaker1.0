@@ -1,8 +1,10 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Activity, Destination, ActivityTransferOptions } from '../../types';
+import { permissionService } from '../../services/permissionService';
 import { Edit2, Trash2, Plus, X, Camera, Clock, Image as ImageIcon, Search, DollarSign, Check, MapPin, Calendar, Loader2, Bus, Car, Ticket } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 import { RichTextEditor } from '../../components/ui/RichTextEditor';
@@ -20,7 +22,11 @@ export const Sightseeing: React.FC = () => {
   const [allActivities, setAllActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
+  const canEdit = 
+    user?.role === UserRole.ADMIN || 
+    (user?.role === UserRole.STAFF && permissionService.hasPermission(user, 'MANAGE_INVENTORY')) || 
+    user?.role === UserRole.OPERATOR;
+
   const showCost = user?.role !== UserRole.AGENT;
 
   // Refresh on load
@@ -248,7 +254,7 @@ export const Sightseeing: React.FC = () => {
                className="px-4 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none shadow-sm cursor-pointer hover:border-brand-300 transition min-w-[160px]"
              >
                 <option value="ALL">All Destinations</option>
-                {allDestinations.map(d => <option key={d.id} value={d.id}>{d.city}</option>)}
+                {allDestinations.map(d => <option key={d.id} value={d.id}>{d.city}, {d.country}</option>)}
              </select>
 
              <select 

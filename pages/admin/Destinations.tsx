@@ -1,8 +1,10 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Destination } from '../../types';
+import { permissionService } from '../../services/permissionService';
 import { Edit2, Trash2, Plus, X, Map, Globe, Clock, Coins, Check, Search, Image as ImageIcon } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 
@@ -14,7 +16,10 @@ export const Destinations: React.FC = () => {
   const [formData, setFormData] = useState<Partial<Destination>>({});
   const [search, setSearch] = useState('');
 
-  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
+  const canEdit = 
+    user?.role === UserRole.ADMIN || 
+    (user?.role === UserRole.STAFF && permissionService.hasPermission(user, 'MANAGE_INVENTORY')) || 
+    user?.role === UserRole.OPERATOR;
   
   useEffect(() => {
       loadDestinations();

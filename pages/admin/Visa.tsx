@@ -1,8 +1,10 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Visa } from '../../types';
+import { permissionService } from '../../services/permissionService';
 import { Edit2, Trash2, Plus, X, FileText, CheckCircle, Clock, BookOpen, AlertCircle } from 'lucide-react';
 
 export const VisaPage: React.FC = () => {
@@ -18,8 +20,11 @@ export const VisaPage: React.FC = () => {
       setAllVisas(data);
   };
   
-  // Operators now have full access
-  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
+  // Enhance logic: Admin OR (Staff with Permission) OR Operator
+  const canEdit = 
+    user?.role === UserRole.ADMIN || 
+    (user?.role === UserRole.STAFF && permissionService.hasPermission(user, 'MANAGE_INVENTORY')) || 
+    user?.role === UserRole.OPERATOR;
   
   // Agents should NOT see the Cost Price (Net Rate)
   const showCost = user?.role !== UserRole.AGENT;

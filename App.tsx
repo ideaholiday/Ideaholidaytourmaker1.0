@@ -1,4 +1,4 @@
-import React, { useMemo, ReactNode, ErrorInfo } from 'react';
+import React, { Component, useMemo, ReactNode, ErrorInfo } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';

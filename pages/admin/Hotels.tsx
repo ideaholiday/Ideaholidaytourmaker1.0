@@ -1,8 +1,10 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Hotel, Destination } from '../../types';
+import { permissionService } from '../../services/permissionService';
 import { Edit2, Plus, X, Search, Hotel as HotelIcon, Calendar, DollarSign, Image as ImageIcon, Phone, Mail, MapPin } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
 
@@ -11,7 +13,12 @@ export const Hotels: React.FC = () => {
   const [allDestinations, setAllDestinations] = useState<Destination[]>([]);
   const [allHotels, setAllHotels] = useState<Hotel[]>([]);
   
-  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR || user?.role === UserRole.HOTEL_PARTNER;
+  const canEdit = 
+    user?.role === UserRole.ADMIN || 
+    (user?.role === UserRole.STAFF && permissionService.hasPermission(user, 'MANAGE_INVENTORY')) || 
+    user?.role === UserRole.OPERATOR || 
+    user?.role === UserRole.HOTEL_PARTNER;
+
   const showCost = user?.role !== UserRole.AGENT;
 
   // Ensure fresh data on load
