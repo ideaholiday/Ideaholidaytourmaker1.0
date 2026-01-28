@@ -67,7 +67,7 @@ export const InventoryManager: React.FC = () => {
               currency: 'INR',
               status: 'PENDING_APPROVAL',
               destinationId: destinations[0]?.id || '',
-              ticketIncluded: true
+              ticketIncluded: true // Default true
           });
           setTransferOpts(DEFAULT_TRANSFER_OPTS);
       }

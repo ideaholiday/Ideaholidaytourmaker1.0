@@ -40,12 +40,20 @@ const InventoryItemRow: React.FC<{
     const [nights, setNights] = useState(defaultNights);
     const [pax, setPax] = useState({ adult: defaultPax, child: 0 }); 
     const [transferMode, setTransferMode] = useState<'TICKET_ONLY' | 'SIC' | 'PVT'>('TICKET_ONLY');
+    const [baseTicketEnabled, setBaseTicketEnabled] = useState(false);
 
     const isAdded = !!existingServiceId;
 
     useEffect(() => {
         setNights(defaultNights);
     }, [defaultNights]);
+
+    // Force TICKET_ONLY if base ticket is disabled (per requirements)
+    useEffect(() => {
+        if (!baseTicketEnabled && type === 'ACTIVITY') {
+            setTransferMode('TICKET_ONLY');
+        }
+    }, [baseTicketEnabled, type]);
 
     const name = item.name || item.activityName || item.transferName;
     const isPartner = !!item.operatorId;
@@ -66,7 +74,10 @@ const InventoryItemRow: React.FC<{
         }
 
         if (type === 'ACTIVITY') {
-            const baseTicketCost = (item.costAdult * pax.adult) + (item.costChild * pax.child);
+            // Base ticket cost depends on checkbox state
+            const baseTicketCost = baseTicketEnabled
+                ? (item.costAdult * pax.adult) + (item.costChild * pax.child)
+                : 0;
 
             if (transferMode === 'TICKET_ONLY') return baseTicketCost;
             
@@ -121,8 +132,22 @@ const InventoryItemRow: React.FC<{
 
     return (
         <div className={`group flex flex-col md:flex-row bg-white border rounded-xl overflow-hidden transition-all duration-200 ${isAdded ? 'border-emerald-500 ring-2 ring-emerald-50 bg-emerald-50/10' : 'border-slate-200 hover:border-brand-300 hover:shadow-md'}`}>
+            
+            {/* Checkbox Section (Left) */}
+            {type === 'ACTIVITY' && (
+                <div className="p-4 flex items-center justify-center bg-slate-50 border-b md:border-b-0 md:border-r border-slate-200">
+                   <input 
+                        type="checkbox" 
+                        checked={baseTicketEnabled} 
+                        onChange={(e) => setBaseTicketEnabled(e.target.checked)}
+                        className="w-5 h-5 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                        title="Enable Base Ticket"
+                   />
+                </div>
+            )}
+
             {/* Image Section */}
-            <div className="w-full md:w-40 h-auto bg-slate-100 shrink-0 relative overflow-hidden flex flex-col justify-center">
+            <div className={`w-full md:w-40 h-auto bg-slate-100 shrink-0 relative overflow-hidden flex flex-col justify-center transition-opacity ${type === 'ACTIVITY' && !baseTicketEnabled ? 'opacity-50' : ''}`}>
                 {image ? (
                     <img src={image} alt={name} className="w-full h-full object-cover min-h-[140px] transition-transform duration-500 group-hover:scale-105" />
                 ) : (
@@ -138,7 +163,7 @@ const InventoryItemRow: React.FC<{
             </div>
 
             {/* Details Section */}
-            <div className="flex-1 p-4 flex flex-col justify-between">
+            <div className={`flex-1 p-4 flex flex-col justify-between transition-opacity ${type === 'ACTIVITY' && !baseTicketEnabled ? 'opacity-50' : ''}`}>
                 <div>
                     <div className="flex justify-between items-start mb-1">
                         <h4 className={`font-bold text-base leading-tight ${isAdded ? 'text-emerald-800' : 'text-slate-800'}`}>{name}</h4>
@@ -173,7 +198,7 @@ const InventoryItemRow: React.FC<{
                     
                     {/* Activity Config */}
                     {type === 'ACTIVITY' && (
-                        <div className="mt-2 bg-slate-50 p-3 rounded-lg border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs mb-3">
+                        <div className={`mt-2 bg-slate-50 p-3 rounded-lg border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs mb-3 ${!baseTicketEnabled ? 'pointer-events-none' : ''}`}>
                              <div className="md:col-span-2">
                                  <label className="block text-slate-500 font-bold mb-1">Transfer Option</label>
                                  <div className="flex flex-wrap gap-2">

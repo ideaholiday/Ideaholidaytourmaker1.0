@@ -763,7 +763,7 @@ export interface OperatorInventoryItem {
   costAdult?: number;
   costChild?: number;
   transferOptions?: ActivityTransferOptions;
-  ticketIncluded?: boolean;
+  ticketIncluded?: boolean; // Added for Activity Base Ticket toggle
   
   // Approval Workflow
   status: InventoryStatus;
