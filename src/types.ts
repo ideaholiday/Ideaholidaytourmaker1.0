@@ -1,5 +1,3 @@
-
-
 export enum UserRole {
   ADMIN = 'ADMIN',
   STAFF = 'STAFF',
@@ -49,7 +47,9 @@ export type Permission =
   | 'MANAGE_INVENTORY'
   | 'CREATE_INVENTORY'
   | 'MANAGE_CONTRACTS'
-  | 'APPROVE_CONTRACTS';
+  | 'APPROVE_CONTRACTS'
+  | 'OPERATOR_VIEW_ASSIGNED_BOOKINGS'
+  | 'OPERATOR_MANAGE_OWN_INVENTORY';
 
 export interface User {
   id: string;
@@ -78,6 +78,7 @@ export interface User {
   updatedAt?: string;
   password?: string; // Mock only
   welcomeEmailSent?: boolean;
+  fcmToken?: string;
 }
 
 export interface Message {
@@ -576,7 +577,7 @@ export interface CompanyProfile {
   isActive: boolean;
 }
 
-export type EntityType = 'BOOKING' | 'PAYMENT' | 'QUOTE' | 'USER' | 'PERMISSION' | 'OPERATOR_ASSIGNMENT' | 'CANCELLATION' | 'GST_INVOICE' | 'GST_CREDIT_NOTE' | 'ACCOUNTING_EXPORT' | 'PAYMENT_REMINDER' | 'CURRENCY_RATE' | 'SUPPLIER_UPDATE' | 'INVENTORY_APPROVAL' | 'CONTRACT' | 'AUDIT_LOG';
+export type EntityType = 'BOOKING' | 'PAYMENT' | 'QUOTE' | 'USER' | 'PERMISSION' | 'OPERATOR_ASSIGNMENT' | 'CANCELLATION' | 'GST_INVOICE' | 'GST_CREDIT_NOTE' | 'ACCOUNTING_EXPORT' | 'PAYMENT_REMINDER' | 'CURRENCY_RATE' | 'SUPPLIER_UPDATE' | 'INVENTORY_APPROVAL' | 'CONTRACT';
 
 export interface AuditLog {
   id: string;
@@ -762,6 +763,7 @@ export interface OperatorInventoryItem {
   costAdult?: number;
   costChild?: number;
   transferOptions?: ActivityTransferOptions;
+  ticketIncluded?: boolean;
   
   // Approval Workflow
   status: InventoryStatus;

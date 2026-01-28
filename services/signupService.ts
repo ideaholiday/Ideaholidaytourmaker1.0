@@ -9,7 +9,7 @@ export interface SignupRequest {
   password?: string; // Added password
   mobile: string;
   city: string;
-  role: UserRole.AGENT | UserRole.OPERATOR;
+  role: UserRole.AGENT | UserRole.OPERATOR | UserRole.HOTEL_PARTNER;
 }
 
 class SignupService {
@@ -30,8 +30,8 @@ class SignupService {
         throw new Error("Password must be at least 6 characters.");
     }
 
-    if (![UserRole.AGENT, UserRole.OPERATOR].includes(data.role)) {
-      throw new Error("Invalid account type. Only Agents and Operators can self-register.");
+    if (![UserRole.AGENT, UserRole.OPERATOR, UserRole.HOTEL_PARTNER].includes(data.role)) {
+      throw new Error("Invalid account type. Only Agents, Operators, and Hotel Partners can self-register.");
     }
 
     const mobileRegex = /^[0-9]{10,15}$/;

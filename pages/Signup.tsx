@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { signupService, SignupRequest } from '../services/signupService';
 import { UserRole } from '../types';
 import { BRANDING } from '../constants';
-import { Shield, Building, User, Mail, Phone, MapPin, Briefcase, CheckCircle, ArrowRight, Loader2, AlertCircle, Globe, Lock } from 'lucide-react';
+import { Shield, Building, User, Mail, Phone, MapPin, Briefcase, CheckCircle, ArrowRight, Loader2, AlertCircle, Globe, Lock, Store } from 'lucide-react';
 
 export const Signup: React.FC = () => {
   const navigate = useNavigate();
@@ -149,6 +149,25 @@ export const Signup: React.FC = () => {
                         </div>
                         {formData.role === UserRole.OPERATOR && <CheckCircle className="ml-auto text-brand-500" size={20} />}
                     </button>
+
+                    <button
+                        type="button"
+                        onClick={() => handleChange('role', UserRole.HOTEL_PARTNER)}
+                        className={`w-full p-5 rounded-2xl border-2 text-left transition-all duration-300 flex items-center gap-4 group ${
+                            formData.role === UserRole.HOTEL_PARTNER 
+                            ? 'border-brand-500 bg-white shadow-lg ring-4 ring-brand-500/10 scale-105 z-10' 
+                            : 'border-transparent bg-white shadow-sm hover:border-slate-300 hover:shadow-md text-slate-500'
+                        }`}
+                    >
+                        <div className={`p-3 rounded-xl transition-colors ${formData.role === UserRole.HOTEL_PARTNER ? 'bg-brand-100 text-brand-600' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
+                            <Store size={24} />
+                        </div>
+                        <div>
+                            <span className={`block font-bold text-lg ${formData.role === UserRole.HOTEL_PARTNER ? 'text-slate-900' : 'text-slate-600'}`}>Hotel Partner</span>
+                            <span className="text-xs text-slate-500">I own or manage property</span>
+                        </div>
+                        {formData.role === UserRole.HOTEL_PARTNER && <CheckCircle className="ml-auto text-brand-500" size={20} />}
+                    </button>
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-slate-200">
@@ -182,7 +201,7 @@ export const Signup: React.FC = () => {
                                     value={formData.companyName}
                                     onChange={(e) => handleChange('companyName', e.target.value)}
                                     className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder-slate-400 font-medium"
-                                    placeholder="Travels Pvt Ltd"
+                                    placeholder={formData.role === UserRole.HOTEL_PARTNER ? "Hotel / Brand Name" : "Travels Pvt Ltd"}
                                 />
                             </div>
                         </div>

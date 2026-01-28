@@ -23,16 +23,22 @@ export const ALL_PERMISSIONS: { key: Permission; label: string; description: str
   { key: 'CREATE_INVENTORY', label: 'Create Inventory Only', description: 'Restricted access: Can only add new inventory items.' },
   { key: 'MANAGE_CONTRACTS', label: 'Manage Contracts', description: 'Create and update supplier contracts.' },
   { key: 'APPROVE_CONTRACTS', label: 'Approve Contracts', description: 'Finalize and activate supplier contracts.' },
+  // Operator Specific Permissions
+  { key: 'OPERATOR_VIEW_ASSIGNED_BOOKINGS', label: 'View Assigned Bookings', description: 'Operator can access bookings assigned to them.' },
+  { key: 'OPERATOR_MANAGE_OWN_INVENTORY', label: 'Manage Own Inventory', description: 'Operator can create and edit their own inventory.' },
 ];
 
 class PermissionService {
   
   hasPermission(user: User, permission: Permission): boolean {
     if (user.role === UserRole.ADMIN) return true; // Admin has all
-    if (user.role === UserRole.STAFF) {
+    
+    // Check permissions for Staff and Operators
+    if (user.role === UserRole.STAFF || user.role === UserRole.OPERATOR) {
       return user.permissions?.includes(permission) || false;
     }
-    return false; // Agents/Operators generally don't use this system, strict roles apply
+    
+    return false; // Agents generally don't use this system permissions
   }
 
   updatePermissions(userId: string, permissions: Permission[]) {
