@@ -1,21 +1,30 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Hotel, Destination } from '../../types';
 import { permissionService } from '../../services/permissionService';
-import { Edit2, Plus, X, Search, Hotel as HotelIcon, Calendar, DollarSign, Image as ImageIcon, Phone, Mail, MapPin } from 'lucide-react';
+import { Edit2, Plus, X, Search, Hotel as HotelIcon, Calendar, DollarSign, Image as ImageIcon, Phone, Mail, MapPin, Upload } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
+import { HotelBulkUploadModal } from '../../components/admin/HotelBulkUploadModal';
 
 export const Hotels: React.FC = () => {
   const { user } = useAuth();
   const [allDestinations, setAllDestinations] = useState<Destination[]>([]);
   const [allHotels, setAllHotels] = useState<Hotel[]>([]);
   
-  const canEdit = 
+  // Permissions Logic
+  // Can Manage (Edit/Delete): Admin, or Staff with MANAGE_INVENTORY, or Owner (Operator/Partner)
+  const canManage = 
     user?.role === UserRole.ADMIN || 
     (user?.role === UserRole.STAFF && permissionService.hasPermission(user, 'MANAGE_INVENTORY')) || 
+    user?.role === UserRole.OPERATOR || 
+    user?.role === UserRole.HOTEL_PARTNER;
+
+  // Can Create (Add): Admin, or Staff with MANAGE or CREATE, or Owner
+  const canCreate = 
+    user?.role === UserRole.ADMIN || 
+    (user?.role === UserRole.STAFF && (permissionService.hasPermission(user, 'MANAGE_INVENTORY') || permissionService.hasPermission(user, 'CREATE_INVENTORY'))) ||
     user?.role === UserRole.OPERATOR || 
     user?.role === UserRole.HOTEL_PARTNER;
 
@@ -38,6 +47,7 @@ export const Hotels: React.FC = () => {
   const [search, setSearch] = useState('');
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingHotel, setEditingHotel] = useState<Hotel | null>(null);
   const [formData, setFormData] = useState<Partial<Hotel>>({});
 
@@ -61,7 +71,7 @@ export const Hotels: React.FC = () => {
       setFormData(hotel);
     } else {
       if (user?.role === UserRole.HOTEL_PARTNER) {
-          alert("Partners cannot create new inventory properties. Please contact Admin to link new properties.");
+          alert("Partners cannot create new inventory properties manually here. Use Bulk Upload or contact Admin.");
           return;
       }
       setEditingHotel(null);
@@ -118,12 +128,6 @@ export const Hotels: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleBulkImport = async (data: any[]) => {
-      // Logic for bulk import
-      alert(`Processed ${data.length} items (Mock)`);
-      await refreshData();
-  };
-
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
@@ -131,18 +135,17 @@ export const Hotels: React.FC = () => {
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Hotel Inventory</h1>
           <p className="text-slate-500 mt-1">Manage hotel contracts and seasonal rates.</p>
         </div>
-        {canEdit && (
+        {canCreate && (
             <div className="flex gap-3">
-                {user?.role !== UserRole.HOTEL_PARTNER && (
-                    <InventoryImportExport 
-                        data={hotels}
-                        headers={['id', 'name', 'destinationId', 'category', 'roomType', 'mealPlan', 'cost', 'currency', 'costType', 'season', 'isActive']}
-                        filename="hotels_rates"
-                        onImport={handleBulkImport}
-                    />
-                )}
+                <button 
+                    onClick={() => setIsBulkModalOpen(true)}
+                    className="bg-white border border-slate-300 text-slate-700 px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-slate-50 transition shadow-sm font-medium"
+                >
+                    <Upload size={18} /> Bulk Upload
+                </button>
+                
                 <button onClick={() => handleOpenModal()} className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition shadow-lg shadow-brand-200 font-medium">
-                    <Plus size={20} /> {user?.role === UserRole.HOTEL_PARTNER ? 'Edit Selected' : 'Add Rate'}
+                    <Plus size={20} /> Add Rate
                 </button>
             </div>
         )}
@@ -171,7 +174,7 @@ export const Hotels: React.FC = () => {
               <th className="px-6 py-4">Room Config</th>
               <th className="px-6 py-4">Season</th>
               {showCost && <th className="px-6 py-4 text-right">Net Cost</th>}
-              {canEdit && <th className="px-6 py-4 text-right">Actions</th>}
+              {canManage && <th className="px-6 py-4 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -215,7 +218,7 @@ export const Hotels: React.FC = () => {
                         <span className="block text-[10px] text-slate-400 font-medium uppercase">{hotel.costType}</span>
                     </td>
                   )}
-                  {canEdit && (
+                  {canManage && (
                     <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2 opacity-100">
                             <button onClick={() => handleOpenModal(hotel)} className="p-2 text-slate-500 hover:text-brand-600 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition shadow-sm">
@@ -237,7 +240,7 @@ export const Hotels: React.FC = () => {
         )}
       </div>
 
-      {isModalOpen && canEdit && (
+      {isModalOpen && (canCreate || (editingHotel && canManage)) && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-0 overflow-hidden transform scale-100 transition-all max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10 backdrop-blur-md">
@@ -473,6 +476,14 @@ export const Hotels: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* BULK UPLOAD MODAL */}
+      <HotelBulkUploadModal 
+          isOpen={isBulkModalOpen}
+          onClose={() => setIsBulkModalOpen(false)}
+          onComplete={refreshData}
+          user={user}
+      />
     </div>
   );
 };

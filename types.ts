@@ -47,6 +47,7 @@ export type Permission =
   | 'VIEW_FINANCE_REPORTS'
   | 'APPROVE_INVENTORY'
   | 'MANAGE_INVENTORY'
+  | 'CREATE_INVENTORY'
   | 'MANAGE_CONTRACTS'
   | 'APPROVE_CONTRACTS';
 
@@ -761,6 +762,7 @@ export interface OperatorInventoryItem {
   costAdult?: number;
   costChild?: number;
   transferOptions?: ActivityTransferOptions;
+  ticketIncluded?: boolean; // Added for Activity Base Ticket toggle
   
   // Approval Workflow
   status: InventoryStatus;
