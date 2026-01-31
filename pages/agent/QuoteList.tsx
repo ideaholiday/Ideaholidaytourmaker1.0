@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -16,7 +15,6 @@ export const QuoteList: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'QUOTES' | 'HISTORY'>('QUOTES');
   const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [pdfGeneratingId, setPdfGeneratingId] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
@@ -130,20 +128,13 @@ export const QuoteList: React.FC = () => {
       }
   };
 
-  const handleDownload = async (e: React.MouseEvent, quote: Quote) => {
+  const handleDownload = (e: React.MouseEvent, quote: Quote) => {
        e.stopPropagation();
-       setPdfGeneratingId(quote.id);
        const mockBreakdown: any = {
          finalPrice: quote.sellingPrice || quote.price || 0,
          perPersonPrice: ((quote.sellingPrice || quote.price || 0) / quote.paxCount),
      };
-     try {
-        await generateQuotePDF(quote, mockBreakdown, user.role, user);
-     } catch (e) {
-        alert("Could not generate PDF.");
-     } finally {
-        setPdfGeneratingId(null);
-     }
+     generateQuotePDF(quote, mockBreakdown, user.role, user);
   };
 
   const handleShare = (e: React.MouseEvent, quote: Quote) => {
@@ -224,8 +215,6 @@ export const QuoteList: React.FC = () => {
                     <tbody className="divide-y divide-slate-100">
                     {processedData.map((quote) => {
                         const displayPrice = quote.sellingPrice || quote.price || 0;
-                        const isThisPdfLoading = pdfGeneratingId === quote.id;
-
                         return (
                             <tr key={quote.id} className="hover:bg-slate-50 transition group cursor-pointer" onClick={() => navigate(`/quote/${quote.id}`)}>
                             <td className="px-6 py-4">
@@ -263,13 +252,8 @@ export const QuoteList: React.FC = () => {
                                     <button onClick={(e) => handleCopyLink(e, quote.id)} title="Copy Link" className="p-2 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition">
                                         <LinkIcon size={18} />
                                     </button>
-                                    <button 
-                                        onClick={(e) => handleDownload(e, quote)} 
-                                        disabled={isThisPdfLoading}
-                                        title="PDF" 
-                                        className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition disabled:opacity-50"
-                                    >
-                                        {isThisPdfLoading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                                    <button onClick={(e) => handleDownload(e, quote)} title="PDF" className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition">
+                                        <Download size={18} />
                                     </button>
                                     <button onClick={(e) => handleShare(e, quote)} title="WhatsApp" className="p-2 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
                                         <Share2 size={18} />

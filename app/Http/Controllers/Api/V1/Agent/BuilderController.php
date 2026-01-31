@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Http\Controllers\Api\V1\Agent;
@@ -5,21 +6,18 @@ namespace App\Http\Controllers\Api\V1\Agent;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Services\Itinerary\BuilderPricingService;
-use App\Services\Itinerary\ItineraryService;
-use Illuminate\Support\Facades\DB;
 use App\Models\Itinerary;
+use App\Enums\ItineraryStatus;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class BuilderController extends Controller
 {
     protected $pricingService;
-    protected $itineraryService;
 
-    public function __construct(
-        BuilderPricingService $pricingService,
-        ItineraryService $itineraryService
-    ) {
+    public function __construct(BuilderPricingService $pricingService)
+    {
         $this->pricingService = $pricingService;
-        $this->itineraryService = $itineraryService;
     }
 
     public function calculate(Request $request)
@@ -35,7 +33,7 @@ class BuilderController extends Controller
             $request->user(), 
             $validated['days'],
             $validated['pax'],
-            $request->input('currency', 'INR'),
+            $request->input('currency', 'INR'), // Default to INR if missing
             $request->input('markup')
         );
 
@@ -55,43 +53,131 @@ class BuilderController extends Controller
             'markup' => 'sometimes|numeric|min:0'
         ]);
 
-        $agent = $request->user();
-        
-        // 1. Calculate Pricing (Authority Check)
-        $pricingResult = $this->pricingService->calculate(
-            $agent, 
-            $validated['days'], 
-            $validated['pax'],
-            $request->input('currency', 'INR'),
-            $request->input('markup')
-        );
+        return DB::transaction(function () use ($request, $validated) {
+            $agent = $request->user();
+            $itinerary = null;
+            $requestedCurrency = $request->input('currency', 'INR');
+            $requestedMarkup = $request->input('markup');
 
-        // 2. Delegate Persistence to Service
-        // This ensures structure, metadata (JSON), and pricing are saved atomically
-        $itinerary = $this->itineraryService->saveFromBuilder(
-            $agent, 
-            $validated, 
-            $pricingResult
-        );
+            // 1. Version Control Strategy
+            if (!empty($validated['id'])) {
+                $existing = Itinerary::find($validated['id']);
+                if ($existing) {
+                    if ($existing->is_locked) {
+                        // CASE A: Locked/Approved -> Create NEXT Version
+                        $itinerary = $existing->createNextVersion($agent);
+                    } else {
+                        // CASE B: Draft/Approved(Editable) -> Update Existing
+                        $itinerary = $existing;
+                    }
+                }
+            }
 
-        return response()->json([
-            'id' => $itinerary->id, 
-            'version' => $itinerary->version,
-            'reference' => $itinerary->reference_code,
-            'message' => 'Itinerary saved successfully.'
-        ]);
-    }
+            if (!$itinerary) {
+                // CASE C: New Itinerary
+                $itinerary = new Itinerary();
+                $itinerary->id = Str::uuid();
+                $itinerary->reference_code = 'QT-' . strtoupper(Str::random(6)) . date('my'); // Unique Ref
+                $itinerary->agent_id = $agent->id;
+                $itinerary->version = 1;
+                $itinerary->is_locked = false;
+            }
+            
+            // 2. Calculate Final Pricing (Backend Authority)
+            $pricing = $this->pricingService->calculate(
+                $agent, 
+                $validated['days'], 
+                $validated['pax'],
+                $requestedCurrency,
+                $requestedMarkup
+            );
 
-    public function lock(Request $request, $id)
-    {
-        $itinerary = Itinerary::where('agent_id', $request->user()->id)->findOrFail($id);
-        
-        $this->itineraryService->lock($itinerary);
+            // Update Header Information
+            $itinerary->title = $validated['title'];
+            $itinerary->destination_summary = $validated['destination_summary'];
+            $itinerary->travel_date = $validated['travel_date'];
+            $itinerary->pax_count = $validated['pax'];
+            $itinerary->display_currency = $pricing['currency'];
+            
+            // AUTO-APPROVE LOGIC: Itinerary is usable immediately
+            $itinerary->status = ItineraryStatus::APPROVED;
+            $itinerary->approved_at = now();
+            $itinerary->allowStatusUpdate = true; // Bypass model protection for this save
 
-        return response()->json([
-            'id' => $itinerary->id,
-            'is_locked' => true,
-            'message' => 'Itinerary locked successfully.'
-        ]);
+            // 3. Save Pricing Snapshot (Immutable Financial Record for THIS version)
+            $itinerary->pricing_snapshot = [
+                'base_total' => $pricing['breakdown']['supplier_base'],
+                'display_total' => $pricing['selling_price'],
+                'system_margin' => $pricing['breakdown']['margin_base'],
+                'agent_markup' => $pricing['breakdown']['markup_base'],
+                'operator_adjustment' => 0,
+                'tax' => $pricing['breakdown']['tax_base'] ?? 0,
+                'rate_timestamp' => now()->toIso8601String()
+            ];
+            
+            $itinerary->save();
+
+            // 4. Persist Days & Services
+            // For a new version or updated draft, we strictly overwrite the day structure 
+            $itinerary->days()->delete(); 
+            
+            foreach ($validated['days'] as $dayData) {
+                $day = $itinerary->days()->create([
+                    'day_number' => $dayData['day_number'],
+                    'title' => $dayData['title'] ?? 'Day ' . $dayData['day_number'],
+                    'city' => $dayData['destination_id'] // Mapping destination_id to city column
+                ]);
+
+                if (!empty($dayData['services'])) {
+                    foreach ($dayData['services'] as $svc) {
+                        
+                        // Resolve Cost for Persistence (Reusing logic from BuilderPricingService concept)
+                        $cost = 0;
+                        $currency = 'INR';
+
+                        if (!empty($svc['inventory_id'])) {
+                             // Try to find in DB to ensure integrity
+                             $product = \App\Models\Product::with('currentVersion')->find($svc['inventory_id']);
+                             if ($product && $product->currentVersion) {
+                                 $cost = $product->currentVersion->net_cost;
+                                 $currency = $product->currentVersion->currency;
+                             }
+                        }
+                        
+                        // Fallback to payload cost if DB lookup failed OR if it's a custom item
+                        // Note: If product found, we use DB price. If not found or custom, use input price.
+                        if ($cost == 0 && (isset($svc['cost']) || isset($svc['estimated_cost']))) {
+                            // Frontend sends 'cost' mapped from 'estimated_cost' in context
+                            $cost = $svc['cost'] ?? $svc['estimated_cost'];
+                            $currency = $svc['currency'] ?? 'INR';
+                        }
+                        
+                        // Sanitize
+                        $cost = is_numeric($cost) ? $cost : 0;
+
+                        $day->services()->create([
+                            'inventory_type' => $svc['type'],
+                            'inventory_id' => $svc['inventory_id'] ?? null,
+                            'service_name' => $svc['name'],
+                            'description_snapshot' => $svc['description'] ?? '', 
+                            
+                            'supplier_net' => $cost, // Persist resolved cost
+                            'supplier_currency' => $currency,
+                            
+                            'quantity' => $svc['quantity'] ?? 1,
+                            'duration_nights' => $svc['nights'] ?? 1,
+                            'meta_data' => $svc['meta'] ?? []
+                        ]);
+                    }
+                }
+            }
+
+            return response()->json([
+                'id' => $itinerary->id, 
+                'version' => $itinerary->version,
+                'reference' => $itinerary->reference_code,
+                'message' => 'Itinerary saved and ready.'
+            ]);
+        });
     }
 }

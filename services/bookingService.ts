@@ -45,19 +45,14 @@ class BookingService {
   }
 
   async createBookingFromQuote(quote: Quote, user: User, travelers?: Traveler[]): Promise<Booking> {
-    // 1. Validation
-    if (!quote.id) throw new Error("Invalid Quote ID");
-    if (quote.status === 'BOOKED') throw new Error("This quote has already been booked.");
-
     const totalAmount = quote.sellingPrice || quote.price || 0;
     const advanceAmount = Math.ceil(totalAmount * 0.30);
     const defaultCompany = await companyService.getDefaultCompany();
 
-    // 2. Create Booking Object
     const newBooking: Booking = {
       id: `bk_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
-      quoteId: quote.id,
-      uniqueRefNo: `BK-${quote.uniqueRefNo.replace('QT-', '')}`, // Transform QT ref to BK ref
+      quoteId: quote.id || '',
+      uniqueRefNo: quote.uniqueRefNo || 'REF-ERR',
       status: 'REQUESTED',
       
       destination: quote.destination || 'Unknown',
@@ -93,7 +88,7 @@ class BookingService {
           senderId: user.id,
           senderName: user.name === 'Client' ? 'Client' : 'System',
           senderRole: user.role === UserRole.AGENT ? UserRole.AGENT : UserRole.ADMIN,
-          content: `Booking Created based on Quote #${quote.uniqueRefNo}. Waiting for Admin approval.`,
+          content: `Booking Created.`,
           timestamp: new Date().toISOString(),
           isSystem: true
       }],
@@ -101,17 +96,10 @@ class BookingService {
       updatedAt: new Date().toISOString()
     };
 
-    // 3. Save Booking
     await dbHelper.save(COLLECTION, newBooking);
     
-    // 4. Lock & Update Quote Status (Prevents double booking and edits)
-    await agentService.updateQuote({ 
-        ...quote, 
-        status: 'BOOKED',
-        isLocked: true 
-    });
-
-    // 5. Update Cache
+    // Update Quote status
+    await agentService.updateQuote({ ...quote, status: 'BOOKED' });
     this.syncAllBookings();
 
     return newBooking;

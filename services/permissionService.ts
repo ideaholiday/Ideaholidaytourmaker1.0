@@ -1,5 +1,4 @@
 
-
 import { User, Permission, UserRole } from '../types';
 import { profileService } from './profileService';
 import { auditLogService } from './auditLogService';
@@ -19,9 +18,6 @@ export const ALL_PERMISSIONS: { key: Permission; label: string; description: str
   { key: 'EXPORT_ACCOUNTING', label: 'Export Accounting', description: 'Download Tally/Zoho ledger data.' },
   { key: 'VIEW_FINANCE_REPORTS', label: 'View P&L', description: 'Access to Profit & Loss reports.' },
   { key: 'APPROVE_INVENTORY', label: 'Approve Inventory', description: 'Review and moderate operator-submitted inventory.' },
-  { key: 'MANAGE_INVENTORY', label: 'Manage Inventory', description: 'Add, Edit, and Delete system inventory (Hotels, Activities, etc.).' },
-  { key: 'MANAGE_CONTRACTS', label: 'Manage Contracts', description: 'Create and update supplier contracts.' },
-  { key: 'APPROVE_CONTRACTS', label: 'Approve Contracts', description: 'Finalize and activate supplier contracts.' },
 ];
 
 class PermissionService {

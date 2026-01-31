@@ -31,7 +31,7 @@ class SignupService {
     }
 
     if (![UserRole.AGENT, UserRole.OPERATOR, UserRole.HOTEL_PARTNER].includes(data.role)) {
-      throw new Error("Invalid account type. Only Agents, Operators, and Hotel Partners can self-register.");
+      throw new Error("Invalid account type. Only Agents, Operators, and Partners can self-register.");
     }
 
     const mobileRegex = /^[0-9]{10,15}$/;

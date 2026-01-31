@@ -1,33 +1,18 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ItineraryBuilderProvider, useBuilder } from '../../components/builder/ItineraryBuilderContext';
 import { InventoryModal } from '../../components/builder/InventoryModal';
-import { Plus, Trash2, MapPin, Loader2, Save, Calendar, Hotel, Camera, Car, Info, Map, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Trash2, MapPin, Loader2, Save, Calendar, Hotel, Camera, Car, Info, Map } from 'lucide-react';
 import { adminService } from '../../services/adminService'; 
 import { inventoryService } from '../../services/inventoryService';
 
 const BuilderContent: React.FC = () => {
-  const { state, initDestination, addService, removeService, saveItinerary, setMarkup } = useBuilder();
+  const { state, initDestination, addService, removeService, saveItinerary } = useBuilder();
   const [modalConfig, setModalConfig] = useState<{ isOpen: boolean, dayId: string, type: any, destId: string } | null>(null);
   
   // Initial Setup State
   const [setup, setSetup] = useState({ destId: '', days: 3 });
-  
-  // Local state for markup toggle logic
-  const [enableMarkup, setEnableMarkup] = useState(true);
-
   const destinations = adminService.getDestinationsSync();
-
-  // Handle Markup Toggle Logic
-  useEffect(() => {
-      if (enableMarkup) {
-          // If enabling, ensure we have a value (default 10 if 0)
-          if (state.markupPercent === 0) setMarkup(10);
-      } else {
-          // If disabling, set to 0
-          setMarkup(0);
-      }
-  }, [enableMarkup]);
 
   const handleStart = () => {
       if (setup.destId) initDestination(setup.days, setup.destId);
@@ -139,28 +124,6 @@ const BuilderContent: React.FC = () => {
                       <span className="text-lg font-mono font-medium text-slate-600">
                           {state.currency} {state.netCost.toLocaleString()}
                       </span>
-                  </div>
-
-                  {/* MARKUP CONTROLS (NEW) */}
-                  <div className="hidden md:flex items-center gap-3 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-                      <div className="flex items-center gap-2 border-r border-slate-200 pr-3">
-                          <span className="text-xs font-bold text-slate-500 uppercase">Markup</span>
-                          <button onClick={() => setEnableMarkup(!enableMarkup)} className="text-brand-600 focus:outline-none hover:text-brand-700 transition">
-                              {enableMarkup ? <ToggleRight size={24} /> : <ToggleLeft size={24} className="text-slate-400" />}
-                          </button>
-                      </div>
-                      <div className="flex items-center gap-1">
-                          <input 
-                              type="number" 
-                              min="0" 
-                              max="100" 
-                              value={state.markupPercent}
-                              onChange={(e) => setMarkup(Number(e.target.value))}
-                              disabled={!enableMarkup}
-                              className="w-12 text-center text-sm font-bold bg-transparent border border-slate-300 rounded focus:ring-1 focus:ring-brand-500 disabled:opacity-50 disabled:bg-slate-100 outline-none"
-                          />
-                          <span className="text-xs font-bold text-slate-500">%</span>
-                      </div>
                   </div>
 
                   {/* SELLING PRICE */}

@@ -1,10 +1,11 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
 import { adminService } from '../../services/adminService';
-import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book, Loader2, Package, Layout, FileCheck } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book, Loader2, Package, Layout, FileCheck, Wallet } from 'lucide-react';
 import { Quote, FixedPackage } from '../../types';
 
 export const AgentDashboard: React.FC = () => {
@@ -63,6 +64,8 @@ export const AgentDashboard: React.FC = () => {
     </div>
   );
 
+  const walletBalance = user.walletBalance || 0;
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -103,13 +106,18 @@ export const AgentDashboard: React.FC = () => {
           icon={<Clock size={24} />} 
           color="bg-amber-500" 
         />
-        <StatCard 
-          label="Confirmed Trips" 
-          value={stats.confirmedQuotes} 
-          subtext={`Conversion Rate: ${stats.conversionRate}%`} 
-          icon={<CheckCircle size={24} />} 
-          color="bg-green-500" 
-        />
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-start justify-between relative overflow-hidden group">
+            <div>
+                <p className="text-sm font-medium text-slate-500 mb-1">Wallet Balance</p>
+                <h3 className="text-2xl font-bold text-slate-900">₹ {walletBalance.toLocaleString()}</h3>
+                <Link to="/agent/wallet" className="text-xs text-brand-600 font-bold mt-1 flex items-center gap-1 hover:underline">
+                    Add Funds <ChevronRight size={10} />
+                </Link>
+            </div>
+            <div className="p-3 rounded-lg bg-emerald-500 text-white shadow-sm">
+                <Wallet size={24} />
+            </div>
+        </div>
         <StatCard 
           label="Total Sales Value" 
           value={`$${stats.totalRevenue.toLocaleString()}`} 

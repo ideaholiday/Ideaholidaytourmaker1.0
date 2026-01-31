@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -8,8 +7,9 @@ import { quickQuoteTemplateService } from '../../services/quickQuoteTemplateServ
 import { calculateQuickEstimate } from '../../services/quickQuotePricing';
 import { calculateRequiredRooms, getDestinationDefaults } from '../../utils/quickQuoteDefaults';
 import { QuickQuoteInputs, Quote, QuickQuoteTemplate, ItineraryItem } from '../../types';
-import { MapPin, Calendar, Users, Hotel, Coffee, Car, Star, DollarSign, ArrowRight, Sparkles, AlertCircle, Save, X, LayoutTemplate, User, IndianRupee } from 'lucide-react';
+import { MapPin, Calendar, Users, Hotel, Coffee, Car, Star, DollarSign, ArrowRight, Sparkles, AlertCircle, Save, X, LayoutTemplate, User, IndianRupee, Heart } from 'lucide-react';
 import { TemplateSelector } from '../../components/quickQuote/TemplateSelector';
+import { generateItinerary } from '../../services/geminiService';
 
 export const QuickQuote: React.FC = () => {
   const { user } = useAuth();
@@ -23,6 +23,7 @@ export const QuickQuote: React.FC = () => {
   const [guestName, setGuestName] = useState('');
   const [guestSalutation, setGuestSalutation] = useState('Mr');
   const [pax, setPax] = useState({ adults: 2, children: 0 });
+  const [preferences, setPreferences] = useState(''); // New State for Activities/Interests
   
   // Quick Inputs
   const [inputs, setInputs] = useState<QuickQuoteInputs>({
@@ -177,13 +178,29 @@ export const QuickQuote: React.FC = () => {
       try {
           const fullGuestName = `${guestSalutation}. ${guestName}`;
 
-          // 1. Create Quote Object
+          // 1. Create Base Quote
           const newQuote = await agentService.createQuote(user, destination, travelDate, pax.adults + pax.children, fullGuestName);
           
           // 2. Generate Skeleton Itinerary for PDF Support
           const skeletonItinerary = generateSkeletonItinerary();
 
-          // 3. Enhance with Quick Quote Data
+          // 3. AI Enhancement (Optional)
+          let aiContent = '';
+          if (useAI) { 
+              const durationText = `${nights} Nights / ${nights + 1} Days`;
+              aiContent = await generateItinerary(
+                  destination, 
+                  durationText, 
+                  'Leisure', 
+                  travelDate,
+                  inputs.hotelCategory,
+                  preferences
+              );
+          } else {
+             aiContent = `${nights} Nights Leisure Trip to ${destination}.`;
+          }
+
+          // 4. Enhance with Quick Quote Data
           const quickDetails = {
               ...newQuote,
               type: 'QUICK' as const,
@@ -193,7 +210,7 @@ export const QuickQuote: React.FC = () => {
               price: estimates.total, // System Net Estimate (Hidden internal ref)
               sellingPrice: estimates.total, // Suggested Selling
               currency: 'INR', // Explicitly set INR
-              serviceDetails: `${nights}N Trip to ${destination}. ${inputs.hotelCategory} Hotel (${inputs.mealPlan}). ${inputs.sightseeingIntensity} Sightseeing.`
+              serviceDetails: aiContent
           };
 
           await agentService.updateQuote(quickDetails);
@@ -201,9 +218,13 @@ export const QuickQuote: React.FC = () => {
 
       } catch (error) {
           console.error(error);
+          alert("Failed to create quote. Please try again.");
           setIsSubmitting(false);
       }
   };
+
+  // Toggle for AI inside component if not in types yet
+  const [useAI, setUseAI] = useState(true);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl relative">
@@ -412,6 +433,29 @@ export const QuickQuote: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* 3. AI Customization Preferences */}
+                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <Heart size={18} className="text-pink-500"/> Preferences & Activities
+                    </h3>
+                    <div className="relative">
+                        <textarea
+                            value={preferences}
+                            onChange={(e) => setPreferences(e.target.value)}
+                            className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
+                            rows={3}
+                            placeholder="e.g. Vegetarian food, interested in historical sites, avoid trekking..."
+                        />
+                        <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                             <span className="text-xs text-slate-400">Powered by Gemini AI</span>
+                             <div className={`w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors ${useAI ? 'bg-brand-600' : 'bg-slate-300'}`} onClick={() => setUseAI(!useAI)}>
+                                 <div className={`w-3 h-3 bg-white rounded-full shadow transition-transform ${useAI ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                             </div>
+                        </div>
+                    </div>
+                 </div>
+
             </div>
 
             {/* RIGHT: LIVE PREVIEW */}
@@ -460,7 +504,7 @@ export const QuickQuote: React.FC = () => {
                             disabled={!destination || isSubmitting}
                             className="w-full bg-white text-slate-900 font-bold py-4 rounded-xl hover:bg-slate-100 transition flex items-center justify-center gap-2 disabled:opacity-50"
                         >
-                            {isSubmitting ? 'Generating...' : 'Create Quote'} <ArrowRight size={20} />
+                            {isSubmitting ? 'Generating AI Itinerary...' : 'Create Quote'} <ArrowRight size={20} />
                         </button>
                         
                         <button 

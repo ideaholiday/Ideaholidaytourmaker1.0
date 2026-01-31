@@ -164,7 +164,7 @@ export const Signup: React.FC = () => {
                         </div>
                         <div>
                             <span className={`block font-bold text-lg ${formData.role === UserRole.HOTEL_PARTNER ? 'text-slate-900' : 'text-slate-600'}`}>Hotel Partner</span>
-                            <span className="text-xs text-slate-500">I own or manage property</span>
+                            <span className="text-xs text-slate-500">I supply hotel inventory</span>
                         </div>
                         {formData.role === UserRole.HOTEL_PARTNER && <CheckCircle className="ml-auto text-brand-500" size={20} />}
                     </button>
@@ -201,7 +201,7 @@ export const Signup: React.FC = () => {
                                     value={formData.companyName}
                                     onChange={(e) => handleChange('companyName', e.target.value)}
                                     className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder-slate-400 font-medium"
-                                    placeholder={formData.role === UserRole.HOTEL_PARTNER ? "Hotel / Brand Name" : "Travels Pvt Ltd"}
+                                    placeholder="Travels Pvt Ltd"
                                 />
                             </div>
                         </div>

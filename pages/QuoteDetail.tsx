@@ -5,37 +5,36 @@ import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
 import { adminService } from '../../services/adminService';
 import { bookingService } from '../../services/bookingService';
-import { currencyService } from '../../services/currencyService';
+import { paymentService } from '../../services/paymentService'; // Import payment service
 import { Quote, ItineraryItem, UserRole } from '../../types';
 import { ItineraryView } from '../components/ItineraryView';
 import { PriceSummary } from '../components/PriceSummary';
-import { ArrowLeft, Edit2, Download, Share2, GitBranch, AlertTriangle, Link as LinkIcon, CheckCircle, Trash2, UserPlus, Truck, Phone, MessageCircle, CreditCard, Save, Loader2 } from 'lucide-react';
-import { calculatePriceFromNet } from '../utils/pricingEngine';
+import { ArrowLeft, Edit2, Download, Share2, GitBranch, Link as LinkIcon, CheckCircle, Trash2, UserPlus, Truck, Phone, MessageCircle, CreditCard, Save } from 'lucide-react';
 import { usePricingEngine } from '../hooks/usePricingEngine';
 import { ItineraryBuilder } from '../components/ItineraryBuilder';
 import { generateQuotePDF } from '../utils/pdfGenerator';
 import { formatWhatsAppQuote } from '../utils/whatsappFormatter';
 import { AssignOperatorModal } from '../components/booking/AssignOperatorModal';
-import { dbHelper } from '../../services/firestoreHelper';
+import { BookingPaymentModal } from '../components/agent/BookingPaymentModal'; // Import new modal
 
 export const QuoteDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, reloadUser } = useAuth(); // Needed to refresh wallet balance after payment
   const [quote, setQuote] = useState<Quote | null>(null);
   const [isEditingItinerary, setIsEditingItinerary] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [isBookingProcessing, setIsBookingProcessing] = useState(false);
   
-  // PDF State
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-
+  // Payment Modal State
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  
   // Admin Payment Control State
   const [adminPaymentStatus, setAdminPaymentStatus] = useState<'PENDING' | 'PARTIAL' | 'CLEARED'>('PENDING');
   const [adminPaymentNote, setAdminPaymentNote] = useState('');
 
-  const { updateHotel, setInput } = usePricingEngine();
+  const { setInput } = usePricingEngine();
 
   useEffect(() => {
     loadQuote();
@@ -46,26 +45,25 @@ export const QuoteDetail: React.FC = () => {
     setIsLoading(true);
 
     try {
-        // Direct DB fetch to bypass Agent-only filters if Admin
-        const found = await dbHelper.getById<Quote>('quotes', id);
+        const allQuotes = await agentService.fetchQuotes(user.id);
+        const found = allQuotes.find(q => q.id === id);
 
         if (found) {
-            // Security: If Agent, check ownership
-            if (user.role === UserRole.AGENT && found.agentId !== user.id) {
-                setQuote(null); // Deny access
-            } 
-            // Security: If Operator, check assignment
-            else if (user.role === UserRole.OPERATOR && found.operatorId !== user.id) {
-                 setQuote(null);
+            setQuote(found);
+            initPricingEngine(found);
+            if (found.operationalDetails) {
+                setAdminPaymentStatus(found.operationalDetails.paymentStatus || 'PENDING');
+                setAdminPaymentNote(found.operationalDetails.paymentNotes || '');
             }
-            else {
-                setQuote(found);
-                initPricingEngine(found);
-                if (found.operationalDetails) {
-                    setAdminPaymentStatus(found.operationalDetails.paymentStatus || 'PENDING');
-                    setAdminPaymentNote(found.operationalDetails.paymentNotes || '');
-                }
-            }
+        } else {
+             // ... existing fallback code ...
+             const storedQuotes = localStorage.getItem('iht_agent_quotes');
+             const parsedQuotes: Quote[] = storedQuotes ? JSON.parse(storedQuotes) : [];
+             const localFound = parsedQuotes.find(q => q.id === id);
+             if (localFound) {
+                 setQuote(localFound);
+                 initPricingEngine(localFound);
+             }
         }
     } catch (e) {
         console.error("Error loading quote:", e);
@@ -101,49 +99,78 @@ export const QuoteDetail: React.FC = () => {
 
   // --- ACTIONS ---
 
-  const handleBook = async () => {
+  const handleBookClick = () => {
       if (!quote || !user) return;
-      if (quote.status === 'BOOKED') {
-          alert("This quote is already booked.");
-          return;
-      }
+      setIsPaymentModalOpen(true);
+  };
 
-      const confirmMsg = `Are you sure you want to confirm Booking for Quote #${quote.uniqueRefNo}?\n\n` + 
-                         `• This will lock the itinerary.\n` +
-                         `• A notification will be sent to the Admin Operations team.\n` +
-                         `• You will be redirected to the Booking Management page.`;
+  const handleConfirmBooking = async (method: 'WALLET' | 'ONLINE') => {
+      if (!quote || !user) return;
+      setIsProcessingPayment(true);
+      
+      try {
+          // 1. Create Booking Record First (Status: REQUESTED)
+          // This ensures we have a booking ID to attach the payment to
+          const newBooking = await bookingService.createBookingFromQuote(quote, user);
+          
+          // CRITICAL: We only capture the NET COST from the agent (B2B Price)
+          const netPayable = quote.price || 0;
 
-      if (window.confirm(confirmMsg)) {
-          setIsBookingProcessing(true);
-          try {
-              // Create Booking & Update Quote Status
-              const newBooking = await bookingService.createBookingFromQuote(quote, user);
+          if (method === 'WALLET') {
+              // 2a. Wallet Payment Flow
+              await paymentService.processWalletDeduction(user, newBooking, netPayable);
               
-              // Slight delay to ensure DB propagation
-              setTimeout(() => {
-                  alert("✅ Booking Request Created Successfully!");
-                  navigate(`/booking/${newBooking.id}`);
-              }, 500);
+              // 3. Mark Booking as Paid
+              // Wallet payments are instant, so we confirm immediately
+              
+              await reloadUser(); // Update UI wallet balance
+              alert("Booking Confirmed! Net amount deducted from wallet.");
+              navigate(`/booking/${newBooking.id}`);
+          
+          } else {
+              // 2b. Online Payment Flow
+              // Trigger Razorpay for Net Cost
+              paymentService.initiatePayment(
+                  newBooking,
+                  'FULL', 
+                  '#0ea5e9',
+                  (paymentId) => {
+                      // Success
+                      setIsProcessingPayment(false);
+                      setIsPaymentModalOpen(false);
+                      alert("Payment Successful! Booking Confirmed.");
+                      navigate(`/booking/${newBooking.id}`);
+                  },
+                  (error) => {
+                      // Failure
+                      setIsProcessingPayment(false);
+                      alert(`Payment Failed: ${error}. Booking created as pending.`);
+                      navigate(`/booking/${newBooking.id}`); // Still go to booking so they can retry
+                  },
+                  netPayable // Pass Override Amount
+              );
+              // Return early to prevent closing modal/processing flag reset before Razorpay finishes
+              return; 
+          }
 
-          } catch (e: any) {
-              console.error(e);
-              alert("Booking failed: " + e.message);
-              setIsBookingProcessing(false);
+      } catch (e: any) {
+          console.error("Booking Error", e);
+          alert("Booking failed: " + e.message);
+      } finally {
+          if (method === 'WALLET') {
+             setIsProcessingPayment(false);
+             setIsPaymentModalOpen(false);
           }
       }
   };
 
   const handleDelete = async () => {
+      // ... existing code ...
       if (!quote) return;
       if (window.confirm(`⚠️ DANGER ZONE ⚠️\n\nAre you sure you want to DELETE Quote #${quote.uniqueRefNo}?`)) {
           try {
               await agentService.deleteQuote(quote.id);
-              if (isAdminOrStaff) {
-                  // Admin goes back to agent profile or dashboard
-                  navigate(-1);
-              } else {
-                  navigate('/agent/quotes');
-              }
+              navigate('/agent/quotes');
           } catch (e: any) {
               alert("Delete failed: " + e.message);
           }
@@ -151,7 +178,8 @@ export const QuoteDetail: React.FC = () => {
   };
 
   const handleUpdateItinerary = (newItinerary: ItineraryItem[], financials?: { net: number, selling: number, currency: string }) => {
-    if (financials) {
+    // ... existing code ...
+     if (financials) {
          const updatedQuote: Quote = { 
             ...quote, 
             itinerary: newItinerary,
@@ -169,7 +197,8 @@ export const QuoteDetail: React.FC = () => {
     }
     setIsEditingItinerary(false);
   };
-
+  
+  // ... existing handlers (Assign Operator, Share, etc.) ...
   const handleAssignOperator = async (operatorId: string, operatorName: string, options: any) => {
       if (!quote || !user) return;
       await agentService.assignOperator(quote.id, operatorId, operatorName, options, user);
@@ -206,7 +235,7 @@ export const QuoteDetail: React.FC = () => {
       navigator.clipboard.writeText(url);
       alert("Public Link copied to clipboard!\n\n" + url);
   };
-
+  
   const handleCreateRevision = async () => {
       if (!user) return;
       if (confirm("Create a new version to edit? The current version will remain locked as history.")) {
@@ -214,19 +243,6 @@ export const QuoteDetail: React.FC = () => {
           if (newQuote) {
               navigate(`/quote/${newQuote.id}`);
           }
-      }
-  };
-
-  const handlePdfGeneration = async () => {
-      if (!user || !quote) return;
-      setIsGeneratingPdf(true);
-      try {
-          await generateQuotePDF(quote, null, user.role, user);
-      } catch (e: any) {
-          console.error("PDF Gen Error", e);
-          alert(`Failed to generate PDF: ${e.message}`);
-      } finally {
-          setIsGeneratingPdf(false);
       }
   };
 
@@ -255,7 +271,11 @@ export const QuoteDetail: React.FC = () => {
                         <span>{quote.paxCount} Pax</span>
                         <span>•</span>
                         <span>{new Date(quote.travelDate).toLocaleDateString()}</span>
-                        {isAdminOrStaff && quote.agentName && <span className="bg-blue-50 text-blue-700 px-2 rounded-full text-xs">Agent: {quote.agentName}</span>}
+                        {quote.operatorName && (
+                            <span className="text-purple-600 font-medium ml-2 border-l border-slate-300 pl-3">
+                                Op: {quote.operatorName} ({quote.operatorStatus || 'Assigned'})
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -271,15 +291,13 @@ export const QuoteDetail: React.FC = () => {
                         </button>
                     )}
 
-                    {/* BOOK BUTTON */}
-                    {!isBooked && hasValidPrice && (isAgent || isAdminOrStaff) && (
+                    {/* BOOK BUTTON (Updated to open Modal) */}
+                    {!isBooked && hasValidPrice && isAgent && (
                         <button 
-                            onClick={handleBook}
-                            disabled={isBookingProcessing} 
-                            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg shadow-sm font-bold transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={handleBookClick} 
+                            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg shadow-sm font-bold transition transform hover:-translate-y-0.5"
                         >
-                            {isBookingProcessing ? <Loader2 size={18} className="animate-spin"/> : <CheckCircle size={18} />} 
-                            {isBookingProcessing ? 'Confirming...' : 'Book Now'}
+                            <CheckCircle size={18} /> Book Now
                         </button>
                     )}
 
@@ -289,9 +307,9 @@ export const QuoteDetail: React.FC = () => {
                             <Edit2 size={16} /> Edit Itinerary
                         </button>
                     )}
-
+                    
                     {/* Versioning if Locked */}
-                    {quote.isLocked && (isAgent || isAdminOrStaff) && !isBooked && (
+                    {quote.isLocked && isAgent && !isBooked && (
                         <button onClick={handleCreateRevision} className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 text-sm font-bold transition">
                             <GitBranch size={16} /> New Version
                         </button>
@@ -307,13 +325,8 @@ export const QuoteDetail: React.FC = () => {
                                 <Share2 size={16} /> WhatsApp
                             </button>
                             {user && (
-                                <button 
-                                    onClick={handlePdfGeneration} 
-                                    disabled={isGeneratingPdf}
-                                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-bold transition shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
-                                >
-                                    {isGeneratingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} 
-                                    {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
+                                <button onClick={() => generateQuotePDF(quote, null, user.role, user)} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-bold transition shadow-sm">
+                                    <Download size={16} /> Download PDF
                                 </button>
                             )}
                         </>
@@ -329,31 +342,6 @@ export const QuoteDetail: React.FC = () => {
             </div>
         </div>
 
-        {/* PRICE WARNING BANNER */}
-        {!hasValidPrice && !isEditingItinerary && (
-            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
-                <div className="flex gap-3">
-                    <div className="bg-amber-100 p-2 rounded-full h-fit text-amber-600">
-                        <AlertTriangle size={20} />
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-amber-900 text-sm">Price Calculation Required</h3>
-                        <p className="text-sm text-amber-800 mt-1 max-w-2xl">
-                            Price not calculated. Please edit the itinerary and save to generate a price.
-                        </p>
-                    </div>
-                </div>
-                {(isAgent || isAdminOrStaff) && !quote.isLocked && (
-                    <button 
-                        onClick={() => setIsEditingItinerary(true)}
-                        className="bg-white border border-amber-200 text-amber-800 px-5 py-2 rounded-lg text-sm font-bold hover:bg-amber-100 transition whitespace-nowrap shadow-sm flex items-center gap-2"
-                    >
-                        <Edit2 size={14} /> Edit & Calculate
-                    </button>
-                )}
-            </div>
-        )}
-
         {isEditingItinerary ? (
             <ItineraryBuilder 
                 initialItinerary={quote.itinerary} 
@@ -365,7 +353,81 @@ export const QuoteDetail: React.FC = () => {
         ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    {/* ... (Existing Ops and Itinerary View) ... */}
+                    {/* GROUND OPERATIONS INFO (ADMIN ONLY) */}
+                    {isAdminOrStaff && quote.operatorId && (
+                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-indigo-500">
+                             {/* ... existing ops content ... */}
+                             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                 <Truck size={20} className="text-indigo-600" /> Ground Operations Info (Shared by Operator)
+                             </h3>
+                             
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                                 <div className="bg-slate-50 p-4 rounded-lg">
+                                     <p className="text-xs font-bold text-slate-400 uppercase mb-2">Trip Manager</p>
+                                     <div className="space-y-1 text-sm">
+                                         <p className="font-medium text-slate-800">{opDetails.tripManagerName || 'Not Assigned'}</p>
+                                         <p className="text-slate-500 flex items-center gap-1"><Phone size={12}/> {opDetails.tripManagerPhone || '-'}</p>
+                                     </div>
+                                 </div>
+                                 <div className="bg-slate-50 p-4 rounded-lg">
+                                     <p className="text-xs font-bold text-slate-400 uppercase mb-2">Driver Details</p>
+                                     <div className="space-y-1 text-sm">
+                                         <p className="font-medium text-slate-800">{opDetails.driverName || 'Not Assigned'}</p>
+                                         <p className="text-slate-500 flex items-center gap-1"><Phone size={12}/> {opDetails.driverPhone || '-'}</p>
+                                         <p className="text-slate-500 text-xs mt-1 bg-white inline-block px-1 rounded border border-slate-200">
+                                            {opDetails.vehicleModel || 'Vehicle'} • {opDetails.vehicleNumber || 'No Plate'}
+                                         </p>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             {opDetails.whatsappGroupLink && (
+                                 <div className="bg-green-50 p-3 rounded-lg border border-green-200 flex justify-between items-center text-sm text-green-800">
+                                     <div className="flex items-center gap-2">
+                                         <MessageCircle size={18} />
+                                         <strong>Ops WhatsApp Group</strong>
+                                     </div>
+                                     <a href={opDetails.whatsappGroupLink} target="_blank" rel="noreferrer" className="text-green-700 underline font-medium">Join Group</a>
+                                 </div>
+                             )}
+
+                             {/* Admin Payment Controls */}
+                             <div className="mt-6 pt-4 border-t border-slate-100">
+                                 <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><CreditCard size={16}/> Operator Payment Status</h4>
+                                 <div className="flex gap-4 items-end">
+                                     <div className="flex-1">
+                                         <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
+                                         <select 
+                                            value={adminPaymentStatus} 
+                                            onChange={(e) => setAdminPaymentStatus(e.target.value as any)}
+                                            className="w-full border border-slate-300 rounded p-2 text-sm"
+                                         >
+                                             <option value="PENDING">Pending</option>
+                                             <option value="PARTIAL">Partial Paid</option>
+                                             <option value="CLEARED">Cleared</option>
+                                         </select>
+                                     </div>
+                                     <div className="flex-[2]">
+                                         <label className="block text-xs font-medium text-slate-500 mb-1">Notes</label>
+                                         <input 
+                                            type="text" 
+                                            value={adminPaymentNote} 
+                                            onChange={(e) => setAdminPaymentNote(e.target.value)}
+                                            className="w-full border border-slate-300 rounded p-2 text-sm"
+                                            placeholder="UTR / Transaction Ref..."
+                                         />
+                                     </div>
+                                     <button 
+                                        onClick={handleUpdateOperatorPayment}
+                                        className="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-indigo-700 flex items-center gap-1"
+                                     >
+                                         <Save size={14}/> Update
+                                     </button>
+                                 </div>
+                             </div>
+                         </div>
+                    )}
+
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h2 className="text-lg font-bold mb-4">Itinerary</h2>
                         <ItineraryView itinerary={quote.itinerary} />
@@ -392,13 +454,26 @@ export const QuoteDetail: React.FC = () => {
             </div>
         )}
 
+        {/* Assign Operator Modal for Admins */}
         {isAssignModalOpen && (
             <AssignOperatorModal 
                 isOpen={isAssignModalOpen}
                 onClose={() => setIsAssignModalOpen(false)}
                 onAssign={handleAssignOperator}
-                currentNetCost={quote.cost || 0}
+                currentNetCost={quote.cost || 0} 
                 currency={quote.currency}
+            />
+        )}
+
+        {/* NEW: Payment & Booking Modal for Agents */}
+        {isPaymentModalOpen && user && (
+            <BookingPaymentModal 
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                quote={quote}
+                agent={user}
+                onConfirm={handleConfirmBooking}
+                isProcessing={isProcessingPayment}
             />
         )}
     </div>

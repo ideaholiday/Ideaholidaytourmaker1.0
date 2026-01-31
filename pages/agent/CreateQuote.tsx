@@ -51,7 +51,10 @@ export const CreateQuote: React.FC = () => {
             aiContent = await generateItinerary(
                 formData.destination, 
                 durationText, 
-                formData.tripType
+                formData.tripType,
+                formData.travelDate,
+                'Standard', // Default hotel category
+                '' // Default preferences
             );
         }
 

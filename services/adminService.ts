@@ -1,4 +1,3 @@
-
 import { Destination, Hotel, PricingRule, Transfer, Activity, Visa, FixedPackage, User, ItineraryTemplate } from '../types';
 import { dbHelper } from './firestoreHelper';
 import { idGeneratorService } from './idGenerator';
@@ -92,18 +91,6 @@ class AdminService {
       await dbHelper.save(COLLECTIONS.HOTELS, hotel);
       this.syncAllFromCloud();
   }
-
-  // New: Bulk Create Hotels
-  async bulkCreateHotels(hotels: Hotel[]) {
-      // Ensure all have IDs
-      const hotelsWithIds = hotels.map(h => ({
-          ...h,
-          id: h.id || `h_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
-      }));
-      await dbHelper.batchSave(COLLECTIONS.HOTELS, hotelsWithIds);
-      this.syncAllFromCloud();
-  }
-
   async deleteHotel(id: string) { await dbHelper.delete(COLLECTIONS.HOTELS, id); this.syncAllFromCloud(); }
 
   // --- ACTIVITIES ---

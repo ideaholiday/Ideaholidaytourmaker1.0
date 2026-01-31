@@ -1,4 +1,5 @@
 
+
 import { Quote, User, UserRole, Message, OperationalDetails, Visa, Booking } from '../types';
 import { dbHelper } from './firestoreHelper';
 import { auditLogService } from './auditLogService';
@@ -9,18 +10,11 @@ const COLLECTION = 'quotes';
 
 class AgentService {
   
-  // Fetch quotes for a specific agent
   async fetchQuotes(agentId: string): Promise<Quote[]> {
       return await dbHelper.getWhere<Quote>(COLLECTION, 'agentId', '==', agentId);
   }
 
-  // Admin: Fetch ALL quotes in the system
-  async getAllQuotes(): Promise<Quote[]> {
-      return await dbHelper.getAll<Quote>(COLLECTION);
-  }
-
-  // Legacy sync placeholder - removed in favor of async calls above, 
-  // but kept returning empty array to prevent TS errors in legacy components if any
+  // Backwards compatibility for components not yet async
   getQuotes(agentId: string): Quote[] { 
       return []; 
   } 
@@ -253,6 +247,23 @@ class AgentService {
 
   async updateAgentProfile(agentId: string, updates: Partial<User>) {
       await dbHelper.save('users', { id: agentId, ...updates });
+  }
+
+  async addWalletFunds(agentId: string, amount: number): Promise<User> {
+      const agent = await dbHelper.getById<User>('users', agentId);
+      if (!agent) throw new Error("Agent not found");
+
+      const newBalance = (agent.walletBalance || 0) + amount;
+      
+      const updates = { 
+          walletBalance: newBalance,
+          updatedAt: new Date().toISOString()
+      };
+      
+      await dbHelper.save('users', { id: agentId, ...updates });
+      
+      // Return updated user object
+      return { ...agent, ...updates };
   }
 }
 

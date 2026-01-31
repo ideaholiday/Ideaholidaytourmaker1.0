@@ -5,7 +5,7 @@ import { bookingService } from '../../services/bookingService';
 // import { profileService } from '../../services/profileService'; // Removed sync service dependency
 import { agentService } from '../../services/agentService'; 
 import { Booking, Quote, User, UserRole, Traveler, PricingBreakdown } from '../../types';
-import { MapPin, Calendar, Users, CheckCircle, Briefcase, ArrowRight, CreditCard, ShieldCheck, Download, Printer, Loader2 } from 'lucide-react';
+import { MapPin, Calendar, Users, CheckCircle, Briefcase, ArrowRight, CreditCard, ShieldCheck, Download, Printer } from 'lucide-react';
 import { generateQuotePDF } from '../../utils/pdfGenerator';
 import { ClientPortalLayout } from '../../components/client/ClientPortalLayout';
 import { AgentContactCard } from '../../components/client/AgentContactCard';
@@ -24,12 +24,10 @@ const TripContent: React.FC<{
   
   const { styles } = useClientBranding();
   const navigate = useNavigate();
-  const [isPdfLoading, setIsPdfLoading] = useState(false);
 
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = () => {
       // Ensure data and agent are available
       if (!data) return;
-      setIsPdfLoading(true);
       // If agent is null, PDF generator will fallback to platform defaults, which is acceptable if agent loading failed
       
       const isBooking = 'payments' in data;
@@ -50,14 +48,8 @@ const TripContent: React.FC<{
           platformNetCost: 0
       };
       
-      try {
-        // Pass the LOADED agent profile to ensuring branding is correct in PDF
-        await generateQuotePDF(data as Quote, breakdown, UserRole.AGENT, agent);
-      } catch (error) {
-        alert('Could not download PDF. Please try again.');
-      } finally {
-        setIsPdfLoading(false);
-      }
+      // Pass the LOADED agent profile to ensuring branding is correct in PDF
+      generateQuotePDF(data as Quote, breakdown, UserRole.AGENT, agent);
   };
 
   if (loading) return <div className="min-h-[60vh] flex items-center justify-center text-slate-400">Loading Trip Details...</div>;
@@ -206,11 +198,9 @@ const TripContent: React.FC<{
 
                           <button 
                             onClick={handleDownloadPDF}
-                            disabled={isPdfLoading}
-                            className="w-full py-3 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="w-full py-3 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition flex items-center justify-center gap-2"
                           >
-                              {isPdfLoading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />} 
-                              Download Itinerary
+                              <Download size={18} /> Download Itinerary
                           </button>
                       </div>
 

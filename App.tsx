@@ -1,7 +1,4 @@
-
-
-
-import React, { useMemo, ReactNode, ErrorInfo, Component } from 'react';
+import React, { useMemo, ReactNode, ErrorInfo, Component, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -67,6 +64,7 @@ import { GuideBook } from './pages/agent/GuideBook';
 import { AgentPackages } from './pages/agent/AgentPackages';
 import { AgentTemplates } from './pages/agent/AgentTemplates';
 import { AgentVisa } from './pages/agent/AgentVisa';
+import { Wallet } from './pages/agent/Wallet';
 
 // Operator Panel Imports
 import { OperatorDashboard } from './pages/operator/OperatorDashboard';
@@ -176,9 +174,9 @@ const Layout = () => {
         <Navbar />
         <SessionWatcher />
         <div className="flex-1 flex flex-col">
-            <React.Suspense fallback={<div className="p-4 flex justify-center"><RefreshCw className="animate-spin text-brand-600"/></div>}>
+            <Suspense fallback={<div className="p-4 flex justify-center"><RefreshCw className="animate-spin text-brand-600"/></div>}>
                 <Outlet />
-            </React.Suspense>
+            </Suspense>
         </div>
         <Footer />
       </div>
@@ -245,6 +243,7 @@ const App: React.FC = () => {
                       <Route path="/agent/packages" element={<AgentPackages />} />
                       <Route path="/agent/templates" element={<AgentTemplates />} />
                       <Route path="/agent/visa" element={<AgentVisa />} />
+                      <Route path="/agent/wallet" element={<Wallet />} />
                   </Route>
 
                   {/* Operator Specific */}

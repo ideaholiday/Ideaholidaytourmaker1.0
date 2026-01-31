@@ -1,10 +1,8 @@
 
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, FixedPackage, ItineraryItem, ItineraryService } from '../../types';
-import { permissionService } from '../../services/permissionService';
 import { Edit2, Trash2, Plus, X, Package, Calendar, Image as ImageIcon, Tag, Check, MapPin, Layers, FileText, DollarSign, Hotel } from 'lucide-react';
 
 type ModalTab = 'OVERVIEW' | 'ITINERARY' | 'PRICING';
@@ -23,10 +21,7 @@ export const FixedPackages: React.FC = () => {
       setAllPackages(data);
   };
   
-  const canEdit = 
-    user?.role === UserRole.ADMIN || 
-    (user?.role === UserRole.STAFF && permissionService.hasPermission(user, 'MANAGE_INVENTORY')) || 
-    user?.role === UserRole.OPERATOR;
+  const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF || user?.role === UserRole.OPERATOR;
 
   const displayedPackages = useMemo(() => {
       return user?.role === UserRole.OPERATOR 

@@ -46,8 +46,6 @@ export type Permission =
   | 'EXPORT_ACCOUNTING' 
   | 'VIEW_FINANCE_REPORTS'
   | 'APPROVE_INVENTORY'
-  | 'MANAGE_INVENTORY'
-  | 'CREATE_INVENTORY'
   | 'MANAGE_CONTRACTS'
   | 'APPROVE_CONTRACTS';
 
@@ -64,7 +62,8 @@ export interface User {
   phone?: string;
   city?: string;
   state?: string;
-  creditLimit?: number;
+  creditLimit?: number; // Post-paid limit assigned by admin
+  walletBalance?: number; // Pre-paid funds loaded by agent
   permissions?: Permission[];
   assignedDestinations?: string[]; // For Operator
   serviceLocations?: string[];
@@ -207,18 +206,17 @@ export interface Quote {
   type?: QuoteType;
   quickQuoteInputs?: QuickQuoteInputs;
   templateId?: string; // If created from a template
-  createdAt?: string; // Creation timestamp for sorting/filtering
 }
 
 export type BookingStatus = 'REQUESTED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED_NO_REFUND' | 'CANCELLED_WITH_REFUND' | 'CANCELLATION_REQUESTED' | 'ON_HOLD' | 'REJECTED';
 
 export type PaymentStatus = 'PENDING' | 'ADVANCE_PAID' | 'PARTIALLY_PAID' | 'PAID_IN_FULL' | 'OVERDUE' | 'REFUNDED';
 
-export type PaymentMode = 'BANK_TRANSFER' | 'UPI' | 'CASH' | 'ONLINE' | 'CREDIT_LIMIT';
+export type PaymentMode = 'BANK_TRANSFER' | 'UPI' | 'CASH' | 'ONLINE' | 'CREDIT_LIMIT' | 'WALLET';
 
 export interface PaymentEntry {
   id: string;
-  type: 'ADVANCE' | 'FULL' | 'BALANCE' | 'REFUND';
+  type: 'ADVANCE' | 'FULL' | 'BALANCE' | 'REFUND' | 'WALLET_TOPUP';
   amount: number;
   date: string;
   mode: PaymentMode;
@@ -762,7 +760,6 @@ export interface OperatorInventoryItem {
   costAdult?: number;
   costChild?: number;
   transferOptions?: ActivityTransferOptions;
-  ticketIncluded?: boolean; // Added for Activity Base Ticket toggle
   
   // Approval Workflow
   status: InventoryStatus;

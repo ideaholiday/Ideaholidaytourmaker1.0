@@ -1,7 +1,9 @@
 
+
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, initializeFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBGCvWFm7hoWVPWWx-j5XtVV8mSYYa1chE",
@@ -28,5 +30,8 @@ export const googleProvider = new GoogleAuthProvider();
 const db = initializeFirestore(app, {
     experimentalForceLongPolling: true // Ensures better connectivity through corporate firewalls
 });
+
+// 5. Functions
+export const functions = getFunctions(app);
 
 export { db };

@@ -22,25 +22,24 @@ export const PriceSummary: React.FC<Props> = ({ breakdown, role, currency }) => 
       <h3 className="font-bold text-slate-900 mb-4 text-lg">Quotation Summary</h3>
       
       <div className="space-y-3">
-        {/* Admin / Staff View: Full Breakdown */}
+        {/* Admin / Staff View: Full Breakdown including Agent Markup */}
         {isAdminOrStaff && (
-          <div className="text-xs text-slate-500 border-b border-slate-200 pb-3 mb-3 space-y-2">
-            <div className="flex justify-between">
-              <span>Supplier Net (Raw)</span>
+          <div className="text-xs text-slate-500 border-b border-slate-200 pb-3 mb-3">
+            <div className="flex justify-between mb-1">
+              <span>Supplier Net</span>
               <span className="font-mono">{breakdown.supplierCost.toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-blue-600">
               <span>+ Platform Margin</span>
               <span className="font-mono">{breakdown.companyMarkupValue.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-slate-700 font-bold border-t border-slate-100 pt-1">
-                <span>Platform Net (Agent B2B)</span>
+            <div className="flex justify-between text-slate-700 font-bold border-t border-slate-200 pt-1 mt-1">
+                <span>Platform Net (B2B Price)</span>
                 <span className="font-mono">{breakdown.platformNetCost.toLocaleString()}</span>
             </div>
-            {/* Show Agent Markup explicitly for Admin visibility */}
-            <div className="flex justify-between text-green-600">
-                <span>+ Agent Markup (Locked)</span>
-                <span className="font-mono">{breakdown.agentMarkupValue.toLocaleString()}</span>
+            <div className="flex justify-between text-green-600 mt-1">
+              <span>+ Agent Markup</span>
+              <span className="font-mono">{breakdown.agentMarkupValue.toLocaleString()}</span>
             </div>
           </div>
         )}
@@ -53,7 +52,7 @@ export const PriceSummary: React.FC<Props> = ({ breakdown, role, currency }) => 
             </div>
         )}
 
-        {/* Agent View: Show Markup */}
+        {/* Only show "Your Markup" to the Agent. Admin already sees it above. */}
         {isAgent && (
             <div className="flex justify-between text-sm text-green-600 font-medium">
                 <span>+ Your Markup</span>

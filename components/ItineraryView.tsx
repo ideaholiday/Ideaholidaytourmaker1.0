@@ -3,7 +3,7 @@ import React from 'react';
 import { ItineraryItem } from '../types';
 import { 
   CheckCircle, Car, Hotel, Camera, Calendar, 
-  MapPin, Utensils, Flag, Clock, Users, Info, CheckSquare
+  MapPin, Coffee, Utensils, Flag, Clock, Users, Briefcase, Info
 } from 'lucide-react';
 
 interface Props {
@@ -24,12 +24,6 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
       const date = new Date(startDate);
       date.setDate(date.getDate() + (dayNum - 1));
       return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', weekday: 'long' }); // e.g. Fri, Oct 12
-  };
-
-  const getTransferModeLabel = (mode: string) => {
-      if (mode === 'SIC') return 'Shared Transfer';
-      if (mode === 'PVT') return 'Private Transfer';
-      return 'Ticket Only';
   };
 
   return (
@@ -80,8 +74,8 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                     <div className="p-6">
                         {/* Day Description */}
                         {item.description && (
-                            <div className="mb-6 text-slate-600 text-sm leading-relaxed border-l-2 border-slate-200 pl-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_h3]:font-bold [&_h3]:text-slate-800 [&_h3]:mt-2">
-                                <div dangerouslySetInnerHTML={{ __html: item.description }} />
+                            <div className="mb-6 text-slate-600 text-sm leading-relaxed whitespace-pre-line border-l-2 border-slate-200 pl-4">
+                                {item.description}
                             </div>
                         )}
 
@@ -94,23 +88,17 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {item.services.map((svc, sIdx) => (
                                         <div key={sIdx} className="flex items-start p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-brand-200 hover:shadow-sm transition-all group/svc">
-                                            {/* Service Icon or Image */}
-                                            {svc.meta?.imageUrl ? (
-                                                <div className="w-16 h-16 rounded-lg mr-3 shadow-sm shrink-0 overflow-hidden border border-slate-200">
-                                                     <img src={svc.meta.imageUrl} alt={svc.name} className="w-full h-full object-cover" />
-                                                </div>
-                                            ) : (
-                                                <div className={`p-2.5 rounded-xl mr-3 shadow-sm shrink-0 flex items-center justify-center ${
-                                                    svc.type === 'HOTEL' ? 'bg-white text-indigo-600' :
-                                                    svc.type === 'ACTIVITY' ? 'bg-white text-rose-500' :
-                                                    svc.type === 'TRANSFER' ? 'bg-white text-sky-600' : 'bg-white text-slate-600'
-                                                }`}>
-                                                    {svc.type === 'HOTEL' && <Hotel size={18} strokeWidth={2.5} />}
-                                                    {svc.type === 'ACTIVITY' && <Camera size={18} strokeWidth={2.5} />}
-                                                    {svc.type === 'TRANSFER' && <Car size={18} strokeWidth={2.5} />}
-                                                    {svc.type === 'OTHER' && <Flag size={18} strokeWidth={2.5} />}
-                                                </div>
-                                            )}
+                                            {/* Service Icon */}
+                                            <div className={`p-2.5 rounded-xl mr-3 shadow-sm shrink-0 flex items-center justify-center ${
+                                                svc.type === 'HOTEL' ? 'bg-white text-indigo-600' :
+                                                svc.type === 'ACTIVITY' ? 'bg-white text-rose-500' :
+                                                svc.type === 'TRANSFER' ? 'bg-white text-sky-600' : 'bg-white text-slate-600'
+                                            }`}>
+                                                {svc.type === 'HOTEL' && <Hotel size={18} strokeWidth={2.5} />}
+                                                {svc.type === 'ACTIVITY' && <Camera size={18} strokeWidth={2.5} />}
+                                                {svc.type === 'TRANSFER' && <Car size={18} strokeWidth={2.5} />}
+                                                {svc.type === 'OTHER' && <Flag size={18} strokeWidth={2.5} />}
+                                            </div>
                                             
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start gap-2">
@@ -118,12 +106,11 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 uppercase tracking-wide shrink-0">{svc.type}</span>
                                                 </div>
                                                 
-                                                {/* Service Description (Rich Text Support) */}
+                                                {/* Service Description (New) */}
                                                 {svc.meta?.description && (
-                                                    <div 
-                                                      className="text-xs text-slate-500 mt-1 line-clamp-3 leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4"
-                                                      dangerouslySetInnerHTML={{ __html: svc.meta.description }}
-                                                    />
+                                                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                                                        {svc.meta.description}
+                                                    </p>
                                                 )}
 
                                                 <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
@@ -137,37 +124,33 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                             <Utensils size={10} /> {svc.meta.mealPlan}
                                                         </span>
                                                     )}
+                                                    {svc.meta?.vehicle && (
+                                                        <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
+                                                            <Car size={10} /> {svc.meta.vehicle}
+                                                        </span>
+                                                    )}
                                                     
-                                                    {/* Pax Count Badges */}
+                                                    {/* Pax Count Badges for Activities & Transfers (New) */}
                                                     {svc.meta?.paxDetails && (
                                                         <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100" title="Passengers">
                                                             <Users size={10} /> {svc.meta.paxDetails.adult}A {svc.meta.paxDetails.child > 0 ? `+ ${svc.meta.paxDetails.child}C` : ''}
                                                         </span>
                                                     )}
-
-                                                    {/* HIGHLIGHTED TRANSFER TYPE BOX */}
-                                                    {svc.meta?.transferMode && (
-                                                        <div className="w-full mt-1.5">
-                                                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
-                                                                <CheckSquare size={12} className="text-emerald-600" /> 
-                                                                [ {getTransferModeLabel(svc.meta.transferMode)} ]
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {/* TRANSFER VEHICLE HIGHLIGHT */}
-                                                    {svc.type === 'TRANSFER' && svc.meta?.vehicle && (
-                                                         <div className="w-full mt-1.5">
-                                                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
-                                                                <CheckSquare size={12} className="text-emerald-600" /> 
-                                                                [ Private Transfer - {svc.meta.vehicle} ]
-                                                            </span>
-                                                        </div>
+                                                    {/* Vehicle Count for Transfers (New) */}
+                                                    {svc.type === 'TRANSFER' && svc.quantity > 1 && (
+                                                        <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
+                                                            <Car size={10} /> {svc.quantity} Vehicles
+                                                        </span>
                                                     )}
 
+                                                    {svc.meta?.type && svc.type === 'ACTIVITY' && (
+                                                        <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
+                                                            <Camera size={10} /> {svc.meta.type}
+                                                        </span>
+                                                    )}
                                                 </div>
 
-                                                {/* Internal Note */}
+                                                {/* Internal Note (New) */}
                                                 {svc.meta?.notes && (
                                                     <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-100">
                                                         <Info size={10} className="mt-0.5 shrink-0"/> {svc.meta.notes}

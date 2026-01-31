@@ -1,29 +1,38 @@
-
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import * as nodemailer from 'nodemailer';
+import * as nodemailer from 'nodemailer'; // Standard library, can be swapped for SendGrid/Postmark
 import { getWelcomeEmailHtml } from './welcomeTemplate';
+import { Buffer } from 'buffer';
 
 admin.initializeApp();
 const db = admin.firestore();
-const fcm = admin.messaging();
+
+// --- RAZORPAY LIVE CREDENTIALS ---
+// In a production environment, these should be set via: 
+// firebase functions:config:set razorpay.key_id="..." razorpay.secret="..."
+const RAZORPAY_KEY_ID = "rzp_live_SAPwjiuTqQAC6H";
+const RAZORPAY_KEY_SECRET = "Joq1q45SoxsRACwun6yN36dA";
 
 // Configure Transporter (Use Environment Variables in Prod)
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: functions.config().email.user, 
-    pass: functions.config().email.pass
+    user: functions.config().email?.user || 'demo@gmail.com', 
+    pass: functions.config().email?.pass || 'demo_pass'  
   }
 });
 
-// --- EMAIL: Welcome Email Trigger ---
+// --- WELCOME EMAIL TRIGGER ---
 export const sendWelcomeEmail = functions.firestore
   .document('users/{userId}')
   .onUpdate(async (change, context) => {
     const before = change.before.data();
     const after = change.after.data();
 
+    // TRIGGER CONDITION:
+    // 1. Email was NOT verified before
+    // 2. Email IS verified now
+    // 3. Welcome email has NOT been sent yet
     if (
       before.emailVerified === false && 
       after.emailVerified === true && 
@@ -42,6 +51,9 @@ export const sendWelcomeEmail = functions.firestore
 
       try {
         await transporter.sendMail(mailOptions);
+        console.log(`Welcome email sent to ${email}`);
+
+        // MARK AS SENT to prevent duplicates
         return change.after.ref.update({
           welcomeEmailSent: true,
           welcomeEmailSentAt: admin.firestore.FieldValue.serverTimestamp()
@@ -51,81 +63,87 @@ export const sendWelcomeEmail = functions.firestore
         return null;
       }
     }
+
     return null;
   });
 
-// --- PUSH NOTIFICATION: Booking Status Update ---
-export const sendBookingNotification = functions.firestore
-  .document('bookings/{bookingId}')
-  .onUpdate(async (change, context) => {
-    const before = change.before.data();
-    const after = change.after.data();
-    const bookingId = context.params.bookingId;
-
-    // Only trigger if Status changed or Operator changed
-    const statusChanged = before.status !== after.status;
-    const operatorAssigned = !before.operatorId && after.operatorId;
-
-    if (!statusChanged && !operatorAssigned) return null;
-
-    let targetUserId = null;
-    let title = '';
-    let body = '';
-
-    // 1. Notify Agent if status changed
-    if (statusChanged) {
-        targetUserId = after.agentId;
-        title = `Booking Update: ${after.uniqueRefNo}`;
-        body = `Status changed to ${after.status.replace(/_/g, ' ')}. Destination: ${after.destination}`;
+// --- PAYMENT VERIFICATION FUNCTION ---
+export const verifyRazorpayPayment = functions.https.onCall(async (data, context) => {
+    // 1. Security Check
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be logged in.');
     }
 
-    // 2. Notify Operator if Assigned
-    if (operatorAssigned) {
-        targetUserId = after.operatorId;
-        title = `New Assignment: ${after.uniqueRefNo}`;
-        body = `You have been assigned a new booking for ${after.destination}. Please review.`;
+    const { paymentId, expectedAmount, currency } = data;
+
+    if (!paymentId || !expectedAmount) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing payment ID or amount.');
     }
 
-    // 3. Notify Operator if Status Changed (e.g. Cancelled)
-    if (statusChanged && after.operatorId) {
-         // This overrides the Agent notification in this simple logic block. 
-         // In prod, you'd send two messages or loop. 
-         // Here we prioritize the Operator for operational alerts if they are involved.
-         if (after.status.includes('CANCEL')) {
-             targetUserId = after.operatorId;
-             title = `Booking Cancelled: ${after.uniqueRefNo}`;
-             body = `Booking for ${after.destination} has been cancelled.`;
-         }
-    }
-
-    if (!targetUserId) return null;
-
-    // Fetch Target User's FCM Token
     try {
-        const userDoc = await db.collection('users').doc(targetUserId).get();
-        const userData = userDoc.data();
+        // 2. Fetch Payment Details from Razorpay
+        // We use Basic Auth with Key ID and Secret
+        const authHeader = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
         
-        if (userData && userData.fcmToken) {
-            const message = {
-                notification: {
-                    title: title,
-                    body: body
-                },
-                token: userData.fcmToken,
-                data: {
-                    bookingId: bookingId,
-                    type: 'BOOKING_UPDATE'
-                }
-            };
+        const response = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Basic ${authHeader}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-            await fcm.send(message);
-            console.log(`Notification sent to user ${targetUserId}`);
-        } else {
-            console.log(`No FCM token found for user ${targetUserId}`);
+        if (!response.ok) {
+            const errBody = await response.text();
+            console.error('Razorpay API Error:', errBody);
+            throw new functions.https.HttpsError('internal', 'Failed to fetch payment details from gateway.');
         }
+
+        const paymentData = await response.json();
+
+        // 3. Verify Status
+        // Status can be 'authorized' or 'captured'
+        if (paymentData.status !== 'authorized' && paymentData.status !== 'captured') {
+            throw new functions.https.HttpsError('failed-precondition', `Payment status is ${paymentData.status}, expected authorized or captured.`);
+        }
+
+        // 4. Verify Amount
+        // Razorpay returns amount in subunits (paise). 
+        // We expect `expectedAmount` from client to be in main units (Rupees), so we multiply by 100.
+        // Or if client sends subunits, adjust accordingly. 
+        // Standard: Client sends 1000 (Rupees). Razorpay has 100000 (Paise).
+        const amountInSubunits = Math.round(expectedAmount * 100);
+        
+        if (paymentData.amount !== amountInSubunits) {
+             console.warn(`Amount Mismatch: Expected ${amountInSubunits}, Got ${paymentData.amount}`);
+             // Allow tiny rounding diff if necessary, but exact match is safer
+             if (Math.abs(paymentData.amount - amountInSubunits) > 100) { // Tolerate 1 rupee diff
+                 throw new functions.https.HttpsError('invalid-argument', 'Payment amount mismatch.');
+             }
+        }
+
+        // 5. Capture Payment (if not already captured)
+        if (paymentData.status === 'authorized') {
+             const captureResp = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/capture`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Basic ${authHeader}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ amount: paymentData.amount, currency: paymentData.currency })
+            });
+            
+            if (!captureResp.ok) {
+                console.error('Capture Failed:', await captureResp.text());
+                throw new functions.https.HttpsError('internal', 'Payment authorized but capture failed.');
+            }
+        }
+
+        // 6. Success
+        return { success: true, paymentId: paymentData.id, amount: paymentData.amount / 100 };
+
     } catch (error) {
-        console.error('Error sending notification:', error);
+        console.error("Verification Logic Error:", error);
+        throw new functions.https.HttpsError('internal', 'Payment verification process failed.');
     }
-    
-    return null;
-  });
+});

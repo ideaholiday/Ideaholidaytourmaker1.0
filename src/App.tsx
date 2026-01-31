@@ -1,15 +1,10 @@
-
-
-
-import React, { useMemo, ReactNode, ErrorInfo, Component } from 'react';
+import React, { useMemo, ReactNode, ErrorInfo, Component, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { SessionWatcher } from './components/SessionWatcher';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { BrandContext, resolveAgentBranding } from './context/BrandContext';
-import { notificationService } from './services/notificationService';
-import { Toast, ToastType } from './components/ui/Toast';
 
 // Pages
 import { Home } from './pages/Home';
@@ -69,6 +64,7 @@ import { GuideBook } from './pages/agent/GuideBook';
 import { AgentPackages } from './pages/agent/AgentPackages';
 import { AgentTemplates } from './pages/agent/AgentTemplates';
 import { AgentVisa } from './pages/agent/AgentVisa';
+import { Wallet } from './pages/agent/Wallet';
 
 // Operator Panel Imports
 import { OperatorDashboard } from './pages/operator/OperatorDashboard';
@@ -97,7 +93,7 @@ interface ErrorBoundaryState {
 }
 
 // --- ERROR BOUNDARY ---
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
@@ -171,42 +167,16 @@ const Layout = () => {
   // Resolve Branding for Agents
   const agentForBranding = user?.role === UserRole.AGENT ? user : null;
   const branding = useMemo(() => resolveAgentBranding(agentForBranding), [agentForBranding]);
-  
-  // Notification State
-  const [toast, setToast] = React.useState<{ msg: string, type: ToastType } | null>(null);
-
-  React.useEffect(() => {
-    // Listen for foreground FCM messages
-    const unsubscribe = notificationService.onMessageListener((payload: any) => {
-        setToast({ 
-            msg: `${payload.notification.title}: ${payload.notification.body}`, 
-            type: 'info' 
-        });
-    });
-    return () => {
-        if(unsubscribe) unsubscribe();
-    };
-  }, []);
 
   return (
     <BrandContext.Provider value={{ branding, isPlatformDefault: !agentForBranding }}>
       <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
         <Navbar />
         <SessionWatcher />
-        
-        {toast && (
-            <Toast 
-                message={toast.msg} 
-                type={toast.type} 
-                isVisible={!!toast} 
-                onClose={() => setToast(null)} 
-            />
-        )}
-
         <div className="flex-1 flex flex-col">
-            <React.Suspense fallback={<div className="p-4 flex justify-center"><RefreshCw className="animate-spin text-brand-600"/></div>}>
+            <Suspense fallback={<div className="p-4 flex justify-center"><RefreshCw className="animate-spin text-brand-600"/></div>}>
                 <Outlet />
-            </React.Suspense>
+            </Suspense>
         </div>
         <Footer />
       </div>
@@ -273,6 +243,7 @@ const App: React.FC = () => {
                       <Route path="/agent/packages" element={<AgentPackages />} />
                       <Route path="/agent/templates" element={<AgentTemplates />} />
                       <Route path="/agent/visa" element={<AgentVisa />} />
+                      <Route path="/agent/wallet" element={<Wallet />} />
                   </Route>
 
                   {/* Operator Specific */}
