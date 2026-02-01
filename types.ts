@@ -88,6 +88,15 @@ export interface Message {
   isSystem: boolean;
 }
 
+export interface SystemNotification {
+  id: string;
+  content: string;
+  link?: string;
+  type: 'INFO' | 'URGENT' | 'PROMO' | 'MEETING';
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface ItineraryService {
   id: string;
   inventory_id?: string; // New: Link to source inventory item

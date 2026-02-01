@@ -64,11 +64,16 @@ export const AgentProfile: React.FC = () => {
               setWalletLogs(myWalletLogs);
 
               // Calculate Stats
+              const confirmedBookingsList = agentBookings.filter(b => b.status === 'CONFIRMED' || b.status === 'COMPLETED');
+              const totalRevenue = confirmedBookingsList.reduce((sum, b) => sum + (b.sellingPrice || 0), 0);
+              const totalNetCost = confirmedBookingsList.reduce((sum, b) => sum + (b.netCost || 0), 0);
+              
               setStats({
                   totalQuotes: agentQuotes.length,
                   totalBookings: agentBookings.length,
-                  confirmedBookings: agentBookings.filter(b => b.status === 'CONFIRMED' || b.status === 'COMPLETED').length,
-                  totalRevenue: agentBookings.reduce((sum, b) => sum + (b.sellingPrice || 0), 0),
+                  confirmedBookings: confirmedBookingsList.length,
+                  totalRevenue: totalRevenue,
+                  totalProfit: totalRevenue - totalNetCost, // Agent's Profit
                   walletBalance: userProfile.walletBalance || 0
               });
           }
@@ -174,8 +179,8 @@ export const AgentProfile: React.FC = () => {
                           <p className="text-lg font-bold text-slate-700">₹ {(agent.creditLimit || 0).toLocaleString()}</p>
                       </div>
                       <div className="text-right">
-                          <p className="text-xs text-slate-400">Total Spent</p>
-                          <p className="text-lg font-bold text-slate-700">₹ {stats.totalRevenue?.toLocaleString()}</p>
+                          <p className="text-xs text-slate-400">Total Booked Margin</p>
+                          <p className="text-lg font-bold text-green-600">+ ₹ {stats.totalProfit?.toLocaleString()}</p>
                       </div>
                   </div>
               </div>
@@ -221,7 +226,7 @@ export const AgentProfile: React.FC = () => {
             onClick={() => setActiveTab('QUOTES')}
             className={`px-6 py-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'QUOTES' ? 'border-brand-600 text-brand-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           >
-            <FileText size={16} /> Quote History
+            <FileText size={16} /> All Quotes
           </button>
           <button 
             onClick={() => setActiveTab('BOOKINGS')}
@@ -266,7 +271,7 @@ export const AgentProfile: React.FC = () => {
                         return (
                           <tr key={q.id} className="hover:bg-slate-50 transition">
                             <td className="px-6 py-3 font-mono text-brand-600 font-medium">{q.uniqueRefNo}</td>
-                            <td className="px-6 py-3 text-slate-500">{new Date().toLocaleDateString()}</td>
+                            <td className="px-6 py-3 text-slate-500">{new Date(q.id.split('_')[1] ? Number(q.id.split('_')[1]) : Date.now()).toLocaleDateString()}</td>
                             <td className="px-6 py-3 text-slate-800">{q.destination}</td>
                             <td className="px-6 py-3 text-right font-mono text-slate-500">
                                 {q.currency} {cost.toLocaleString()}
@@ -314,29 +319,39 @@ export const AgentProfile: React.FC = () => {
                        <th className="px-6 py-3 font-semibold">Booking Ref</th>
                        <th className="px-6 py-3 font-semibold">Travel Date</th>
                        <th className="px-6 py-3 font-semibold">Guest</th>
-                       <th className="px-6 py-3 font-semibold text-right">Value</th>
+                       <th className="px-6 py-3 font-semibold text-right text-blue-600">Net B2B</th>
+                       <th className="px-6 py-3 font-semibold text-right text-slate-900">Selling Price</th>
+                       <th className="px-6 py-3 font-semibold text-right text-green-600">Margin</th>
                        <th className="px-6 py-3 font-semibold text-right">Paid</th>
-                       <th className="px-6 py-3 font-semibold text-right">Balance</th>
                        <th className="px-6 py-3 font-semibold">Status</th>
                        <th className="px-6 py-3 font-semibold text-right">Action</th>
                      </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
-                     {bookings.map(b => (
+                     {bookings.map(b => {
+                       const net = b.netCost || 0;
+                       const sell = b.sellingPrice || 0;
+                       const margin = sell - net;
+                       const marginPercent = net > 0 ? ((margin / net) * 100).toFixed(1) : '0';
+
+                       return (
                        <tr key={b.id} className="hover:bg-slate-50 transition">
                          <td className="px-6 py-3 font-mono text-brand-600 font-medium">{b.uniqueRefNo}</td>
                          <td className="px-6 py-3 text-slate-500">{new Date(b.travelDate).toLocaleDateString()}</td>
                          <td className="px-6 py-3 text-slate-800 font-medium">
                              {b.travelers[0] ? `${b.travelers[0].firstName} ${b.travelers[0].lastName}` : 'Guest'}
                          </td>
-                         <td className="px-6 py-3 text-right font-mono">
-                             {b.currency} {b.sellingPrice.toLocaleString()}
+                         <td className="px-6 py-3 text-right font-mono font-medium text-blue-600">
+                             {b.currency} {net.toLocaleString()}
+                         </td>
+                         <td className="px-6 py-3 text-right font-mono font-bold text-slate-900">
+                             {b.currency} {sell.toLocaleString()}
                          </td>
                          <td className="px-6 py-3 text-right font-mono text-green-600">
-                             {b.currency} {b.paidAmount.toLocaleString()}
+                             + {b.currency} {margin.toLocaleString()} <div className="text-[9px] text-slate-400">({marginPercent}%)</div>
                          </td>
-                         <td className="px-6 py-3 text-right font-mono text-red-600">
-                             {b.currency} {b.balanceAmount.toLocaleString()}
+                         <td className="px-6 py-3 text-right font-mono text-slate-600">
+                             {b.currency} {b.paidAmount.toLocaleString()}
                          </td>
                          <td className="px-6 py-3">
                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${b.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
@@ -352,8 +367,8 @@ export const AgentProfile: React.FC = () => {
                              </button>
                          </td>
                        </tr>
-                     ))}
-                     {bookings.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-400">No confirmed bookings yet.</td></tr>}
+                     )})}
+                     {bookings.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-slate-400">No confirmed bookings yet.</td></tr>}
                    </tbody>
                  </table>
                </div>

@@ -1,4 +1,5 @@
-import { Destination, Hotel, PricingRule, Transfer, Activity, Visa, FixedPackage, User, ItineraryTemplate } from '../types';
+
+import { Destination, Hotel, PricingRule, Transfer, Activity, Visa, FixedPackage, User, ItineraryTemplate, SystemNotification } from '../types';
 import { dbHelper } from './firestoreHelper';
 import { idGeneratorService } from './idGenerator';
 
@@ -11,7 +12,8 @@ const COLLECTIONS = {
     PACKAGES: 'fixed_packages',
     TEMPLATES: 'system_templates',
     USERS: 'users',
-    SETTINGS: 'system_settings'
+    SETTINGS: 'system_settings',
+    NOTIFICATIONS: 'system_notifications'
 };
 
 class AdminService {
@@ -25,10 +27,11 @@ class AdminService {
       templates: ItineraryTemplate[];
       users: User[];
       pricingRule: PricingRule | null;
-  } = { destinations: [], hotels: [], activities: [], transfers: [], visas: [], packages: [], templates: [], users: [], pricingRule: null };
+      notifications: SystemNotification[];
+  } = { destinations: [], hotels: [], activities: [], transfers: [], visas: [], packages: [], templates: [], users: [], pricingRule: null, notifications: [] };
 
   async syncAllFromCloud() {
-      const [d, h, a, t, v, p, tp, u, pr] = await Promise.all([
+      const [d, h, a, t, v, p, tp, u, pr, n] = await Promise.all([
           dbHelper.getAll<Destination>(COLLECTIONS.DESTINATIONS),
           dbHelper.getAll<Hotel>(COLLECTIONS.HOTELS),
           dbHelper.getAll<Activity>(COLLECTIONS.ACTIVITIES),
@@ -37,7 +40,8 @@ class AdminService {
           dbHelper.getAll<FixedPackage>(COLLECTIONS.PACKAGES),
           dbHelper.getAll<ItineraryTemplate>(COLLECTIONS.TEMPLATES),
           dbHelper.getAll<User>(COLLECTIONS.USERS),
-          dbHelper.getById<PricingRule>(COLLECTIONS.SETTINGS, 'pricing_rule')
+          dbHelper.getById<PricingRule>(COLLECTIONS.SETTINGS, 'pricing_rule'),
+          dbHelper.getAll<SystemNotification>(COLLECTIONS.NOTIFICATIONS)
       ]);
       this.cache.destinations = d;
       this.cache.hotels = h;
@@ -48,6 +52,7 @@ class AdminService {
       this.cache.templates = tp;
       this.cache.users = u;
       this.cache.pricingRule = pr || { id:'pricing_rule', name:'Default', markupType:'Percentage', companyMarkup:10, agentMarkup:10, gstPercentage:5, roundOff:'Nearest 10', isActive:true };
+      this.cache.notifications = n;
   }
 
   // --- SYNC ACCESSORS (From Cache) ---
@@ -60,6 +65,7 @@ class AdminService {
   getSystemTemplatesSync(): ItineraryTemplate[] { return this.cache.templates; }
   getUsersSync(): User[] { return this.cache.users; }
   getPricingRuleSync(): PricingRule { return this.cache.pricingRule!; }
+  getNotificationsSync(): SystemNotification[] { return this.cache.notifications; }
 
   // --- DESTINATIONS ---
   async getDestinations(): Promise<Destination[]> {
@@ -182,10 +188,35 @@ class AdminService {
   async saveUser(user: Partial<User>) {
       if (!user.id) throw new Error("User ID required");
       // @ts-ignore
-      await dbHelper.save(COLLECTIONS.USERS, user);
+      await dbHelper.save(COLLECTIONs.USERS, user);
       this.syncAllFromCloud();
   }
   async deleteUser(id: string) { await dbHelper.delete(COLLECTIONS.USERS, id); this.syncAllFromCloud(); }
+
+  // --- SYSTEM NOTIFICATIONS ---
+  async getActiveNotifications(): Promise<SystemNotification[]> {
+      const all = await dbHelper.getAll<SystemNotification>(COLLECTIONS.NOTIFICATIONS);
+      this.cache.notifications = all;
+      return all.filter(n => n.isActive);
+  }
+
+  async saveNotification(notif: Partial<SystemNotification>) {
+      if (!notif.id) {
+          notif.id = `msg_${Date.now()}`;
+          notif.createdAt = new Date().toISOString();
+      }
+      // @ts-ignore
+      await dbHelper.save(COLCTIONS.NOTIFICATIONS, notif);
+      // Refresh cache in background
+      const all = await dbHelper.getAll<SystemNotification>(COLLECTIONS.NOTIFICATIONS);
+      this.cache.notifications = all;
+  }
+
+  async deleteNotification(id: string) {
+      await dbHelper.delete(COLLECTIONS.NOTIFICATIONS, id);
+      const all = await dbHelper.getAll<SystemNotification>(COLLECTIONS.NOTIFICATIONS);
+      this.cache.notifications = all;
+  }
 }
 
 export const adminService = new AdminService();

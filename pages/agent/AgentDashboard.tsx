@@ -1,12 +1,12 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
 import { adminService } from '../../services/adminService';
 import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book, Loader2, Package, Layout, FileCheck, Wallet } from 'lucide-react';
-import { Quote, FixedPackage } from '../../types';
+import { Quote, FixedPackage, SystemNotification } from '../../types';
+import { NotificationTicker } from '../../components/ui/NotificationTicker';
 
 export const AgentDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +19,7 @@ export const AgentDashboard: React.FC = () => {
   });
   const [recentQuotes, setRecentQuotes] = useState<Quote[]>([]);
   const [featuredPackages, setFeaturedPackages] = useState<FixedPackage[]>([]);
+  const [notifications, setNotifications] = useState<SystemNotification[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
@@ -33,6 +34,10 @@ export const AgentDashboard: React.FC = () => {
                   // Load featured packages
                   const pkgs = await adminService.getFixedPackages();
                   setFeaturedPackages(pkgs.filter(p => p.isActive).slice(0, 3));
+
+                  // Load notifications
+                  const notes = await adminService.getActiveNotifications();
+                  setNotifications(notes);
               } finally {
                   setLoading(false);
               }
@@ -67,7 +72,7 @@ export const AgentDashboard: React.FC = () => {
   const walletBalance = user.walletBalance || 0;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 pb-16">
       {/* Header */}
       <div className="flex flex-col xl:flex-row justify-between items-center mb-8 gap-4">
         <div>
@@ -258,6 +263,9 @@ export const AgentDashboard: React.FC = () => {
               </div>
           </div>
       </div>
+      
+      {/* Ticker at the bottom */}
+      <NotificationTicker notifications={notifications} />
     </div>
   );
 };
