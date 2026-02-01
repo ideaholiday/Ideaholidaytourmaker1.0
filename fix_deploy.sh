@@ -1,11 +1,8 @@
 #!/bin/bash
 
-# Idea Holiday Tour Maker - Firebase Configuration Repair
-# This script forces the creation of firebase.json and .firebaserc
+echo "🚀 Starting Full Deployment Repair..."
 
-echo "🔧 Starting Repair for Idea Holiday Tour Maker..."
-
-# 1. Create firebase.json
+# 1. Create Configs
 cat > firebase.json <<EOF
 {
   "functions": [
@@ -25,9 +22,8 @@ cat > firebase.json <<EOF
   ]
 }
 EOF
-echo "✅ Created firebase.json"
+echo "✅ Restored firebase.json"
 
-# 2. Create .firebaserc
 cat > .firebaserc <<EOF
 {
   "projects": {
@@ -35,13 +31,19 @@ cat > .firebaserc <<EOF
   }
 }
 EOF
-echo "✅ Created .firebaserc"
+echo "✅ Restored .firebaserc"
 
-# 3. Verify Functions Directory
+# 2. Install Dependencies (Critical Step)
 if [ -d "functions" ]; then
-    echo "✅ Functions directory detected."
+    echo "📦 Installing Function Dependencies..."
+    cd functions
+    npm install
+    cd ..
 else
-    echo "⚠️ Functions directory missing! Please check project structure."
+    echo "❌ Error: 'functions' directory missing!"
+    exit 1
 fi
 
-echo "🎉 Configuration Restored. You can now run 'firebase deploy --only functions'"
+# 3. Deploy
+echo "🔥 Deploying to Firebase (this may take a few minutes)..."
+firebase deploy --only functions

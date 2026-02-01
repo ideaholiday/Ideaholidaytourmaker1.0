@@ -1,8 +1,8 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import * as nodemailer from 'nodemailer'; // Standard library, can be swapped for SendGrid/Postmark
-import * as crypto from 'crypto'; // Native Node.js crypto
+import * as nodemailer from 'nodemailer';
+import * as crypto from 'crypto';
 import { getWelcomeEmailHtml } from './welcomeTemplate';
 import { Buffer } from 'buffer';
 
@@ -12,7 +12,7 @@ const db = admin.firestore();
 // --- CONFIGURATION ---
 const RAZORPAY_KEY_ID = "rzp_live_SAPwjiuTqQAC6H";
 const RAZORPAY_KEY_SECRET = "Joq1q45SoxsRACwun6yN36dA";
-const WEBHOOK_SECRET = "idea_holiday_secret_key_123"; // Must match Razorpay Dashboard
+const WEBHOOK_SECRET = "idea_holiday_secret_key_123";
 
 // Configure Transporter (Use Environment Variables in Prod)
 const transporter = nodemailer.createTransport({
@@ -24,12 +24,16 @@ const transporter = nodemailer.createTransport({
 });
 
 // --- RAZORPAY WEBHOOK ---
-export const razorpayWebhook = functions.https.onRequest(async (req, res) => {
-  const signature = req.get('x-razorpay-signature');
-  const body = JSON.stringify(req.body);
+// Uses rawBody for signature verification to avoid JSON parsing mismatches
+export const razorpayWebhook = functions.https.onRequest(async (req: any, res: any) => {
+  const signature = req.headers['x-razorpay-signature'];
+  
+  // Firebase Functions parses body automatically, but we need the raw buffer for signature verification
+  // req.rawBody is available in Firebase Cloud Functions
+  const body = req.rawBody;
 
-  if (!signature) {
-    res.status(400).send('Missing signature');
+  if (!signature || !body) {
+    res.status(400).send('Missing signature or body');
     return;
   }
 
@@ -79,7 +83,6 @@ export const razorpayWebhook = functions.https.onRequest(async (req, res) => {
 async function handleBookingPayment(bookingId: string, paymentId: string, amount: number, method: string) {
   const bookingRef = db.collection('bookings').doc(bookingId);
   
-  // Use transaction to ensure atomic read-write and strict idempotency
   await db.runTransaction(async (transaction) => {
     const bookingSnap = await transaction.get(bookingRef);
 
@@ -91,25 +94,18 @@ async function handleBookingPayment(bookingId: string, paymentId: string, amount
     const booking = bookingSnap.data();
     const payments = booking?.payments || [];
     
-    // Check if payment ID already exists in array
-    // We check substring because reference might be "Gateway: pay_123..."
     const existingIndex = payments.findIndex((p: any) => p.reference && p.reference.includes(paymentId));
     
     if (existingIndex > -1) {
-        // Payment Exists: Update Verification Status if needed
         if (payments[existingIndex].verificationStatus !== 'VERIFIED') {
              console.log(`Updating existing payment ${paymentId} to VERIFIED`);
              payments[existingIndex].verificationStatus = 'VERIFIED';
              payments[existingIndex].source = 'RAZORPAY_WEBHOOK';
-             
              transaction.update(bookingRef, { payments: payments });
-        } else {
-            console.log(`Payment ${paymentId} already verified. Skipping.`);
         }
         return;
     }
 
-    // Payment NOT found: Create New Entry (Frontend failed to record)
     console.log(`Creating missing payment record for ${paymentId}`);
     
     const newPaid = (booking?.paidAmount || 0) + amount;
@@ -143,36 +139,28 @@ async function handleBookingPayment(bookingId: string, paymentId: string, amount
 async function handleWalletTopup(userId: string, paymentId: string, amount: number) {
   const userRef = db.collection('users').doc(userId);
   
-  // Check if log exists to prevent double credit
   const existingLogs = await db.collection('audit_logs')
         .where('entityId', '==', paymentId)
         .where('action', '==', 'WALLET_TOPUP')
         .get();
         
-  if (!existingLogs.empty) {
-      console.log(`Wallet topup ${paymentId} already processed.`);
-      return;
-  }
+  if (!existingLogs.empty) return;
 
-  // Add funds using increment
   await userRef.update({
     walletBalance: admin.firestore.FieldValue.increment(amount),
     updatedAt: new Date().toISOString()
   });
 
-  // Log Audit (IMPORTANT: performedById is the USER ID so it shows in their history)
   await db.collection('audit_logs').add({
      entityType: 'PAYMENT',
      entityId: paymentId,
      action: 'WALLET_TOPUP',
      description: `Wallet top-up via Webhook. Amount: ${amount}`,
-     performedById: userId, // CRITICAL FIX: Attribute to user for history filtering
+     performedById: userId, 
      performedByName: 'Razorpay Webhook',
      timestamp: new Date().toISOString(),
      newValue: { amount, gatewayId: paymentId, verified: true }
   });
-
-  console.log(`Wallet for user ${userId} topped up via Webhook.`);
 }
 
 // --- WELCOME EMAIL TRIGGER ---
@@ -182,11 +170,7 @@ export const sendWelcomeEmail = functions.firestore
     const before = change.before.data();
     const after = change.after.data();
 
-    if (
-      before.emailVerified === false && 
-      after.emailVerified === true && 
-      !after.welcomeEmailSent
-    ) {
+    if (before.emailVerified === false && after.emailVerified === true && !after.welcomeEmailSent) {
       const email = after.email;
       const name = after.displayName || 'Partner';
       const dashboardUrl = 'https://b2b.ideaholiday.com/#/login';
@@ -200,7 +184,6 @@ export const sendWelcomeEmail = functions.firestore
 
       try {
         await transporter.sendMail(mailOptions);
-        console.log(`Welcome email sent to ${email}`);
         return change.after.ref.update({
           welcomeEmailSent: true,
           welcomeEmailSentAt: admin.firestore.FieldValue.serverTimestamp()
@@ -213,7 +196,7 @@ export const sendWelcomeEmail = functions.firestore
     return null;
   });
 
-// --- CLIENT-SIDE VERIFICATION HELPER (FALLBACK) ---
+// --- CLIENT-SIDE VERIFICATION HELPER ---
 export const verifyRazorpayPayment = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be logged in.');
@@ -236,14 +219,12 @@ export const verifyRazorpayPayment = functions.https.onCall(async (data, context
             }
         });
 
-        if (!response.ok) {
-            throw new functions.https.HttpsError('internal', 'Failed to fetch payment details from gateway.');
-        }
+        if (!response.ok) throw new functions.https.HttpsError('internal', 'Gateway Error');
 
         const paymentData = await response.json();
 
         if (paymentData.status !== 'authorized' && paymentData.status !== 'captured') {
-            throw new functions.https.HttpsError('failed-precondition', `Payment status is ${paymentData.status}.`);
+            throw new functions.https.HttpsError('failed-precondition', `Invalid Status: ${paymentData.status}`);
         }
 
         if (paymentData.status === 'authorized') {
@@ -255,16 +236,13 @@ export const verifyRazorpayPayment = functions.https.onCall(async (data, context
                 },
                 body: JSON.stringify({ amount: paymentData.amount, currency: paymentData.currency })
             });
-            
-            if (!captureResp.ok) {
-                throw new functions.https.HttpsError('internal', 'Payment authorized but capture failed.');
-            }
+            if (!captureResp.ok) throw new functions.https.HttpsError('internal', 'Capture Failed');
         }
 
         return { success: true, paymentId: paymentData.id, amount: paymentData.amount / 100 };
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Verification Logic Error:", error);
-        throw new functions.https.HttpsError('internal', 'Payment verification process failed.');
+        throw new functions.https.HttpsError('internal', error.message);
     }
 });
