@@ -13,6 +13,7 @@ class AgentService {
       return await dbHelper.getWhere<Quote>(COLLECTION, 'agentId', '==', agentId);
   }
 
+  // New method to fetch a single quote by ID (bypass agentId filter for Admins)
   async getQuoteById(id: string): Promise<Quote | null> {
       return await dbHelper.getById<Quote>(COLLECTION, id);
   }

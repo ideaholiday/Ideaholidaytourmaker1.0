@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -25,6 +26,9 @@ export const QuickQuote: React.FC = () => {
   const [pax, setPax] = useState({ adults: 2, children: 0 });
   const [preferences, setPreferences] = useState(''); // New State for Activities/Interests
   
+  // Trip Type State (Must be part of formData logic to be used in AI gen)
+  const [tripType, setTripType] = useState('Leisure');
+
   // Quick Inputs
   const [inputs, setInputs] = useState<QuickQuoteInputs>({
       hotelCategory: '4 Star',
@@ -191,13 +195,13 @@ export const QuickQuote: React.FC = () => {
               aiContent = await generateItinerary(
                   destination, 
                   durationText, 
-                  'Leisure', 
+                  tripType, // Pass the selected trip type
                   travelDate,
                   inputs.hotelCategory,
                   preferences
               );
           } else {
-             aiContent = `${nights} Nights Leisure Trip to ${destination}.`;
+             aiContent = `${nights} Nights ${tripType} Trip to ${destination}.`;
           }
 
           // 4. Enhance with Quick Quote Data
@@ -365,6 +369,20 @@ export const QuickQuote: React.FC = () => {
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Rooms</label>
                             <input type="number" min="1" className="w-full border p-2 rounded-lg font-bold text-brand-700 bg-brand-50" value={inputs.rooms} onChange={e => setInputs({...inputs, rooms: Number(e.target.value)})} />
+                        </div>
+                        <div>
+                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Trip Style</label>
+                             <select
+                                value={tripType}
+                                onChange={(e) => setTripType(e.target.value)}
+                                className="w-full border p-2 rounded-lg bg-white outline-none"
+                             >
+                                 <option value="Leisure">Leisure</option>
+                                 <option value="Honeymoon">Honeymoon</option>
+                                 <option value="Adventure">Adventure</option>
+                                 <option value="Business">Business</option>
+                                 <option value="Luxury">Luxury</option>
+                             </select>
                         </div>
                     </div>
 
