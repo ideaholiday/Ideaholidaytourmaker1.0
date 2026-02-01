@@ -247,6 +247,7 @@ export const AgentProfile: React.FC = () => {
                       <th className="px-6 py-3 font-semibold">Ref No</th>
                       <th className="px-6 py-3 font-semibold">Created</th>
                       <th className="px-6 py-3 font-semibold">Destination</th>
+                      <th className="px-6 py-3 font-semibold text-right text-slate-500">System Cost</th>
                       <th className="px-6 py-3 font-semibold text-right text-blue-600">Net Cost (B2B)</th>
                       <th className="px-6 py-3 font-semibold text-right text-green-600">Markup</th>
                       <th className="px-6 py-3 font-semibold text-right text-slate-900">Selling Price</th>
@@ -256,17 +257,21 @@ export const AgentProfile: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {quotes.map(q => {
-                        const net = q.price || 0;
+                        const net = q.price || 0; // B2B Price
                         const sell = q.sellingPrice || 0;
                         const markup = sell - net;
                         const markupPercent = net > 0 ? ((markup / net) * 100).toFixed(1) : '0';
+                        const cost = q.cost || 0; // System Cost
 
                         return (
                           <tr key={q.id} className="hover:bg-slate-50 transition">
                             <td className="px-6 py-3 font-mono text-brand-600 font-medium">{q.uniqueRefNo}</td>
                             <td className="px-6 py-3 text-slate-500">{new Date().toLocaleDateString()}</td>
                             <td className="px-6 py-3 text-slate-800">{q.destination}</td>
-                            <td className="px-6 py-3 text-right font-mono font-medium text-slate-600">
+                            <td className="px-6 py-3 text-right font-mono text-slate-500">
+                                {q.currency} {cost.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-3 text-right font-mono font-medium text-blue-600">
                                 {q.currency} {net.toLocaleString()}
                             </td>
                             <td className="px-6 py-3 text-right font-mono text-green-600">
@@ -294,7 +299,7 @@ export const AgentProfile: React.FC = () => {
                           </tr>
                         );
                     })}
-                    {quotes.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-400">No quotes found.</td></tr>}
+                    {quotes.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-slate-400">No quotes found.</td></tr>}
                   </tbody>
                 </table>
               </div>

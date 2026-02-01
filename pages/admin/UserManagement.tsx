@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import { permissionService, ALL_PERMISSIONS } from '../../services/permissionService';
 import { useAuth } from '../../context/AuthContext';
 import { User, UserRole, Permission, Destination, Hotel, Transfer } from '../../types';
-import { Users, Edit2, Trash2, Plus, X, Shield, Briefcase, User as UserIcon, Lock, Check, Search, MapPin, CreditCard, Building, Store, Hotel as HotelIcon, Car, KeyRound, AlertTriangle, Globe, Image, ShieldAlert } from 'lucide-react';
+import { Users, Edit2, Trash2, Plus, X, Shield, Briefcase, User as UserIcon, Lock, Search, MapPin, CreditCard, Building, Store, Hotel as HotelIcon, Car, KeyRound, Globe, ShieldAlert, Eye } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   
   const [users, setUsers] = useState<User[]>([]);
@@ -145,6 +146,14 @@ export const UserManagement: React.FC = () => {
       const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
       adminService.saveUser({ ...user, status: newStatus });
       loadData();
+  };
+
+  const handleViewProfile = (user: User) => {
+      if (user.role === UserRole.AGENT) {
+          navigate(`/admin/agents/${user.id}`);
+      } else if (user.role === UserRole.OPERATOR) {
+          navigate(`/admin/operators/${user.id}`);
+      }
   };
 
   // --- FORM HANDLERS ---
@@ -332,6 +341,15 @@ export const UserManagement: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {(u.role === UserRole.AGENT || u.role === UserRole.OPERATOR) && (
+                        <button 
+                            onClick={() => handleViewProfile(u)}
+                            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            title="View Full Profile"
+                        >
+                            <Eye size={16} />
+                        </button>
+                    )}
                     <button 
                         onClick={() => handleOpenModal(u)} 
                         className="p-2 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition"
@@ -362,8 +380,7 @@ export const UserManagement: React.FC = () => {
           </tbody>
         </table>
       </div>
-
-      {/* CREATE / EDIT MODAL */}
+      {/* ... MODAL CODE REMAINS SAME ... */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl max-w-2xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -451,8 +468,6 @@ export const UserManagement: React.FC = () => {
               <hr className="border-slate-100" />
 
               {/* DYNAMIC ROLE FIELDS */}
-              
-              {/* 1. AGENT FIELDS */}
               {formData.role === UserRole.AGENT && (
                   <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 animate-in fade-in space-y-4">
                       <div>
@@ -466,7 +481,6 @@ export const UserManagement: React.FC = () => {
                         />
                         <p className="text-xs text-emerald-600 mt-1">Maximum booking value allowed on credit.</p>
                       </div>
-
                       <div className="border-t border-emerald-100 pt-4">
                         <h3 className="font-bold text-emerald-800 text-sm mb-3 flex items-center gap-2"><Globe size={16}/> White Label Configuration</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -498,7 +512,6 @@ export const UserManagement: React.FC = () => {
                   </div>
               )}
 
-              {/* 2. OPERATOR FIELDS */}
               {formData.role === UserRole.OPERATOR && (
                   <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 animate-in fade-in">
                       <h3 className="font-bold text-amber-800 text-sm mb-3 flex items-center gap-2"><MapPin size={16}/> Assigned Regions</h3>
@@ -519,7 +532,6 @@ export const UserManagement: React.FC = () => {
                   </div>
               )}
 
-              {/* 3. HOTEL PARTNER FIELDS */}
               {formData.role === UserRole.HOTEL_PARTNER && (
                   <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 animate-in fade-in">
                       <h3 className="font-bold text-purple-800 text-sm mb-3 flex items-center gap-2"><Store size={16}/> Inventory Linking</h3>
@@ -568,7 +580,6 @@ export const UserManagement: React.FC = () => {
                   </div>
               )}
 
-              {/* 4. STAFF FIELDS */}
               {formData.role === UserRole.STAFF && (
                   <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 animate-in fade-in">
                       <h3 className="font-bold text-blue-800 text-sm mb-3 flex items-center gap-2"><Lock size={16}/> Access Permissions</h3>
@@ -591,7 +602,6 @@ export const UserManagement: React.FC = () => {
                   </div>
               )}
 
-              {/* 5. ADMIN FIELDS */}
               {formData.role === UserRole.ADMIN && (
                   <div className="bg-red-50 p-4 rounded-xl border border-red-100 animate-in fade-in flex items-start gap-3">
                       <ShieldAlert size={20} className="text-red-600 mt-1" />

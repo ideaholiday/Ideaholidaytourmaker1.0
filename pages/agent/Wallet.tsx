@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { paymentService } from '../../services/paymentService';
 import { auditLogService } from '../../services/auditLogService';
 import { AuditLog } from '../../types';
-import { Wallet as WalletIcon, CreditCard, History, Plus, ArrowUpRight, DollarSign, Loader2, ArrowDownLeft, Search, Filter, Download } from 'lucide-react';
+import { Wallet as WalletIcon, CreditCard, History, Plus, ArrowUpRight, DollarSign, Loader2, ArrowDownLeft, Search, Filter, Download, AlertTriangle, Clock } from 'lucide-react';
 
 export const Wallet: React.FC = () => {
   const { user, reloadUser } = useAuth();
@@ -28,7 +28,7 @@ export const Wallet: React.FC = () => {
       // Filter by Type
       if (filterType !== 'ALL') {
           filtered = filtered.filter(t => {
-              const isCredit = t.action === 'WALLET_TOPUP';
+              const isCredit = t.action.includes('TOPUP');
               return filterType === 'CREDIT' ? isCredit : !isCredit;
           });
       }
@@ -53,7 +53,7 @@ export const Wallet: React.FC = () => {
       
       const myTransactions = logs.filter(l => 
           l.performedById === user?.id && 
-          (l.action === 'WALLET_TOPUP' || l.action === 'WALLET_PAYMENT')
+          (l.action.includes('WALLET_TOPUP') || l.action === 'WALLET_PAYMENT')
       );
       
       setTransactions(myTransactions);
@@ -83,13 +83,22 @@ export const Wallet: React.FC = () => {
               await loadHistory(); // Refresh list
               setTopUpAmount('');
               setIsProcessing(false);
-              alert("Wallet recharged successfully!");
           },
           (error) => {
               setIsProcessing(false);
               alert("Transaction failed: " + error);
           }
       );
+  };
+
+  const getStatusBadge = (action: string) => {
+      if (action === 'WALLET_TOPUP_FAILED') {
+          return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-100"><AlertTriangle size={10} /> Failed</span>;
+      }
+      if (action === 'WALLET_TOPUP_PROCESSING') {
+          return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100"><Clock size={10} /> Pending</span>;
+      }
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100">Success</span>;
   };
 
   return (
@@ -218,7 +227,7 @@ export const Wallet: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredTransactions.map((tx) => {
-                                const isCredit = tx.action === 'WALLET_TOPUP';
+                                const isCredit = tx.action.includes('TOPUP');
                                 const amount = tx.newValue?.amount || 0;
                                 const balance = tx.newValue?.newBalance;
 
@@ -256,9 +265,7 @@ export const Wallet: React.FC = () => {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100">
-                                                Success
-                                            </span>
+                                            {getStatusBadge(tx.action)}
                                         </td>
                                     </tr>
                                 );

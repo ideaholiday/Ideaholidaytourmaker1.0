@@ -1,5 +1,4 @@
 
-
 import { Quote, User, UserRole, Message, OperationalDetails, Visa, Booking } from '../types';
 import { dbHelper } from './firestoreHelper';
 import { auditLogService } from './auditLogService';
@@ -249,7 +248,7 @@ class AgentService {
       await dbHelper.save('users', { id: agentId, ...updates });
   }
 
-  async addWalletFunds(agentId: string, amount: number): Promise<User> {
+  async addWalletFunds(agentId: string, amount: number): Promise<number> {
       const agent = await dbHelper.getById<User>('users', agentId);
       if (!agent) throw new Error("Agent not found");
 
@@ -262,8 +261,7 @@ class AgentService {
       
       await dbHelper.save('users', { id: agentId, ...updates });
       
-      // Return updated user object
-      return { ...agent, ...updates };
+      return newBalance;
   }
 }
 

@@ -1,4 +1,4 @@
-import React, { useMemo, ReactNode, ErrorInfo, Component, Suspense } from 'react';
+import React, { useMemo, ReactNode, ErrorInfo, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -129,7 +129,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-    return this.props.children;
+    return (this as any).props.children;
   }
 }
 

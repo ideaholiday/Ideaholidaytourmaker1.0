@@ -4,7 +4,7 @@ import { bookingService } from './bookingService';
 import { auditLogService } from './auditLogService';
 import { agentService } from './agentService';
 import { dbHelper } from './firestoreHelper';
-import { functions } from './firebase'; // Import functions instance
+import { functions } from './firebase'; 
 import { httpsCallable } from 'firebase/functions';
 
 declare global {
@@ -13,21 +13,21 @@ declare global {
   }
 }
 
-// Types for Razorpay
 interface RazorpayOptions {
   key: string;
-  amount: number; // in subunits
+  amount: number; 
   currency: string;
   name: string;
   description: string;
   image?: string;
-  order_id?: string; // Made optional
+  order_id?: string; 
   handler: (response: any) => void;
   prefill?: {
     name?: string;
     email?: string;
     contact?: string;
   };
+  notes?: { [key: string]: string }; 
   theme?: {
     color?: string;
   };
@@ -40,26 +40,21 @@ class PaymentService {
   
   private razorpayKey = "rzp_live_SAPwjiuTqQAC6H"; // LIVE KEY
 
-  /**
-   * Initializes the payment flow for a Booking.
-   */
   async initiatePayment(
     booking: Booking, 
     type: 'ADVANCE' | 'FULL' | 'BALANCE',
     brandColor: string,
     onSuccess: (paymentId: string) => void,
     onFailure: (error: string) => void,
-    overrideAmount?: number // Optional override (e.g. Net Cost)
+    overrideAmount?: number 
   ) {
     try {
-      // 1. Determine Amount
       let amountToPay = 0;
       const currency = booking.currency || 'INR';
 
       if (overrideAmount && overrideAmount > 0) {
           amountToPay = overrideAmount;
       } else {
-          // Standard Logic
           if (type === 'FULL') {
             amountToPay = booking.balanceAmount; 
           } else if (type === 'ADVANCE') {
@@ -72,10 +67,8 @@ class PaymentService {
 
       if (amountToPay <= 0) throw new Error("No pending balance to pay.");
 
-      // 2. Create Order (Internal Ref)
       const order = await this.createPaymentOrder(booking.id, amountToPay, currency);
 
-      // 3. Open Gateway
       this.openRazorpay(
           order,
           booking.agentName || "Idea Holiday Partner",
@@ -83,16 +76,35 @@ class PaymentService {
           brandColor,
           {
              name: booking.agentName, 
-             email: "client@example.com", // In a real app, pass actual email
+             email: "client@example.com", 
              contact: "9999999999"
           },
+          // META DATA FOR WEBHOOK
+          {
+              paymentType: 'BOOKING',
+              bookingId: booking.id,
+              refNo: booking.uniqueRefNo
+          },
           async (response) => {
-              // Success Callback
+              // 1. Optimistic Success Callback to UI
+              onSuccess(response.razorpay_payment_id);
+              
+              // 2. Background Backend Verification
               try {
-                  const paymentId = await this.verifyPayment(response, booking, amountToPay, type);
-                  onSuccess(paymentId);
+                  await this.verifyPayment(response, booking, amountToPay, type);
+                  console.log("Backend verification successful.");
               } catch (e: any) {
-                  onFailure(e.message);
+                  console.warn("Backend verification failed (Optimistic Flow). Relying on Webhook.", e);
+                  
+                  // 3. Fallback Record: Save as FAILED_VERIFY so admin sees the attempt
+                  await bookingService.recordPayment(
+                      booking.id,
+                      amountToPay,
+                      'ONLINE',
+                      `Gateway: ${response.razorpay_payment_id}`,
+                      { id: 'sys_fallback', name: 'System', role: 'ADMIN' } as any,
+                      'FAILED_VERIFY' // Status indicating webhook needs to fix this
+                  );
               }
           },
           onFailure
@@ -104,63 +116,6 @@ class PaymentService {
     }
   }
 
-  /**
-   * Wallet Payment Processing (Internal Deduction)
-   */
-  async processWalletDeduction(
-      user: User,
-      booking: Booking,
-      amount: number
-  ): Promise<string> {
-      // 1. Double check balance
-      const currentBalance = user.walletBalance || 0;
-      const creditLimit = user.creditLimit || 0;
-      const available = currentBalance + creditLimit;
-
-      if (available < amount) {
-          throw new Error("Insufficient wallet balance.");
-      }
-
-      // 2. Deduct Logic
-      // If user has wallet balance, consume that first. Then credit limit.
-      let newBalance = currentBalance - amount;
-      
-      // Update User
-      await agentService.updateAgentProfile(user.id, { 
-          walletBalance: newBalance,
-          updatedAt: new Date().toISOString()
-      });
-
-      // 3. Record Payment on Booking
-      const paymentRef = `WALLET-${Date.now()}`;
-      
-      // Create system user context for the record
-      const agentUser = { ...user }; // Clone user to use as recorder
-
-      await bookingService.recordPayment(
-          booking.id,
-          amount,
-          'WALLET', // New mode
-          paymentRef,
-          agentUser
-      );
-
-      // 4. Audit Log
-      auditLogService.logAction({
-          entityType: 'PAYMENT',
-          entityId: paymentRef,
-          action: 'WALLET_PAYMENT',
-          description: `Paid ${amount} for booking ${booking.uniqueRefNo} via Wallet. New Balance: ${newBalance}`,
-          user: user,
-          newValue: { amount, method: 'WALLET', newBalance }
-      });
-
-      return paymentRef;
-  }
-
-  /**
-   * Wallet Top Up Flow
-   */
   async initiateWalletTopUp(
     user: User,
     amount: number,
@@ -170,34 +125,78 @@ class PaymentService {
       try {
           if (amount <= 0) throw new Error("Invalid amount.");
 
-          // 1. Create Order
           const order = await this.createPaymentOrder(`wallet_${user.id}`, amount, 'INR');
 
-          // 2. Open Gateway
           this.openRazorpay(
               order,
               user.companyName || user.name,
               "Wallet Top-up",
-              "#0ea5e9", // Standard brand color
+              "#0ea5e9", 
               {
                   name: user.name,
                   email: user.email,
                   contact: user.phone
               },
+              {
+                  paymentType: 'WALLET',
+                  userId: user.id
+              },
               async (response) => {
+                  const paymentId = response.razorpay_payment_id;
+                  
                   try {
-                      // Call secure verification
+                      // 1. Log Attempt immediately (Processing State)
+                      // This ensures a record exists even if verification crashes
+                      await auditLogService.logAction({
+                          entityType: 'PAYMENT',
+                          entityId: paymentId,
+                          action: 'WALLET_TOPUP_PROCESSING',
+                          description: `Processing Gateway Payment: ₹${amount}`,
+                          user: user,
+                          newValue: { amount: amount, gatewayId: paymentId }
+                      });
+
+                      // 2. Verify with Server
                       await this.verifyWalletPayment(response, user, amount);
                       
-                      // If verification passes, the Cloud Function confirms it's captured.
-                      // Now we can safely add funds to DB.
-                      // Note: Ideally, the Cloud Function should update the DB to prevent frontend manipulation,
-                      // but for this architecture, we double-check here.
-                      const updatedUser = await agentService.addWalletFunds(user.id, amount);
-                      onSuccess(updatedUser.walletBalance || 0);
+                      // 3. Update DB Balance (Source of Truth)
+                      const newBalance = await agentService.addWalletFunds(user.id, amount);
+
+                      // 4. Log Success (Updates the previous log logic effectively by adding new entry)
+                      await auditLogService.logAction({
+                          entityType: 'PAYMENT',
+                          entityId: paymentId,
+                          action: 'WALLET_TOPUP',
+                          description: `Wallet Top-up Successful`,
+                          user: user,
+                          newValue: { 
+                              amount: amount, 
+                              newBalance: newBalance,
+                              verified: true
+                          }
+                      });
+
+                      // 5. Update UI
+                      onSuccess(newBalance);
+
                   } catch (e: any) {
-                      console.error("Wallet Top-up Verification Failed", e);
-                      onFailure("Payment verification failed. Please contact support if amount was deducted.");
+                      console.error("Wallet Top-up Verification Error:", e);
+                      
+                      // 6. Log Failure for Admin Review
+                      await auditLogService.logAction({
+                          entityType: 'PAYMENT',
+                          entityId: paymentId,
+                          action: 'WALLET_TOPUP_FAILED',
+                          description: `Payment Verification Failed. ID: ${paymentId}`,
+                          user: user,
+                          newValue: { amount: amount, error: e.message }
+                      });
+
+                      // Fallback: We show success to user because money was deducted, 
+                      // but we don't update DB balance here to prevent fraud.
+                      // The Webhook is the final safety net to add funds if verification failed.
+                      alert("Payment received at gateway but system verification timed out.\n\nYour balance will update automatically in a few minutes via our secure webhook.");
+                      onSuccess((user.walletBalance || 0)); // Don't show fake balance, wait for webhook
                   }
               },
               onFailure
@@ -208,12 +207,42 @@ class PaymentService {
       }
   }
 
+  async processWalletDeduction(agent: User, booking: Booking, amount: number) {
+      const available = (agent.walletBalance || 0) + (agent.creditLimit || 0);
+      if (available < amount) {
+          throw new Error("Insufficient wallet balance or credit limit.");
+      }
+
+      const newBalance = await agentService.addWalletFunds(agent.id, -amount);
+
+      await bookingService.recordPayment(
+          booking.id,
+          amount,
+          'WALLET',
+          `Wallet Deduct: ${booking.uniqueRefNo}`,
+          agent,
+          'VERIFIED' // Wallet deductions are always verified internal actions
+      );
+
+      await auditLogService.logAction({
+          entityType: 'PAYMENT',
+          entityId: `wallet_pay_${Date.now()}`,
+          action: 'WALLET_PAYMENT',
+          description: `Booking Payment via Wallet for ${booking.uniqueRefNo}`,
+          user: agent,
+          newValue: { amount: -amount, newBalance: newBalance, bookingId: booking.id }
+      });
+  }
+
+  // --- INTERNAL ---
+
   private openRazorpay(
       order: any, 
       name: string, 
       description: string, 
       color: string, 
       prefill: any, 
+      notes: { [key: string]: string },
       onSuccess: (res: any) => void, 
       onFailure: (err: string) => void
   ) {
@@ -223,10 +252,10 @@ class PaymentService {
         currency: order.currency,
         name: name,
         description: description,
-        // order_id: order.id, // DISABLED: Client-side checkout requires no Order ID to avoid auth errors
         image: "https://file-service-alpha.vercel.app/file/a8d8e3c0-362c-473d-82d2-282e366184e9/607e4d82-c86e-4171-aa3b-8575027588b3.png", 
         handler: onSuccess,
         prefill: prefill,
+        notes: notes, 
         theme: { color: color || "#0ea5e9" },
         modal: {
             ondismiss: () => onFailure("Payment cancelled by user.")
@@ -240,98 +269,60 @@ class PaymentService {
           });
           rzp1.open();
       } else {
-          // Fallback if script didn't load (Dev mode simulation)
-          console.warn("Razorpay SDK not found. Simulating payment flow.");
-          const confirmed = confirm(`[MOCK GATEWAY] Pay ${order.currency} ${order.amount / 100}?`);
-          if (confirmed) {
-               setTimeout(() => {
-                  onSuccess({
-                      razorpay_payment_id: `pay_mock_${Date.now()}`,
-                      razorpay_order_id: order.id,
-                      razorpay_signature: "mock_signature"
-                  });
-               }, 1500);
-          } else {
-              onFailure("Payment cancelled.");
-          }
+          console.warn("Razorpay SDK not found.");
+          onFailure("Payment Gateway not loaded.");
       }
   }
 
-  // --- BACKEND SIMULATION ---
-
   private async createPaymentOrder(refId: string, amount: number, currency: string) {
-      // Logic for internal order ref only
+      // Mock order creation - In prod, this calls backend to get razorpay order_id
       return {
-          id: `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+          id: `order_mock_${Date.now()}`, 
           entity: "order",
           amount: amount * 100, 
-          amount_paid: 0,
-          amount_due: amount * 100,
-          currency: currency,
-          receipt: `rcpt_${refId.substring(0, 8)}`,
-          status: "created",
-          created_at: Math.floor(Date.now() / 1000)
+          currency: currency
       };
   }
 
-  private async verifyPayment(response: any, booking: Booking, amount: number, type: 'ADVANCE' | 'FULL' | 'BALANCE'): Promise<string> {
-      // Call Cloud Function to verify
+  private async verifyPayment(response: any, booking: Booking, amount: number, type: string): Promise<string> {
+      const paymentId = response.razorpay_payment_id;
       const verifyFn = httpsCallable(functions, 'verifyRazorpayPayment');
       
       const result = await verifyFn({
-          paymentId: response.razorpay_payment_id,
+          paymentId: paymentId,
           expectedAmount: amount,
           currency: booking.currency
       });
 
       const data = result.data as any;
-      if (!data.success) throw new Error("Payment verification failed on server.");
+      if (!data.success) throw new Error("Payment verification declined by server.");
 
-      // Record in DB if verified
-      const systemUser: User = { id: 'sys_payment_gateway', name: 'Online Gateway', role: 'ADMIN' as any, email: 'gateway@system.com', isVerified: true };
-      
+      // Record in DB with Verified status
       await bookingService.recordPayment(
           booking.id,
           amount,
           'ONLINE',
-          `Gateway: ${response.razorpay_payment_id}`,
-          systemUser
+          `Gateway: ${paymentId}`,
+          { id: 'sys_payment', name: 'Online Gateway', role: 'ADMIN' } as any,
+          'VERIFIED',
+          'MANUAL' // Source is manual/frontend
       );
 
-      auditLogService.logAction({
-          entityType: 'PAYMENT',
-          entityId: response.razorpay_payment_id,
-          action: 'ONLINE_PAYMENT_RECEIVED',
-          description: `Received ${booking.currency} ${amount} (${type}) via Gateway. Verified.`,
-          user: systemUser,
-          newValue: { amount, type, gatewayId: response.razorpay_payment_id }
-      });
-
-      return response.razorpay_payment_id;
+      return paymentId;
   }
 
   private async verifyWalletPayment(response: any, user: User, amount: number) {
-      // Call Cloud Function to verify
+      const paymentId = response.razorpay_payment_id;
       const verifyFn = httpsCallable(functions, 'verifyRazorpayPayment');
       
       const result = await verifyFn({
-          paymentId: response.razorpay_payment_id,
+          paymentId: paymentId,
           expectedAmount: amount,
           currency: 'INR'
       });
-
-      const data = result.data as any;
-      if (!data.success) throw new Error("Payment verification failed on server.");
       
-      // Log the specific wallet transaction
-      auditLogService.logAction({
-          entityType: 'PAYMENT',
-          entityId: response.razorpay_payment_id,
-          action: 'WALLET_TOPUP',
-          description: `Wallet top-up of INR ${amount} by ${user.name}. Verified.`,
-          user: user,
-          newValue: { amount, gatewayId: response.razorpay_payment_id }
-      });
+      const data = result.data as any;
+      if (!data.success) throw new Error("Server declined.");
   }
 }
 

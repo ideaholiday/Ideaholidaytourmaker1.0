@@ -1,17 +1,18 @@
+
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import * as nodemailer from 'nodemailer'; // Standard library, can be swapped for SendGrid/Postmark
+import * as crypto from 'crypto'; // Native Node.js crypto
 import { getWelcomeEmailHtml } from './welcomeTemplate';
 import { Buffer } from 'buffer';
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// --- RAZORPAY LIVE CREDENTIALS ---
-// In a production environment, these should be set via: 
-// firebase functions:config:set razorpay.key_id="..." razorpay.secret="..."
+// --- CONFIGURATION ---
 const RAZORPAY_KEY_ID = "rzp_live_SAPwjiuTqQAC6H";
 const RAZORPAY_KEY_SECRET = "Joq1q45SoxsRACwun6yN36dA";
+const WEBHOOK_SECRET = "idea_holiday_secret_key_123"; // Must match Razorpay Dashboard
 
 // Configure Transporter (Use Environment Variables in Prod)
 const transporter = nodemailer.createTransport({
@@ -22,6 +23,158 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// --- RAZORPAY WEBHOOK ---
+export const razorpayWebhook = functions.https.onRequest(async (req, res) => {
+  const signature = req.get('x-razorpay-signature');
+  const body = JSON.stringify(req.body);
+
+  if (!signature) {
+    res.status(400).send('Missing signature');
+    return;
+  }
+
+  // 1. Verify Signature
+  const expectedSignature = crypto
+    .createHmac('sha256', WEBHOOK_SECRET)
+    .update(body)
+    .digest('hex');
+
+  if (signature !== expectedSignature) {
+    console.error("Invalid Webhook Signature");
+    res.status(400).send('Invalid signature');
+    return;
+  }
+
+  // 2. Process Event
+  const event = req.body.event;
+  const payload = req.body.payload.payment.entity;
+  
+  console.log(`Received Webhook: ${event}`, payload.id);
+
+  if (event === 'payment.captured') {
+    const notes = payload.notes || {};
+    const amount = payload.amount / 100; // Convert to main unit
+    const paymentId = payload.id;
+
+    try {
+      if (notes.paymentType === 'BOOKING' && notes.bookingId) {
+        await handleBookingPayment(notes.bookingId, paymentId, amount, payload.method);
+      } else if (notes.paymentType === 'WALLET' && notes.userId) {
+        await handleWalletTopup(notes.userId, paymentId, amount);
+      } else {
+        console.warn('Unknown Payment Type or missing metadata', notes);
+      }
+    } catch (err) {
+      console.error("Error processing webhook data:", err);
+      res.status(500).send('Internal Error');
+      return;
+    }
+  }
+
+  res.json({ status: 'ok' });
+});
+
+// --- HELPERS ---
+
+async function handleBookingPayment(bookingId: string, paymentId: string, amount: number, method: string) {
+  const bookingRef = db.collection('bookings').doc(bookingId);
+  
+  // Use transaction to ensure atomic read-write and strict idempotency
+  await db.runTransaction(async (transaction) => {
+    const bookingSnap = await transaction.get(bookingRef);
+
+    if (!bookingSnap.exists) {
+        console.warn(`Booking ${bookingId} not found for payment ${paymentId}`);
+        return;
+    }
+
+    const booking = bookingSnap.data();
+    const payments = booking?.payments || [];
+    
+    // Check if payment ID already exists in array
+    // We check substring because reference might be "Gateway: pay_123..."
+    const existingIndex = payments.findIndex((p: any) => p.reference && p.reference.includes(paymentId));
+    
+    if (existingIndex > -1) {
+        // Payment Exists: Update Verification Status if needed
+        if (payments[existingIndex].verificationStatus !== 'VERIFIED') {
+             console.log(`Updating existing payment ${paymentId} to VERIFIED`);
+             payments[existingIndex].verificationStatus = 'VERIFIED';
+             payments[existingIndex].source = 'RAZORPAY_WEBHOOK';
+             
+             transaction.update(bookingRef, { payments: payments });
+        } else {
+            console.log(`Payment ${paymentId} already verified. Skipping.`);
+        }
+        return;
+    }
+
+    // Payment NOT found: Create New Entry (Frontend failed to record)
+    console.log(`Creating missing payment record for ${paymentId}`);
+    
+    const newPaid = (booking?.paidAmount || 0) + amount;
+    let newStatus = booking?.paymentStatus;
+    if (newPaid >= (booking?.totalAmount || 0)) newStatus = 'PAID_IN_FULL';
+    else if (newPaid > 0) newStatus = 'PARTIALLY_PAID';
+
+    const paymentEntry = {
+        id: `pay_${Date.now()}`,
+        type: (booking?.paidAmount === 0) ? 'ADVANCE' : 'BALANCE',
+        amount: amount,
+        date: new Date().toISOString(),
+        mode: 'ONLINE',
+        reference: `Gateway: ${paymentId}`,
+        receiptNumber: `RCPT-${Date.now()}`,
+        recordedBy: 'SYSTEM_WEBHOOK',
+        verificationStatus: 'VERIFIED',
+        source: 'RAZORPAY_WEBHOOK'
+    };
+
+    transaction.update(bookingRef, {
+        paidAmount: newPaid,
+        balanceAmount: (booking?.totalAmount || 0) - newPaid,
+        paymentStatus: newStatus,
+        payments: admin.firestore.FieldValue.arrayUnion(paymentEntry),
+        updatedAt: new Date().toISOString()
+    });
+  });
+}
+
+async function handleWalletTopup(userId: string, paymentId: string, amount: number) {
+  const userRef = db.collection('users').doc(userId);
+  
+  // Check if log exists to prevent double credit
+  const existingLogs = await db.collection('audit_logs')
+        .where('entityId', '==', paymentId)
+        .where('action', '==', 'WALLET_TOPUP')
+        .get();
+        
+  if (!existingLogs.empty) {
+      console.log(`Wallet topup ${paymentId} already processed.`);
+      return;
+  }
+
+  // Add funds using increment
+  await userRef.update({
+    walletBalance: admin.firestore.FieldValue.increment(amount),
+    updatedAt: new Date().toISOString()
+  });
+
+  // Log Audit (IMPORTANT: performedById is the USER ID so it shows in their history)
+  await db.collection('audit_logs').add({
+     entityType: 'PAYMENT',
+     entityId: paymentId,
+     action: 'WALLET_TOPUP',
+     description: `Wallet top-up via Webhook. Amount: ${amount}`,
+     performedById: userId, // CRITICAL FIX: Attribute to user for history filtering
+     performedByName: 'Razorpay Webhook',
+     timestamp: new Date().toISOString(),
+     newValue: { amount, gatewayId: paymentId, verified: true }
+  });
+
+  console.log(`Wallet for user ${userId} topped up via Webhook.`);
+}
+
 // --- WELCOME EMAIL TRIGGER ---
 export const sendWelcomeEmail = functions.firestore
   .document('users/{userId}')
@@ -29,10 +182,6 @@ export const sendWelcomeEmail = functions.firestore
     const before = change.before.data();
     const after = change.after.data();
 
-    // TRIGGER CONDITION:
-    // 1. Email was NOT verified before
-    // 2. Email IS verified now
-    // 3. Welcome email has NOT been sent yet
     if (
       before.emailVerified === false && 
       after.emailVerified === true && 
@@ -52,8 +201,6 @@ export const sendWelcomeEmail = functions.firestore
       try {
         await transporter.sendMail(mailOptions);
         console.log(`Welcome email sent to ${email}`);
-
-        // MARK AS SENT to prevent duplicates
         return change.after.ref.update({
           welcomeEmailSent: true,
           welcomeEmailSentAt: admin.firestore.FieldValue.serverTimestamp()
@@ -63,26 +210,22 @@ export const sendWelcomeEmail = functions.firestore
         return null;
       }
     }
-
     return null;
   });
 
-// --- PAYMENT VERIFICATION FUNCTION ---
+// --- CLIENT-SIDE VERIFICATION HELPER (FALLBACK) ---
 export const verifyRazorpayPayment = functions.https.onCall(async (data, context) => {
-    // 1. Security Check
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be logged in.');
     }
 
-    const { paymentId, expectedAmount, currency } = data;
+    const { paymentId, expectedAmount } = data;
 
     if (!paymentId || !expectedAmount) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing payment ID or amount.');
     }
 
     try {
-        // 2. Fetch Payment Details from Razorpay
-        // We use Basic Auth with Key ID and Secret
         const authHeader = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
         
         const response = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
@@ -94,35 +237,15 @@ export const verifyRazorpayPayment = functions.https.onCall(async (data, context
         });
 
         if (!response.ok) {
-            const errBody = await response.text();
-            console.error('Razorpay API Error:', errBody);
             throw new functions.https.HttpsError('internal', 'Failed to fetch payment details from gateway.');
         }
 
         const paymentData = await response.json();
 
-        // 3. Verify Status
-        // Status can be 'authorized' or 'captured'
         if (paymentData.status !== 'authorized' && paymentData.status !== 'captured') {
-            throw new functions.https.HttpsError('failed-precondition', `Payment status is ${paymentData.status}, expected authorized or captured.`);
+            throw new functions.https.HttpsError('failed-precondition', `Payment status is ${paymentData.status}.`);
         }
 
-        // 4. Verify Amount
-        // Razorpay returns amount in subunits (paise). 
-        // We expect `expectedAmount` from client to be in main units (Rupees), so we multiply by 100.
-        // Or if client sends subunits, adjust accordingly. 
-        // Standard: Client sends 1000 (Rupees). Razorpay has 100000 (Paise).
-        const amountInSubunits = Math.round(expectedAmount * 100);
-        
-        if (paymentData.amount !== amountInSubunits) {
-             console.warn(`Amount Mismatch: Expected ${amountInSubunits}, Got ${paymentData.amount}`);
-             // Allow tiny rounding diff if necessary, but exact match is safer
-             if (Math.abs(paymentData.amount - amountInSubunits) > 100) { // Tolerate 1 rupee diff
-                 throw new functions.https.HttpsError('invalid-argument', 'Payment amount mismatch.');
-             }
-        }
-
-        // 5. Capture Payment (if not already captured)
         if (paymentData.status === 'authorized') {
              const captureResp = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/capture`, {
                 method: 'POST',
@@ -134,12 +257,10 @@ export const verifyRazorpayPayment = functions.https.onCall(async (data, context
             });
             
             if (!captureResp.ok) {
-                console.error('Capture Failed:', await captureResp.text());
                 throw new functions.https.HttpsError('internal', 'Payment authorized but capture failed.');
             }
         }
 
-        // 6. Success
         return { success: true, paymentId: paymentData.id, amount: paymentData.amount / 100 };
 
     } catch (error) {

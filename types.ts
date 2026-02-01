@@ -1,5 +1,4 @@
 
-
 export enum UserRole {
   ADMIN = 'ADMIN',
   STAFF = 'STAFF',
@@ -224,6 +223,8 @@ export interface PaymentEntry {
   receiptNumber?: string;
   recordedBy: string;
   companyId?: string;
+  verificationStatus?: 'VERIFIED' | 'FAILED_VERIFY' | 'PENDING';
+  source?: 'WEBHOOK' | 'MANUAL' | 'SYSTEM';
 }
 
 export type CancellationType = 'FREE' | 'PARTIAL' | 'NON_REFUNDABLE';

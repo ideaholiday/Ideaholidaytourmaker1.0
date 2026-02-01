@@ -23,10 +23,8 @@ class BookingService {
   }
   
   async getBooking(id: string): Promise<Booking | null> {
-    // Prefer cache if fresh logic existed, but for now simple fetch
     const booking = await dbHelper.getById<Booking>(COLLECTION, id);
     if(booking) {
-        // Update cache
         const idx = this.bookingsCache.findIndex(b => b.id === id);
         if(idx !== -1) this.bookingsCache[idx] = booking;
         else this.bookingsCache.push(booking);
@@ -40,7 +38,6 @@ class BookingService {
 
   async getBookingsForOperator(operatorId: string): Promise<Booking[]> {
     const all = await this.getAllBookings();
-    // FIX: Allow REQUESTED bookings to be seen if assigned to this operator
     return all.filter(b => b.operatorId === operatorId && b.status !== 'REJECTED');
   }
 
@@ -74,10 +71,8 @@ class BookingService {
 
       agentId: quote.agentId || '',
       agentName: quote.agentName || 'Unknown Agent',
-      // FIX: Ensure undefined becomes null for Firestore
       staffId: quote.staffId || null, 
       
-      // FIX: Ensure undefined becomes null for Firestore
       operatorId: quote.operatorId || null,
       operatorName: quote.operatorName || null,
       
@@ -98,7 +93,6 @@ class BookingService {
 
     await dbHelper.save(COLLECTION, newBooking);
     
-    // Update Quote status
     await agentService.updateQuote({ ...quote, status: 'BOOKED' });
     this.syncAllBookings();
 
@@ -133,7 +127,15 @@ class BookingService {
     this.syncAllBookings();
   }
 
-  async recordPayment(bookingId: string, amount: number, mode: PaymentMode, reference: string, user: User) {
+  async recordPayment(
+      bookingId: string, 
+      amount: number, 
+      mode: PaymentMode, 
+      reference: string, 
+      user: User,
+      verificationStatus: 'VERIFIED' | 'FAILED_VERIFY' | 'PENDING' = 'VERIFIED',
+      source: 'WEBHOOK' | 'MANUAL' | 'SYSTEM' = 'MANUAL'
+  ) {
       const booking = await this.getBooking(bookingId);
       if (!booking) return;
 
@@ -150,7 +152,9 @@ class BookingService {
           reference,
           receiptNumber,
           recordedBy: user.id,
-          companyId
+          companyId,
+          verificationStatus, // Save extended fields
+          source
       };
 
       const newPaid = booking.paidAmount + amount;
