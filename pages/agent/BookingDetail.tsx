@@ -1,15 +1,14 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { bookingService } from '../../services/bookingService';
 import { gstService } from '../../services/gstService';
-import { Booking, Message, UserRole } from '../../types';
+import { Booking, UserRole, BookingOpsDetails } from '../../types';
 import { ItineraryView } from '../../components/ItineraryView';
 import { BookingStatusTimeline } from '../../components/booking/BookingStatusTimeline';
 import { PaymentPanel } from '../../components/booking/PaymentPanel';
 import { CancellationRequestModal } from '../../components/booking/CancellationRequestModal';
-import { ArrowLeft, MapPin, Calendar, Users, DollarSign, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Users, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText, Eye, EyeOff, Truck, Phone, Briefcase, Info, Save, Loader2, Edit2, User } from 'lucide-react';
 import { generateQuotePDF, generateInvoicePDF } from '../../utils/pdfGenerator';
 
 export const BookingDetail: React.FC = () => {
@@ -20,12 +19,23 @@ export const BookingDetail: React.FC = () => {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [hasInvoice, setHasInvoice] = useState(false);
 
+  // View Mode
+  const [viewMode, setViewMode] = useState<'INTERNAL' | 'CLIENT'>('INTERNAL');
+  const [publicNote, setPublicNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  
+  // Ops Edit State
+  const [isOpsEditing, setIsOpsEditing] = useState(false);
+  const [opsData, setOpsData] = useState<BookingOpsDetails>({});
+
   useEffect(() => {
     const load = async () => {
         if (id) {
             const found = await bookingService.getBooking(id);
             setBooking(found || null);
             if(found) {
+                setPublicNote(found.publicNote || '');
+                setOpsData(found.opsDetails || {});
                 gstService.getInvoiceByBooking(found.id).then(inv => setHasInvoice(!!inv));
             }
         }
@@ -36,22 +46,23 @@ export const BookingDetail: React.FC = () => {
   if (!booking || !user) return <div className="p-8 text-center">Loading Booking...</div>;
 
   const isAdminOrStaff = user.role === UserRole.ADMIN || user.role === UserRole.STAFF;
+  const isAgent = user.role === UserRole.AGENT;
   const backLink = isAdminOrStaff ? '/admin/bookings' : '/agent/dashboard';
   const backLabel = isAdminOrStaff ? 'Back to Booking Manager' : 'Back to Dashboard';
 
+  const canToggleView = isAgent || isAdminOrStaff;
+  const showInternal = canToggleView && viewMode === 'INTERNAL';
+  
+  const bookingStatus = booking.status || 'REQUESTED'; // Safety fallback
+
   const handleDownloadPDF = () => {
-      const mockQuote: any = {
-          ...booking,
-          uniqueRefNo: booking.uniqueRefNo,
-          itinerary: booking.itinerary
-      };
-      
       const breakdown: any = {
           finalPrice: booking.sellingPrice,
-          perPersonPrice: booking.sellingPrice / booking.paxCount
+          perPersonPrice: booking.sellingPrice / booking.paxCount,
+          supplierCost: 0,
+          platformNetCost: 0,
       };
-      
-      generateQuotePDF(mockQuote, breakdown, user.role, user);
+      generateQuotePDF(booking as any, breakdown, user.role, user);
   };
 
   const handleDownloadInvoice = async () => {
@@ -67,16 +78,8 @@ export const BookingDetail: React.FC = () => {
       const domain = user.customDomain || window.location.host;
       const protocol = window.location.protocol;
       const url = `${protocol}//${domain}/#/view/${booking.id}`;
-      
       navigator.clipboard.writeText(url);
-      
-      let msg = `Public Client Link copied!\n\n${url}`;
-      if (user.customDomain) {
-          msg += `\n\n✅ Using your custom domain: ${user.customDomain}`;
-      } else {
-          msg += `\n\n💡 Tip: Configure a custom domain in your profile to hide the platform URL.`;
-      }
-      alert(msg);
+      alert("Public Link copied to clipboard!");
   };
 
   const handleCancellationRequest = async (reason: string) => {
@@ -85,28 +88,69 @@ export const BookingDetail: React.FC = () => {
       const updated = await bookingService.getBooking(booking.id);
       setBooking(updated || null);
   };
+  
+  const handleSavePublicNote = async () => {
+      if (!booking) return;
+      setIsSavingNote(true);
+      await bookingService.updateBooking({ ...booking, publicNote });
+      setIsSavingNote(false);
+      alert("Client note saved.");
+  };
 
-  const isCancellable = ['CONFIRMED', 'BOOKED', 'IN_PROGRESS'].includes(booking.status);
-  const isCancelled = booking.status.includes('CANCEL') || booking.status === 'CANCELLATION_REQUESTED';
+  const handleSaveOps = async () => {
+      if(!booking) return;
+      await bookingService.updateBooking({ ...booking, opsDetails: opsData });
+      setIsOpsEditing(false);
+      alert("Operational details updated.");
+  };
+
+  const isCancellable = ['CONFIRMED', 'BOOKED', 'IN_PROGRESS'].includes(bookingStatus);
+  const isCancelled = bookingStatus.includes('CANCEL') || bookingStatus === 'CANCELLATION_REQUESTED';
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <button onClick={() => navigate(backLink)} className="flex items-center text-slate-500 hover:text-slate-800 mb-6">
-        <ArrowLeft size={18} className="mr-1" /> {backLabel}
-      </button>
+      <div className="flex justify-between items-center mb-6">
+        <button onClick={() => navigate(backLink)} className="flex items-center text-slate-500 hover:text-slate-800">
+            <ArrowLeft size={18} className="mr-1" /> {backLabel}
+        </button>
+
+        {canToggleView && (
+            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                <button 
+                    onClick={() => setViewMode('INTERNAL')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition ${viewMode === 'INTERNAL' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    <Eye size={14} /> Internal View
+                </button>
+                <button 
+                    onClick={() => setViewMode('CLIENT')}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition ${viewMode === 'CLIENT' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    <EyeOff size={14} /> Client View
+                </button>
+            </div>
+        )}
+      </div>
+
+      {!showInternal && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
+                <EyeOff size={18} />
+                <strong>Client Preview Mode:</strong> Viewing as your customer sees it. Internal costs and operational details are hidden.
+            </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden mb-8">
         <div className="bg-slate-900 text-white p-6 flex flex-col md:flex-row justify-between items-center">
             <div>
                 <div className="flex items-center gap-3">
                     <h1 className="text-xl font-bold">Booking #{booking.uniqueRefNo}</h1>
-                    {isCancelled && <span className="bg-red-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase">{booking.status.replace('_', ' ')}</span>}
+                    {isCancelled && <span className="bg-red-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase">{bookingStatus.replace('_', ' ')}</span>}
                 </div>
                 <div className="flex gap-4 mt-2 text-sm text-slate-300">
                     <span className="flex items-center gap-1"><MapPin size={14}/> {booking.destination}</span>
                     <span className="flex items-center gap-1"><Calendar size={14}/> {booking.travelDate}</span>
                     <span className="flex items-center gap-1"><Users size={14}/> {booking.paxCount} Pax</span>
-                    {isAdminOrStaff && (
+                    {showInternal && isAdminOrStaff && (
                         <span className="flex items-center gap-1 text-yellow-400 font-bold ml-2">
                              Operator: {booking.operatorName || 'Unassigned'}
                         </span>
@@ -114,15 +158,17 @@ export const BookingDetail: React.FC = () => {
                 </div>
             </div>
             <div className="mt-4 md:mt-0 flex gap-2">
-                {hasInvoice && (
+                {hasInvoice && showInternal && (
                     <button onClick={handleDownloadInvoice} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition font-medium">
                         <FileText size={16} /> Tax Invoice
                     </button>
                 )}
-                <button onClick={handleShareClientLink} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition font-medium shadow-sm">
-                    <Globe size={16} /> Client Live Link
-                </button>
-                {isCancellable && (
+                {showInternal && (
+                    <button onClick={handleShareClientLink} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition font-medium shadow-sm">
+                        <Globe size={16} /> Client Live Link
+                    </button>
+                )}
+                {isCancellable && showInternal && (
                     <button 
                         onClick={() => setIsCancelModalOpen(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-red-600/90 hover:bg-red-600 text-white rounded-lg text-sm transition font-medium"
@@ -137,56 +183,191 @@ export const BookingDetail: React.FC = () => {
         </div>
 
         {/* Cancellation Banner */}
-        {booking.status === 'CANCELLATION_REQUESTED' && (
+        {bookingStatus === 'CANCELLATION_REQUESTED' && showInternal && (
             <div className="bg-amber-50 border border-amber-200 p-4 flex items-center gap-3 text-amber-800 text-sm">
                 <AlertTriangle size={20} />
                 <p><strong>Cancellation Requested:</strong> Your request is under review by the admin team. Final refund amount (if any) will be updated shortly.</p>
             </div>
         )}
 
-        {/* Refund Details */}
-        {booking.status.includes('CANCELLED') && booking.cancellation?.refundAmount !== undefined && (
-            <div className="bg-slate-50 border-b border-slate-200 p-6 flex justify-between items-center">
-                <div>
-                    <h3 className="font-bold text-slate-900">Cancellation Summary</h3>
-                    <p className="text-sm text-slate-500">Processed on {new Date(booking.cancellation.processedAt!).toLocaleDateString()}</p>
-                </div>
-                <div className="text-right">
-                    <p className="text-xs text-slate-500 uppercase">Refund Amount</p>
-                    <p className={`text-xl font-bold ${booking.cancellation.refundAmount > 0 ? 'text-green-600' : 'text-slate-600'}`}>
-                        {booking.currency} {booking.cancellation.refundAmount.toLocaleString()}
-                    </p>
-                    <p className="text-xs font-medium text-slate-400">{booking.cancellation.refundStatus}</p>
-                </div>
-            </div>
-        )}
-
         {!isCancelled && (
             <div className="bg-slate-50 border-b border-slate-200">
-                <BookingStatusTimeline status={booking.status} />
-            </div>
-        )}
-
-        {/* Privacy Note for Agent */}
-        {!isAdminOrStaff && (
-            <div className="bg-blue-50 px-6 py-2 border-b border-blue-100 flex items-center gap-2 text-xs text-blue-700">
-                <ShieldCheck size={14} />
-                <span><strong>Privacy Active:</strong> The generated Client Link hides Idea Holiday branding and uses your agency details.</span>
+                <BookingStatusTimeline status={bookingStatus} />
             </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3">
-            <div className="lg:col-span-2 p-6 border-r border-slate-200">
-                <h2 className="text-lg font-bold text-slate-900 mb-4">Itinerary & Services</h2>
-                <ItineraryView itinerary={booking.itinerary} />
+            <div className="lg:col-span-2 p-6 border-r border-slate-200 space-y-6">
+                
+                {/* Public Note / Client Remarks */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
+                            <FileText size={18} className="text-slate-400" /> 
+                            {showInternal ? "Remarks for Client" : "Important Notes"}
+                    </h2>
+                    {showInternal ? (
+                        <div>
+                            <textarea 
+                                className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none mb-2"
+                                rows={3}
+                                placeholder="Enter notes visible to the client (e.g. Voucher will be sent via email...)"
+                                value={publicNote}
+                                onChange={(e) => setPublicNote(e.target.value)}
+                            />
+                            <div className="flex justify-end">
+                                <button 
+                                    onClick={handleSavePublicNote}
+                                    disabled={isSavingNote}
+                                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded font-bold transition disabled:opacity-50"
+                                >
+                                    {isSavingNote ? 'Saving...' : 'Save Note'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        publicNote ? (
+                            <p className="text-sm text-slate-600 whitespace-pre-line bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                {publicNote}
+                            </p>
+                        ) : (
+                            <p className="text-sm text-slate-400 italic">No additional notes.</p>
+                        )
+                    )}
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 className="text-lg font-bold text-slate-900 mb-4">Itinerary & Services</h2>
+                    <ItineraryView itinerary={booking.itinerary} />
+                </div>
             </div>
 
-            <div className="lg:col-span-1 p-6">
-                <PaymentPanel 
-                    booking={booking}
-                    user={user}
-                    onRecordPayment={() => {}} 
-                />
+            <div className="lg:col-span-1 p-6 space-y-6">
+                
+                {/* OPS MANAGEMENT PANEL - ADMIN ONLY */}
+                {showInternal && isAdminOrStaff && (
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                         <div className="bg-purple-50 p-4 border-b border-purple-100 flex justify-between items-center">
+                             <h3 className="font-bold text-purple-900 flex items-center gap-2">
+                                 <Truck size={18} /> Operations Info
+                             </h3>
+                             {!isOpsEditing ? (
+                                 <button onClick={() => setIsOpsEditing(true)} className="text-xs font-bold text-purple-700 hover:text-purple-900 flex items-center gap-1">
+                                     <Edit2 size={12}/> Edit
+                                 </button>
+                             ) : (
+                                 <button onClick={handleSaveOps} className="text-xs font-bold text-green-600 hover:text-green-800 flex items-center gap-1">
+                                     <Save size={12}/> Save
+                                 </button>
+                             )}
+                         </div>
+                         <div className="p-4 space-y-4 text-sm">
+                             <div>
+                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Driver Details</label>
+                                 {isOpsEditing ? (
+                                     <div className="space-y-2">
+                                         <input type="text" placeholder="Driver Name" className="w-full border p-2 rounded text-xs" value={opsData.driverName || ''} onChange={e => setOpsData({...opsData, driverName: e.target.value})} />
+                                         <input type="text" placeholder="Phone" className="w-full border p-2 rounded text-xs" value={opsData.driverPhone || ''} onChange={e => setOpsData({...opsData, driverPhone: e.target.value})} />
+                                     </div>
+                                 ) : (
+                                     <div className="text-slate-700">
+                                         <p className="font-medium">{opsData.driverName || 'Not Assigned'}</p>
+                                         <p className="text-xs text-slate-500">{opsData.driverPhone}</p>
+                                     </div>
+                                 )}
+                             </div>
+                             
+                             <div>
+                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Vehicle</label>
+                                 {isOpsEditing ? (
+                                     <div className="space-y-2">
+                                         <input type="text" placeholder="Model (e.g. Innova)" className="w-full border p-2 rounded text-xs" value={opsData.vehicleModel || ''} onChange={e => setOpsData({...opsData, vehicleModel: e.target.value})} />
+                                         <input type="text" placeholder="Plate Number" className="w-full border p-2 rounded text-xs" value={opsData.vehicleNumber || ''} onChange={e => setOpsData({...opsData, vehicleNumber: e.target.value})} />
+                                     </div>
+                                 ) : (
+                                     <div className="text-slate-700">
+                                         <p>{opsData.vehicleModel || '-'}</p>
+                                         <p className="text-xs text-slate-500">{opsData.vehicleNumber}</p>
+                                     </div>
+                                 )}
+                             </div>
+
+                             <div>
+                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tour Manager / Guide</label>
+                                 {isOpsEditing ? (
+                                     <div className="space-y-2">
+                                          <input type="text" placeholder="Manager Name" className="w-full border p-2 rounded text-xs" value={opsData.tourManagerName || ''} onChange={e => setOpsData({...opsData, tourManagerName: e.target.value})} />
+                                          <input type="text" placeholder="Manager Phone" className="w-full border p-2 rounded text-xs" value={opsData.tourManagerPhone || ''} onChange={e => setOpsData({...opsData, tourManagerPhone: e.target.value})} />
+                                          <input type="text" placeholder="Guide Name" className="w-full border p-2 rounded text-xs" value={opsData.tourGuideName || ''} onChange={e => setOpsData({...opsData, tourGuideName: e.target.value})} />
+                                     </div>
+                                 ) : (
+                                     <div className="text-slate-700 space-y-2">
+                                         {opsData.tourManagerName && (
+                                             <div>
+                                                 <p className="font-medium flex items-center gap-1"><Briefcase size={12}/> {opsData.tourManagerName}</p>
+                                                 <p className="text-xs text-slate-500 pl-4">{opsData.tourManagerPhone}</p>
+                                             </div>
+                                         )}
+                                         {opsData.tourGuideName && (
+                                             <div>
+                                                 <p className="font-medium flex items-center gap-1"><User size={12} /> {opsData.tourGuideName}</p>
+                                             </div>
+                                         )}
+                                         {!opsData.tourManagerName && !opsData.tourGuideName && <span className="text-slate-400 italic">No details added</span>}
+                                     </div>
+                                 )}
+                             </div>
+                             
+                             <div>
+                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Internal Remarks</label>
+                                 {isOpsEditing ? (
+                                     <textarea rows={3} className="w-full border p-2 rounded text-xs" placeholder="Operational notes..." value={opsData.otherNotes || ''} onChange={e => setOpsData({...opsData, otherNotes: e.target.value})} />
+                                 ) : (
+                                     <p className="text-xs text-slate-600 italic bg-slate-50 p-2 rounded border border-slate-100">{opsData.otherNotes || 'No remarks.'}</p>
+                                 )}
+                             </div>
+                         </div>
+                    </div>
+                )}
+
+                {/* READ ONLY OPS VIEW FOR AGENTS */}
+                {showInternal && isAgent && opsData.driverName && (
+                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                         <div className="bg-green-50 p-4 border-b border-green-100">
+                             <h3 className="font-bold text-green-900 flex items-center gap-2">
+                                 <Truck size={18} /> Driver & Trip Details
+                             </h3>
+                         </div>
+                         <div className="p-4 space-y-3 text-sm">
+                             <div className="flex justify-between">
+                                 <span className="text-slate-500">Driver:</span>
+                                 <span className="font-medium text-slate-900">{opsData.driverName}</span>
+                             </div>
+                             <div className="flex justify-between">
+                                 <span className="text-slate-500">Contact:</span>
+                                 <span className="font-medium text-slate-900">{opsData.driverPhone}</span>
+                             </div>
+                             <div className="flex justify-between">
+                                 <span className="text-slate-500">Vehicle:</span>
+                                 <span className="font-medium text-slate-900">{opsData.vehicleModel} ({opsData.vehicleNumber})</span>
+                             </div>
+                              {opsData.tourManagerName && (
+                                 <div className="flex justify-between border-t border-slate-100 pt-2 mt-2">
+                                     <span className="text-slate-500">Tour Manager:</span>
+                                     <span className="font-medium text-slate-900">{opsData.tourManagerName} ({opsData.tourManagerPhone})</span>
+                                 </div>
+                             )}
+                         </div>
+                     </div>
+                )}
+
+                {showInternal && (
+                    <PaymentPanel 
+                        booking={booking}
+                        user={user}
+                        onRecordPayment={() => {}} 
+                    />
+                )}
+                
             </div>
         </div>
       </div>

@@ -64,7 +64,7 @@ export const BookingPaymentModal: React.FC<Props> = ({
                 <h2 className="text-4xl font-bold text-slate-900 mt-1">{currency} {amountToPay.toLocaleString()}</h2>
                 {markup > 0 && (
                     <div className="mt-2 pt-2 border-t border-blue-200 text-xs text-slate-600 flex justify-center gap-2">
-                        <span>Selling Price: {currency} {sellingPrice.toLocaleString()}</span>
+                        <span>Client Price: {currency} {sellingPrice.toLocaleString()}</span>
                         <span className="text-green-600 font-bold">• Profit Retained: {currency} {markup.toLocaleString()}</span>
                     </div>
                 )}

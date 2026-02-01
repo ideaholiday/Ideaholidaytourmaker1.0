@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { BookingStatus } from '../../types';
 import { Check, Clock, Play, Flag, XCircle, AlertCircle } from 'lucide-react';
@@ -16,16 +15,18 @@ const STEPS: { status: BookingStatus; label: string; icon: any }[] = [
 ];
 
 export const BookingStatusTimeline: React.FC<Props> = ({ status }) => {
-  if (status === 'CANCELLED_NO_REFUND' || status === 'CANCELLED_WITH_REFUND' || status === 'REJECTED') {
+  const safeStatus = status || 'REQUESTED'; // Fallback
+
+  if (safeStatus === 'CANCELLED_NO_REFUND' || safeStatus === 'CANCELLED_WITH_REFUND' || safeStatus === 'REJECTED') {
       return (
           <div className="bg-red-50 p-4 rounded-lg flex items-center justify-center gap-2 text-red-700 font-bold border border-red-200">
               <XCircle size={20} />
-              Booking {status.replace(/_/g, ' ')}
+              Booking {safeStatus.replace(/_/g, ' ')}
           </div>
       );
   }
 
-  if (status === 'ON_HOLD') {
+  if (safeStatus === 'ON_HOLD') {
       return (
           <div className="bg-amber-50 p-4 rounded-lg flex items-center justify-center gap-2 text-amber-700 font-bold border border-amber-200">
               <AlertCircle size={20} />
@@ -34,7 +35,7 @@ export const BookingStatusTimeline: React.FC<Props> = ({ status }) => {
       );
   }
 
-  const currentIdx = STEPS.findIndex(s => s.status === status);
+  const currentIdx = STEPS.findIndex(s => s.status === safeStatus);
   // If status not in main flow (e.g. specialized state), default to 0
   const activeIndex = currentIdx === -1 ? 0 : currentIdx;
 

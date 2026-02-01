@@ -29,7 +29,7 @@ export const razorpayWebhook = functions.https.onRequest(async (req: any, res: a
   const signature = req.headers['x-razorpay-signature'];
   
   // Firebase Functions parses body automatically, but we need the raw buffer for signature verification
-  // req.rawBody is available in Firebase Cloud Functions
+  // req.rawBody is available in Firebase Cloud Functions if configured, else construct manually
   const body = req.rawBody;
 
   if (!signature || !body) {
@@ -94,23 +94,39 @@ async function handleBookingPayment(bookingId: string, paymentId: string, amount
     const booking = bookingSnap.data();
     const payments = booking?.payments || [];
     
+    // Check if payment already exists (via Optimistic update)
+    // The frontend creates a reference like "Gateway: pay_123..."
     const existingIndex = payments.findIndex((p: any) => p.reference && p.reference.includes(paymentId));
     
     if (existingIndex > -1) {
-        if (payments[existingIndex].verificationStatus !== 'VERIFIED') {
+        // Payment exists! Update it to verified if not already.
+        // This handles the "Success but Verify" flow.
+        const currentPay = payments[existingIndex];
+        
+        if (currentPay.verificationStatus !== 'VERIFIED') {
              console.log(`Updating existing payment ${paymentId} to VERIFIED`);
-             payments[existingIndex].verificationStatus = 'VERIFIED';
-             payments[existingIndex].source = 'RAZORPAY_WEBHOOK';
-             transaction.update(bookingRef, { payments: payments });
+             
+             // Create modified array to update just this item
+             const updatedPayments = [...payments];
+             updatedPayments[existingIndex] = {
+                 ...currentPay,
+                 verificationStatus: 'VERIFIED',
+                 source: 'RAZORPAY_WEBHOOK_VERIFIED'
+             };
+             
+             transaction.update(bookingRef, { payments: updatedPayments });
+        } else {
+             console.log(`Payment ${paymentId} already verified. Skipping.`);
         }
         return;
     }
 
-    console.log(`Creating missing payment record for ${paymentId}`);
+    console.log(`Creating NEW payment record via Webhook for ${paymentId}`);
     
     const newPaid = (booking?.paidAmount || 0) + amount;
     let newStatus = booking?.paymentStatus;
-    if (newPaid >= (booking?.totalAmount || 0)) newStatus = 'PAID_IN_FULL';
+    // Allow tiny rounding buffer
+    if (newPaid >= ((booking?.totalAmount || 0) - 0.5)) newStatus = 'PAID_IN_FULL';
     else if (newPaid > 0) newStatus = 'PARTIALLY_PAID';
 
     const paymentEntry = {
@@ -128,7 +144,7 @@ async function handleBookingPayment(bookingId: string, paymentId: string, amount
 
     transaction.update(bookingRef, {
         paidAmount: newPaid,
-        balanceAmount: (booking?.totalAmount || 0) - newPaid,
+        balanceAmount: Math.max(0, (booking?.totalAmount || 0) - newPaid),
         paymentStatus: newStatus,
         payments: admin.firestore.FieldValue.arrayUnion(paymentEntry),
         updatedAt: new Date().toISOString()
@@ -139,12 +155,16 @@ async function handleBookingPayment(bookingId: string, paymentId: string, amount
 async function handleWalletTopup(userId: string, paymentId: string, amount: number) {
   const userRef = db.collection('users').doc(userId);
   
+  // Idempotency check using audit logs
   const existingLogs = await db.collection('audit_logs')
         .where('entityId', '==', paymentId)
         .where('action', '==', 'WALLET_TOPUP')
         .get();
         
-  if (!existingLogs.empty) return;
+  if (!existingLogs.empty) {
+      console.log(`Wallet Topup ${paymentId} already processed.`);
+      return;
+  }
 
   await userRef.update({
     walletBalance: admin.firestore.FieldValue.increment(amount),

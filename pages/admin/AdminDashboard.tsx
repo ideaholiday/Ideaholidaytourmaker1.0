@@ -59,15 +59,21 @@ export const AdminDashboard: React.FC = () => {
       if(!newNote.content) return;
       
       setIsNoteSubmitting(true);
-      await adminService.saveNotification({
-          ...newNote,
-          isActive: true
-      });
-      setNewNote({ content: '', link: '', type: 'INFO' });
-      setIsNoteSubmitting(false);
-      // Refresh list logic (either full reload or append local)
-      const all = await adminService.getActiveNotifications();
-      setNotifications(all);
+      try {
+          await adminService.saveNotification({
+              ...newNote,
+              isActive: true
+          });
+          setNewNote({ content: '', link: '', type: 'INFO' });
+          // Refresh list
+          const all = await adminService.getActiveNotifications();
+          setNotifications(all);
+      } catch (error) {
+          console.error("Failed to post notification", error);
+          alert("Failed to post notification. Check console.");
+      } finally {
+          setIsNoteSubmitting(false);
+      }
   };
 
   const handleDeleteNotification = async (id: string) => {
@@ -155,7 +161,7 @@ export const AdminDashboard: React.FC = () => {
                   <button 
                     type="submit" 
                     disabled={isNoteSubmitting}
-                    className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 rounded-lg text-sm transition"
+                    className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 rounded-lg text-sm transition disabled:opacity-50"
                   >
                       {isNoteSubmitting ? 'Posting...' : 'Post to Ticker'}
                   </button>

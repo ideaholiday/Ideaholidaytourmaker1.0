@@ -203,6 +203,7 @@ export interface Quote {
   status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'PENDING' | 'CONFIRMED' | 'BOOKED' | 'CANCELLED' | 'IN_PROGRESS' | 'COMPLETED' | 'ESTIMATE';
   
   messages: Message[];
+  publicNote?: string; // Note visible to client
   
   hotelMode?: 'CMS' | 'REF';
   childCount?: number;
@@ -259,6 +260,19 @@ export interface DriverDetails {
   vehicleNumber: string;
 }
 
+// Enhanced Ops Details for Booking
+export interface BookingOpsDetails {
+  driverName?: string;
+  driverPhone?: string;
+  vehicleModel?: string;
+  vehicleNumber?: string;
+  tourGuideName?: string;
+  tourGuidePhone?: string;
+  tourManagerName?: string;
+  tourManagerPhone?: string;
+  otherNotes?: string;
+}
+
 export interface Booking {
   id: string;
   quoteId: string;
@@ -299,11 +313,16 @@ export interface Booking {
   companyId?: string;
 
   comments: Message[];
+  publicNote?: string; // Note visible to client
+  
+  // Ops Info
+  opsDetails?: BookingOpsDetails;
+  
   createdAt: string;
   updatedAt: string;
   
   cancellation?: CancellationDetails;
-  driverDetails?: DriverDetails;
+  driverDetails?: DriverDetails; // Legacy (can map to opsDetails)
   remindersDisabled?: boolean;
 }
 

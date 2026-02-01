@@ -187,8 +187,8 @@ class AdminService {
 
   async saveUser(user: Partial<User>) {
       if (!user.id) throw new Error("User ID required");
-      // @ts-ignore
-      await dbHelper.save(COLLECTIONs.USERS, user);
+      // Fixed Typo: COLLECTIONs -> COLLECTIONS
+      await dbHelper.save(COLLECTIONS.USERS, user as User);
       this.syncAllFromCloud();
   }
   async deleteUser(id: string) { await dbHelper.delete(COLLECTIONS.USERS, id); this.syncAllFromCloud(); }
@@ -205,8 +205,8 @@ class AdminService {
           notif.id = `msg_${Date.now()}`;
           notif.createdAt = new Date().toISOString();
       }
-      // @ts-ignore
-      await dbHelper.save(COLCTIONS.NOTIFICATIONS, notif);
+      // Fixed Typo: COLCTIONS -> COLLECTIONS
+      await dbHelper.save(COLLECTIONS.NOTIFICATIONS, notif as SystemNotification);
       // Refresh cache in background
       const all = await dbHelper.getAll<SystemNotification>(COLLECTIONS.NOTIFICATIONS);
       this.cache.notifications = all;

@@ -1,3 +1,4 @@
+
 import { User, UserRole, UserStatus } from '../types';
 import { adminService } from './adminService'; // To reuse User CRUD
 import { agentService } from './agentService';
@@ -118,8 +119,12 @@ class ProfileService {
 
   getAdminDashboardStats() {
     const users = adminService.getUsersSync();
+    
     const agents = users.filter(u => u.role === UserRole.AGENT).length;
     const operators = users.filter(u => u.role === UserRole.OPERATOR).length;
+    const partners = users.filter(u => u.role === UserRole.HOTEL_PARTNER).length;
+    const staff = users.filter(u => u.role === UserRole.STAFF).length;
+
     const bookings = bookingService.getAllBookingsSync();
     
     const activeBookings = bookings.filter(b => ['CONFIRMED', 'IN_PROGRESS'].includes(b.status));
@@ -129,6 +134,8 @@ class ProfileService {
     return {
       totalAgents: agents,
       totalOperators: operators,
+      totalPartners: partners,
+      totalStaff: staff,
       activeBookings: activeBookings.length,
       totalRevenue,
       pendingPayments

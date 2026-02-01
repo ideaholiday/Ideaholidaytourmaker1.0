@@ -5,7 +5,7 @@ import { bookingService } from '../../services/bookingService';
 // import { profileService } from '../../services/profileService'; // Removed sync service dependency
 import { agentService } from '../../services/agentService'; 
 import { Booking, Quote, User, UserRole, Traveler, PricingBreakdown } from '../../types';
-import { MapPin, Calendar, Users, CheckCircle, Briefcase, ArrowRight, CreditCard, ShieldCheck, Download, Printer } from 'lucide-react';
+import { MapPin, Calendar, Users, CheckCircle, Briefcase, ArrowRight, CreditCard, ShieldCheck, Download, Printer, FileText } from 'lucide-react';
 import { generateQuotePDF } from '../../utils/pdfGenerator';
 import { ClientPortalLayout } from '../../components/client/ClientPortalLayout';
 import { AgentContactCard } from '../../components/client/AgentContactCard';
@@ -152,6 +152,18 @@ const TripContent: React.FC<{
                           </div>
                       </div>
                   </div>
+                  
+                  {/* Public Note (If Exists) */}
+                  {data.publicNote && (
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-6">
+                          <h3 className="font-bold text-blue-900 text-lg mb-2 flex items-center gap-2">
+                              <FileText size={20} /> Important Information
+                          </h3>
+                          <p className="text-blue-800 text-sm whitespace-pre-line leading-relaxed">
+                              {data.publicNote}
+                          </p>
+                      </div>
+                  )}
 
                   {/* Itinerary */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { bookingService } from '../../services/bookingService';
 import { bookingOperatorService } from '../../services/bookingOperatorService';
@@ -66,6 +65,8 @@ export const BookingManager: React.FC = () => {
         
       if (!matchSearch) return false;
 
+      const safeStatus = b.status || '';
+
       // 2. Tab Filter
       if (activeTab === 'ALL') return true;
       
@@ -73,16 +74,16 @@ export const BookingManager: React.FC = () => {
           // Paid (at least advance) AND (Unassigned OR Declined)
           const isPaid = b.paymentStatus === 'ADVANCE_PAID' || b.paymentStatus === 'PAID_IN_FULL' || b.paymentStatus === 'PARTIALLY_PAID';
           const isUnassigned = !b.operatorId || b.operatorStatus === 'DECLINED';
-          const notCancelled = !b.status.includes('CANCEL') && b.status !== 'REJECTED';
+          const notCancelled = !safeStatus.includes('CANCEL') && safeStatus !== 'REJECTED';
           return isPaid && isUnassigned && notCancelled;
       }
 
       if (activeTab === 'ASSIGNED') {
-          return !!b.operatorId && b.status !== 'COMPLETED';
+          return !!b.operatorId && safeStatus !== 'COMPLETED';
       }
 
       if (activeTab === 'COMPLETED') {
-          return b.status === 'COMPLETED';
+          return safeStatus === 'COMPLETED';
       }
 
       return true;
@@ -92,7 +93,7 @@ export const BookingManager: React.FC = () => {
   const countReady = bookings.filter(b => 
       (b.paymentStatus === 'ADVANCE_PAID' || b.paymentStatus === 'PAID_IN_FULL' || b.paymentStatus === 'PARTIALLY_PAID') && 
       (!b.operatorId || b.operatorStatus === 'DECLINED') && 
-      !b.status.includes('CANCEL')
+      !(b.status || '').includes('CANCEL')
   ).length;
 
   if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.STAFF)) return <div>Unauthorized</div>;

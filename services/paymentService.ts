@@ -67,6 +67,7 @@ class PaymentService {
 
       if (amountToPay <= 0) throw new Error("No pending balance to pay.");
 
+      // Create Order (Simulated locally, or call backend)
       const order = await this.createPaymentOrder(booking.id, amountToPay, currency);
 
       this.openRazorpay(
@@ -86,25 +87,30 @@ class PaymentService {
               refNo: booking.uniqueRefNo
           },
           async (response) => {
-              // 1. Optimistic Success Callback to UI
-              onSuccess(response.razorpay_payment_id);
-              
-              // 2. Background Backend Verification
+              const paymentId = response.razorpay_payment_id;
+
+              // OPTIMISTIC PAYMENT RECORDING
+              // We record the payment immediately in Firestore so the UI updates instantly.
+              // The backend webhook will process this later and confirm it.
               try {
-                  await this.verifyPayment(response, booking, amountToPay, type);
-                  console.log("Backend verification successful.");
-              } catch (e: any) {
-                  console.warn("Backend verification failed (Optimistic Flow). Relying on Webhook.", e);
-                  
-                  // 3. Fallback Record: Save as FAILED_VERIFY so admin sees the attempt
                   await bookingService.recordPayment(
                       booking.id,
                       amountToPay,
                       'ONLINE',
-                      `Gateway: ${response.razorpay_payment_id}`,
-                      { id: 'sys_fallback', name: 'System', role: 'ADMIN' } as any,
-                      'FAILED_VERIFY' // Status indicating webhook needs to fix this
+                      `Gateway: ${paymentId}`,
+                      { id: 'frontend_optimistic', name: 'System', role: 'ADMIN' } as any,
+                      'VERIFIED', // Optimistically mark valid. Webhook will double check.
+                      'MANUAL'
                   );
+                  
+                  // Trigger success callback to navigate/update UI
+                  onSuccess(paymentId);
+                  
+              } catch (e) {
+                  console.error("Optimistic recording failed", e);
+                  // Even if local record fails, if payment went through, webhook will catch it.
+                  // Still verify with user.
+                  onSuccess(paymentId); 
               }
           },
           onFailure
@@ -145,8 +151,7 @@ class PaymentService {
                   const paymentId = response.razorpay_payment_id;
                   
                   try {
-                      // 1. Log Attempt immediately (Processing State)
-                      // This ensures a record exists even if verification crashes
+                      // 1. Log Attempt
                       await auditLogService.logAction({
                           entityType: 'PAYMENT',
                           entityId: paymentId,
@@ -156,13 +161,11 @@ class PaymentService {
                           newValue: { amount: amount, gatewayId: paymentId }
                       });
 
-                      // 2. Verify with Server
-                      await this.verifyWalletPayment(response, user, amount);
-                      
-                      // 3. Update DB Balance (Source of Truth)
+                      // 2. Optimistic Balance Update
+                      // We trust the success callback for immediate UI feedback.
                       const newBalance = await agentService.addWalletFunds(user.id, amount);
 
-                      // 4. Log Success (Updates the previous log logic effectively by adding new entry)
+                      // 3. Log Success
                       await auditLogService.logAction({
                           entityType: 'PAYMENT',
                           entityId: paymentId,
@@ -176,27 +179,14 @@ class PaymentService {
                           }
                       });
 
-                      // 5. Update UI
+                      // 4. Update UI
                       onSuccess(newBalance);
 
                   } catch (e: any) {
                       console.error("Wallet Top-up Verification Error:", e);
-                      
-                      // 6. Log Failure for Admin Review
-                      await auditLogService.logAction({
-                          entityType: 'PAYMENT',
-                          entityId: paymentId,
-                          action: 'WALLET_TOPUP_FAILED',
-                          description: `Payment Verification Failed. ID: ${paymentId}`,
-                          user: user,
-                          newValue: { amount: amount, error: e.message }
-                      });
-
-                      // Fallback: We show success to user because money was deducted, 
-                      // but we don't update DB balance here to prevent fraud.
-                      // The Webhook is the final safety net to add funds if verification failed.
-                      alert("Payment received at gateway but system verification timed out.\n\nYour balance will update automatically in a few minutes via our secure webhook.");
-                      onSuccess((user.walletBalance || 0)); // Don't show fake balance, wait for webhook
+                      // Fallback: Webhook will handle it.
+                      alert("Payment received. Your balance will update shortly via our secure server.");
+                      onSuccess((user.walletBalance || 0)); 
                   }
               },
               onFailure
@@ -246,6 +236,11 @@ class PaymentService {
       onSuccess: (res: any) => void, 
       onFailure: (err: string) => void
   ) {
+      // Flag to track if success handler has been called.
+      // Razorpay modal auto-closes on success, triggering ondismiss.
+      // We must prevent ondismiss from calling onFailure in this case.
+      let isPaymentSuccessful = false;
+
       const options: RazorpayOptions = {
         key: this.razorpayKey,
         amount: order.amount,
@@ -253,19 +248,29 @@ class PaymentService {
         name: name,
         description: description,
         image: "https://file-service-alpha.vercel.app/file/a8d8e3c0-362c-473d-82d2-282e366184e9/607e4d82-c86e-4171-aa3b-8575027588b3.png", 
-        handler: onSuccess,
+        handler: (response: any) => {
+            isPaymentSuccessful = true;
+            onSuccess(response);
+        },
         prefill: prefill,
         notes: notes, 
         theme: { color: color || "#0ea5e9" },
         modal: {
-            ondismiss: () => onFailure("Payment cancelled by user.")
+            ondismiss: () => {
+                if (!isPaymentSuccessful) {
+                    console.log("Payment modal dismissed by user.");
+                    onFailure("Payment cancelled by user.");
+                }
+            }
         }
       };
 
       if (window.Razorpay) {
           const rzp1 = new window.Razorpay(options);
           rzp1.on('payment.failed', function (response: any){
-                onFailure(response.error.description);
+                isPaymentSuccessful = false; // Just in case
+                console.error("Razorpay Failure:", response.error);
+                onFailure(response.error.description || "Payment Failed");
           });
           rzp1.open();
       } else {
@@ -282,47 +287,6 @@ class PaymentService {
           amount: amount * 100, 
           currency: currency
       };
-  }
-
-  private async verifyPayment(response: any, booking: Booking, amount: number, type: string): Promise<string> {
-      const paymentId = response.razorpay_payment_id;
-      const verifyFn = httpsCallable(functions, 'verifyRazorpayPayment');
-      
-      const result = await verifyFn({
-          paymentId: paymentId,
-          expectedAmount: amount,
-          currency: booking.currency
-      });
-
-      const data = result.data as any;
-      if (!data.success) throw new Error("Payment verification declined by server.");
-
-      // Record in DB with Verified status
-      await bookingService.recordPayment(
-          booking.id,
-          amount,
-          'ONLINE',
-          `Gateway: ${paymentId}`,
-          { id: 'sys_payment', name: 'Online Gateway', role: 'ADMIN' } as any,
-          'VERIFIED',
-          'MANUAL' // Source is manual/frontend
-      );
-
-      return paymentId;
-  }
-
-  private async verifyWalletPayment(response: any, user: User, amount: number) {
-      const paymentId = response.razorpay_payment_id;
-      const verifyFn = httpsCallable(functions, 'verifyRazorpayPayment');
-      
-      const result = await verifyFn({
-          paymentId: paymentId,
-          expectedAmount: amount,
-          currency: 'INR'
-      });
-      
-      const data = result.data as any;
-      if (!data.success) throw new Error("Server declined.");
   }
 }
 

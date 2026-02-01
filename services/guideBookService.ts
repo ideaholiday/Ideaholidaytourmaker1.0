@@ -71,22 +71,52 @@ To maintain the "Idea Holiday" standard, please adhere to the following during s
     // --- AGENT GUIDES ---
     {
         id: 'g1',
-        title: 'Getting Started with Quick Quotes',
+        title: 'Getting Started with Itinerary Builder',
         category: 'Platform Guide',
-        lastUpdated: '2023-11-01',
+        lastUpdated: '2024-02-15',
         targetRoles: [UserRole.AGENT, UserRole.ADMIN, UserRole.STAFF],
         content: `
-### Creating Estimates in Seconds
+### The Smart Builder Workflow
 
-The **Quick Quote** module allows you to generate professional estimates without selecting specific hotels or building a day-wise itinerary immediately.
+Create complex multi-city itineraries in minutes using our intelligent builder tools.
 
-**Steps:**
-1. Navigate to **New Quote** > **Quick Quote**.
-2. Select your destination and travel dates.
-3. Choose a **Hotel Category** (e.g., 4 Star) and **Meal Plan**.
-4. The system will automatically calculate an estimated price based on average rates for that season.
+#### Step 1: Define Route & Basics
+1.  Navigate to **Itinerary Builder** from your dashboard.
+2.  Enter **Guest Details** (Lead Name, Travel Date, Adult/Child count).
+3.  **Build Route:** Use the City Selector to add destinations (e.g., "Dubai" + "Abu Dhabi").
+4.  Adjust **Nights** for each city using the +/- buttons.
+5.  Click **Generate Itinerary** to create the day-wise skeleton.
 
-> **Tip:** Use "Quick Quote Templates" to load pre-configured packages for popular destinations like Dubai or Thailand instantly.
+#### Step 2: The Builder Interface
+Once generated, you will see three main areas:
+*   **Left Sidebar:** Drag & Drop days to reorder the sequence.
+*   **Main Editor:** The detailed day-by-day plan where you add services.
+*   **Top Header:** Real-time pricing (Net Cost vs Client Price) and Save controls.
+
+#### Step 3: Adding Services
+To build the quote, add services to specific days:
+1.  Locate the Day card (e.g., "Day 1: Arrival").
+2.  Click the small buttons: **+ Hotel**, **+ Activity**, or **+ Transfer**.
+3.  A modal will open showing **Live Inventory** filtered for that city.
+4.  **Select & Configure:**
+    *   *Hotels:* Choose Room Type and Meal Plan.
+    *   *Activities:* Choose between Ticket Only, Shared Transfer (SIC), or Private Transfer (PVT).
+    *   *Transfers:* Select Vehicle Type and Capacity.
+5.  Click **Add** to insert it into the day.
+    *   *Note:* You can also use the **"Custom"** tab in the modal to add non-inventory items manually.
+
+#### Step 4: Pricing & Markup
+*   **Net Cost:** This is displayed in the top header (Visible ONLY to you). It is the sum of B2B rates.
+*   **Markup Control:** Use the toggle in the header to enable/disable markup. Enter your desired percentage (Default is 10%).
+*   **Client Price:** This updates automatically as you add services or change markup. This is the final price shown on the PDF.
+
+#### Step 5: Finalize
+1.  Review the itinerary flow.
+2.  Click **Save Quote** in the top right.
+3.  You will be redirected to the **Quote Detail** page where you can:
+    *   Download PDF (Client Version).
+    *   Share via WhatsApp.
+    *   Copy a Public Link.
         `
     },
     {
@@ -96,27 +126,26 @@ The **Quick Quote** module allows you to generate professional estimates without
         lastUpdated: '2023-12-15',
         targetRoles: [UserRole.AGENT, UserRole.ADMIN, UserRole.STAFF],
         content: `
-### Build Complex Trips Like a Pro
+### Advanced Builder Features
 
-The **Smart Builder** is our most powerful tool for creating detailed, day-by-day itineraries. It connects directly to live inventory for Hotels, Activities, and Transfers.
+#### 1. AI Route Optimization
+When building your route in Step 1, the system analyzes connectivity. If a better route order exists (e.g., minimizing travel time), a **"Smart Route Available"** banner will appear. Click "Apply" to auto-sort your cities.
 
-#### 1. Trip Basics & Route
-*   **Single City:** Select a destination like "Dubai".
-*   **Multi-City:** Select a country (e.g., "Thailand") and build a route (e.g., Phuket -> Krabi -> Bangkok).
-*   **AI Optimization:** The system analyzes your route and suggests the most logical sequence to save travel time.
+#### 2. Drag & Drop Reordering
+Changed your mind about the flow? In the Builder view, simply **drag a Day** from the left sidebar and drop it into a new position. The day numbers will auto-update.
 
-#### 2. Hotel Selection
-*   **Partner Inventory:** Browse live rates from our contracted hotels. Filter by Star Rating or Meal Plan.
-*   **Reference Mode:** If you have your own hotel arrangement, switch to "Reference Mode" to enter a manual cost that is excluded from our net calculation but included in the final quote.
+#### 3. Custom Items
+Can't find a specific tour in our inventory?
+1. Click **+ Activity**.
+2. Select the **Custom** tab (Pen icon).
+3. Enter the Name, Net Cost, and Description manually.
+4. This allows you to add unique experiences while keeping the quote in one system.
 
-#### 3. Day-by-Day Planning
-*   **Auto-Suggestions:** The builder automatically inserts Airport Transfers on arrival/departure days.
-*   **Adding Services:** Click **"Add Sightseeing"** or **"Add Transfer"** on any day.
-*   **Custom Services:** Can't find an activity? Use the "Custom" tab to add unique experiences manually.
-
-#### 4. Templates
-*   **Save as Favorite:** Built a perfect honeymoon package? Save it as a template to reuse later with one click.
-*   **System Templates:** Load pre-built "Best Sellers" to save time.
+#### 4. Cloning Days
+If you have a leisure day that repeats (e.g., 3 days of beach relaxation):
+1. Hover over the Day in the sidebar.
+2. Click the **Duplicate (Copy)** icon.
+3. A standardized copy of that day will be added to the end of the itinerary.
         `
     },
     {
@@ -273,25 +302,6 @@ You can white-label all client-facing documents (PDFs, Shared Links) with your o
 4. Update your **Contact Information** and **Website**.
 
 Once saved, all subsequent PDFs and the Client Portal will display your logo and colors instead of Idea Holiday's.
-        `
-    },
-    {
-        id: 'g3',
-        title: 'Privacy Wall & Operator Interactions',
-        category: 'Policy',
-        lastUpdated: '2023-09-20',
-        targetRoles: [UserRole.AGENT, UserRole.OPERATOR, UserRole.ADMIN, UserRole.STAFF],
-        content: `
-### Protecting Your Business
-
-Idea Holiday Tour Maker enforces a strict **Privacy Wall** to protect your business relationships.
-
-**How it works:**
-*   **Ground Operators** never see your Client's name or the Selling Price. They only see the operational itinerary and net cost (if you choose to reveal it).
-*   **Clients** never see the Ground Operator or Idea Holiday branding. They only see your agency details.
-*   **Chat System** automatically masks identities. Agents appear as "Platform" to Operators, and Operators appear as "Ground Team" to Agents.
-
-This ensures your clients remain yours, and your suppliers remain strictly back-end partners.
         `
     },
     {

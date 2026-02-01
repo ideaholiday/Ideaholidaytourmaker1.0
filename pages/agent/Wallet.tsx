@@ -4,12 +4,14 @@ import { useAuth } from '../../context/AuthContext';
 import { paymentService } from '../../services/paymentService';
 import { auditLogService } from '../../services/auditLogService';
 import { AuditLog } from '../../types';
-import { Wallet as WalletIcon, CreditCard, History, Plus, ArrowUpRight, DollarSign, Loader2, ArrowDownLeft, Search, Filter, Download, AlertTriangle, Clock } from 'lucide-react';
+import { Wallet as WalletIcon, CreditCard, History, Plus, ArrowUpRight, DollarSign, Loader2, ArrowDownLeft, Search, Filter, Download, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
 
 export const Wallet: React.FC = () => {
   const { user, reloadUser } = useAuth();
   const [topUpAmount, setTopUpAmount] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // History State
   const [transactions, setTransactions] = useState<AuditLog[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<AuditLog[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
@@ -47,18 +49,23 @@ export const Wallet: React.FC = () => {
 
   const loadHistory = async () => {
       setIsLoadingHistory(true);
-      // Fetch Audit logs related to payments for this user
-      // We look for 'WALLET_TOPUP' (Credit) and 'WALLET_PAYMENT' (Debit)
-      const logs = await auditLogService.getLogs({ entityType: 'PAYMENT' });
-      
-      const myTransactions = logs.filter(l => 
-          l.performedById === user?.id && 
-          (l.action.includes('WALLET_TOPUP') || l.action === 'WALLET_PAYMENT')
-      );
-      
-      setTransactions(myTransactions);
-      setFilteredTransactions(myTransactions);
-      setIsLoadingHistory(false);
+      try {
+          // Fetch Audit logs related to payments for this user
+          // We look for 'WALLET_TOPUP' (Credit) and 'WALLET_PAYMENT' (Debit)
+          const logs = await auditLogService.getLogs({ entityType: 'PAYMENT' });
+          
+          const myTransactions = logs.filter(l => 
+              l.performedById === user?.id && 
+              (l.action.includes('WALLET_TOPUP') || l.action === 'WALLET_PAYMENT')
+          );
+          
+          setTransactions(myTransactions);
+          setFilteredTransactions(myTransactions);
+      } catch (error) {
+          console.error("Failed to load wallet history", error);
+      } finally {
+          setIsLoadingHistory(false);
+      }
   };
 
   if (!user) return null;
@@ -80,9 +87,10 @@ export const Wallet: React.FC = () => {
           amount,
           async (newBalance) => {
               await reloadUser();
-              await loadHistory(); // Refresh list
+              await loadHistory(); // Refresh list immediately after top-up
               setTopUpAmount('');
               setIsProcessing(false);
+              alert("Wallet topped up successfully!");
           },
           (error) => {
               setIsProcessing(false);
@@ -107,7 +115,7 @@ export const Wallet: React.FC = () => {
             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                 <WalletIcon className="text-brand-600" /> Agency Wallet
             </h1>
-            <p className="text-slate-500">Manage your pre-paid balance and credit limits.</p>
+            <p className="text-slate-500">Manage your pre-paid balance, credit limits, and view transaction history.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -177,9 +185,9 @@ export const Wallet: React.FC = () => {
             </div>
         </div>
 
-        {/* Transaction History */}
+        {/* Transaction History Section */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50">
                 <div className="flex items-center gap-2">
                     <History size={18} className="text-slate-500" />
                     <h3 className="font-bold text-slate-800">Transaction History</h3>
@@ -193,18 +201,25 @@ export const Wallet: React.FC = () => {
                             placeholder="Search transactions..." 
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                            className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white"
                         />
                     </div>
                     <select 
                         value={filterType}
                         onChange={(e) => setFilterType(e.target.value as any)}
-                        className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-brand-500"
+                        className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
                     >
-                        <option value="ALL">All Types</option>
-                        <option value="CREDIT">Credits (In)</option>
-                        <option value="DEBIT">Debits (Out)</option>
+                        <option value="ALL">All Transactions</option>
+                        <option value="CREDIT">Credits (Top-ups)</option>
+                        <option value="DEBIT">Debits (Payments)</option>
                     </select>
+                    <button 
+                        onClick={loadHistory}
+                        className="p-2 bg-white border border-slate-300 rounded-lg text-slate-500 hover:text-brand-600 hover:border-brand-300 transition"
+                        title="Refresh History"
+                    >
+                        <RefreshCw size={18} className={isLoadingHistory ? "animate-spin" : ""} />
+                    </button>
                 </div>
             </div>
             
@@ -216,11 +231,12 @@ export const Wallet: React.FC = () => {
             ) : filteredTransactions.length > 0 ? (
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 text-xs uppercase">
+                        <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 text-xs uppercase tracking-wide">
                             <tr>
                                 <th className="px-6 py-3 font-semibold">Date</th>
+                                <th className="px-6 py-3 font-semibold">Type</th>
                                 <th className="px-6 py-3 font-semibold">Description</th>
-                                <th className="px-6 py-3 font-semibold">Transaction ID</th>
+                                <th className="px-6 py-3 font-semibold">Reference</th>
                                 <th className="px-6 py-3 font-semibold text-right">Amount</th>
                                 <th className="px-6 py-3 font-semibold text-right">Status</th>
                             </tr>
@@ -237,26 +253,29 @@ export const Wallet: React.FC = () => {
                                             {new Date(tx.timestamp).toLocaleString()}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-full ${isCredit ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                                                    {isCredit ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                                            <div className="flex items-center gap-2">
+                                                <div className={`p-1.5 rounded-full ${isCredit ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                                    {isCredit ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
                                                 </div>
-                                                <div>
-                                                    <span className="font-bold text-slate-800 block">
-                                                        {isCredit ? 'Wallet Top-up' : 'Booking Payment'}
-                                                    </span>
-                                                    <span className="text-xs text-slate-500 line-clamp-1" title={tx.description}>
-                                                        {tx.description.replace(/via Wallet/i, '').trim()}
-                                                    </span>
-                                                </div>
+                                                <span className={`text-xs font-bold ${isCredit ? 'text-green-700' : 'text-red-700'}`}>
+                                                    {isCredit ? 'CREDIT' : 'DEBIT'}
+                                                </span>
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="font-medium text-slate-800 block">
+                                                {isCredit ? 'Wallet Top-up' : 'Booking Payment'}
+                                            </span>
+                                            <span className="text-xs text-slate-500 line-clamp-1" title={tx.description}>
+                                                {tx.description.replace(/via Wallet/i, '').replace(/Admin Manual Adjustment:/i, 'Adj:').trim()}
+                                            </span>
                                         </td>
                                         <td className="px-6 py-4 font-mono text-slate-400 text-xs group-hover:text-slate-600">
                                             {tx.entityId}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <span className={`font-bold text-base ${isCredit ? 'text-green-600' : 'text-slate-900'}`}>
-                                                {isCredit ? '+' : '-'} ₹ {amount.toLocaleString()}
+                                                {isCredit ? '+' : '-'} ₹ {Math.abs(amount).toLocaleString()}
                                             </span>
                                             {balance !== undefined && (
                                                 <div className="text-[10px] text-slate-400 mt-1">
@@ -275,6 +294,7 @@ export const Wallet: React.FC = () => {
                 </div>
             ) : (
                 <div className="p-12 text-center text-slate-400 italic bg-slate-50/50">
+                    <History size={32} className="mx-auto mb-2 opacity-50" />
                     No transactions found matching your filters.
                 </div>
             )}

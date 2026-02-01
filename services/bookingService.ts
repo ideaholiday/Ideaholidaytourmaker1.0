@@ -42,8 +42,14 @@ class BookingService {
   }
 
   async createBookingFromQuote(quote: Quote, user: User, travelers?: Traveler[]): Promise<Booking> {
-    const totalAmount = quote.sellingPrice || quote.price || 0;
+    // B2B LOGIC: Total Payable by Agent is the NET COST (quote.price).
+    // Selling Price is stored for Agent's reference/Client View.
+    const totalAmount = quote.price || 0; 
+    const sellingPrice = quote.sellingPrice || totalAmount; 
+    
+    // Advance logic based on Net Cost
     const advanceAmount = Math.ceil(totalAmount * 0.30);
+    
     const defaultCompany = await companyService.getDefaultCompany();
 
     const newBooking: Booking = {
@@ -59,11 +65,11 @@ class BookingService {
       itinerary: quote.itinerary || [], 
       
       netCost: quote.price || 0,
-      sellingPrice: totalAmount,
+      sellingPrice: sellingPrice,
       currency: quote.currency || 'INR',
       
       paymentStatus: 'PENDING',
-      totalAmount: totalAmount,
+      totalAmount: totalAmount, // Agent owes Net Cost
       advanceAmount: advanceAmount,
       paidAmount: 0,
       balanceAmount: totalAmount,
@@ -77,6 +83,7 @@ class BookingService {
       operatorName: quote.operatorName || null,
       
       companyId: defaultCompany.id,
+      publicNote: quote.publicNote, // Inherit any existing note
 
       comments: [{
           id: `msg_${Date.now()}`,
@@ -127,6 +134,11 @@ class BookingService {
     this.syncAllBookings();
   }
 
+  async updateBooking(booking: Booking) {
+      await dbHelper.save(COLLECTION, { ...booking, updatedAt: new Date().toISOString() });
+      this.syncAllBookings();
+  }
+
   async recordPayment(
       bookingId: string, 
       amount: number, 
@@ -139,12 +151,19 @@ class BookingService {
       const booking = await this.getBooking(bookingId);
       if (!booking) return;
 
+      // Duplicate Check: If we already have this reference (likely from webhook or retry), stop.
+      // Exception: If prev attempt failed verification, allow retry (not implemented here for simplicity)
+      if (booking.payments.some(p => p.reference === reference)) {
+          console.warn("Duplicate payment attempt detected", reference);
+          return;
+      }
+
       const type = (booking.paidAmount === 0 && amount < booking.totalAmount) ? 'ADVANCE' : 'FULL';
       const companyId = booking.companyId || (await companyService.getDefaultCompany()).id;
       const receiptNumber = await companyService.generateNextReceiptNumber(companyId);
 
       const entry: PaymentEntry = {
-          id: `pay_${Date.now()}`,
+          id: `pay_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
           type,
           amount,
           date: new Date().toISOString(),
@@ -153,22 +172,33 @@ class BookingService {
           receiptNumber,
           recordedBy: user.id,
           companyId,
-          verificationStatus, // Save extended fields
+          verificationStatus, 
           source
       };
 
       const newPaid = booking.paidAmount + amount;
+      
+      // Strict Floating Point Safety
+      const total = booking.totalAmount;
+      const paid = Math.round(newPaid * 100) / 100;
+      
       let newStatus = booking.paymentStatus;
       
-      if (newPaid >= booking.totalAmount) newStatus = 'PAID_IN_FULL';
-      else if (newPaid > 0) newStatus = 'PARTIALLY_PAID';
+      // Update Status based on Agent's Payable Amount (Net Cost)
+      // Allow tiny rounding diff (0.5)
+      if (paid >= (total - 0.5)) { 
+          newStatus = 'PAID_IN_FULL';
+      } else if (paid > 0) {
+          newStatus = 'PARTIALLY_PAID';
+      }
 
       const updated = {
           ...booking,
           payments: [...booking.payments, entry],
-          paidAmount: newPaid,
-          balanceAmount: booking.totalAmount - newPaid,
-          paymentStatus: newStatus
+          paidAmount: paid,
+          balanceAmount: Math.max(0, total - paid),
+          paymentStatus: newStatus,
+          updatedAt: new Date().toISOString()
       };
 
       await dbHelper.save(COLLECTION, updated);

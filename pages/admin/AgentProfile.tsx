@@ -10,7 +10,7 @@ import { ProfileCard } from '../../components/profile/ProfileCard';
 import { 
     FileText, CheckCircle, XCircle, AlertTriangle, ArrowLeft, 
     Wallet, CreditCard, TrendingUp, History, PlusCircle, MinusCircle, 
-    Loader2, Eye, ArrowUpRight, ArrowDownLeft 
+    Loader2, Eye, ArrowUpRight, ArrowDownLeft, Trash2, Search 
 } from 'lucide-react';
 
 export const AgentProfile: React.FC = () => {
@@ -30,6 +30,7 @@ export const AgentProfile: React.FC = () => {
   const [isAdjustingWallet, setIsAdjustingWallet] = useState(false);
   const [adjustmentAmount, setAdjustmentAmount] = useState('');
   const [adjustmentType, setAdjustmentType] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
+  const [quoteSearch, setQuoteSearch] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -56,11 +57,20 @@ export const AgentProfile: React.FC = () => {
               setQuotes(agentQuotes);
               setBookings(agentBookings);
 
-              // Filter logs for this agent's wallet transactions
-              const myWalletLogs = allLogs.filter(l => 
-                  (l.performedById === id || l.entityId.startsWith('wallet_') || l.description.includes(userProfile.name)) &&
-                  (l.action === 'WALLET_TOPUP' || l.action === 'WALLET_PAYMENT')
-              );
+              // STRICT FILTER: Only show wallet logs specifically for this agent ID
+              const myWalletLogs = allLogs.filter(l => {
+                   if (l.entityId === `wallet_${id}` && l.action === 'WALLET_TOPUP') return true;
+                   if (l.action === 'WALLET_TOPUP' || l.action === 'WALLET_PAYMENT') {
+                       if (l.performedById === id) return true; 
+                   }
+                   if (l.action === 'WALLET_PAYMENT' && l.newValue?.bookingId) {
+                        const relevantBooking = agentBookings.find(b => b.id === l.newValue.bookingId);
+                        if (relevantBooking) return true;
+                   }
+                   if (l.description.includes(userProfile.name)) return true;
+                   return false;
+              });
+              
               setWalletLogs(myWalletLogs);
 
               // Calculate Stats
@@ -101,32 +111,46 @@ export const AgentProfile: React.FC = () => {
           return;
       }
 
-      // If DEBIT, we send negative amount to the service
       const finalAmount = adjustmentType === 'CREDIT' ? amount : -amount;
 
       try {
           await agentService.addWalletFunds(agent.id, finalAmount);
           
-          // Log the Admin Action
           auditLogService.logAction({
               entityType: 'PAYMENT',
-              entityId: `admin_adj_${Date.now()}`,
+              entityId: `wallet_${agent.id}`,
               action: adjustmentType === 'CREDIT' ? 'WALLET_TOPUP' : 'WALLET_PAYMENT',
-              description: `Admin Manual Adjustment: ${adjustmentType} ${amount}`,
-              user: agent, // Logged against agent but performed by admin logically
+              description: `Admin Manual Adjustment: ${adjustmentType} ${amount} for ${agent.name}`,
+              user: agent,
               newValue: { amount: finalAmount, type: 'MANUAL_ADJUSTMENT' }
           });
 
           setAdjustmentAmount('');
           setIsAdjustingWallet(false);
-          loadFullProfile(); // Reload to see new balance
+          loadFullProfile(); 
           alert("Wallet updated successfully.");
       } catch (error: any) {
           alert("Failed to update wallet: " + error.message);
       }
   };
 
+  const handleDeleteQuote = async (quoteId: string) => {
+      if (window.confirm("Are you sure you want to delete this quote permanently?")) {
+          try {
+              await agentService.deleteQuote(quoteId);
+              loadFullProfile(); // Reload lists
+          } catch (e: any) {
+              alert("Error deleting quote: " + e.message);
+          }
+      }
+  };
+
   if (!agent) return <div className="p-8 text-center">Loading Profile...</div>;
+
+  const filteredQuotes = quotes.filter(q => 
+    (q.uniqueRefNo?.toLowerCase() || '').includes(quoteSearch.toLowerCase()) || 
+    (q.destination?.toLowerCase() || '').includes(quoteSearch.toLowerCase())
+  );
 
   return (
     <div>
@@ -221,25 +245,41 @@ export const AgentProfile: React.FC = () => {
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
-        <div className="flex border-b border-slate-200 bg-slate-50">
-          <button 
-            onClick={() => setActiveTab('QUOTES')}
-            className={`px-6 py-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'QUOTES' ? 'border-brand-600 text-brand-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-          >
-            <FileText size={16} /> All Quotes
-          </button>
-          <button 
-            onClick={() => setActiveTab('BOOKINGS')}
-            className={`px-6 py-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'BOOKINGS' ? 'border-brand-600 text-brand-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-          >
-            <CheckCircle size={16} /> Confirmed Bookings
-          </button>
-          <button 
-            onClick={() => setActiveTab('WALLET')}
-            className={`px-6 py-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'WALLET' ? 'border-brand-600 text-brand-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-          >
-            <History size={16} /> Wallet Ledger
-          </button>
+        <div className="flex border-b border-slate-200 bg-slate-50 justify-between items-center pr-4">
+          <div className="flex">
+              <button 
+                onClick={() => setActiveTab('QUOTES')}
+                className={`px-6 py-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'QUOTES' ? 'border-brand-600 text-brand-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              >
+                <FileText size={16} /> All Quotes
+              </button>
+              <button 
+                onClick={() => setActiveTab('BOOKINGS')}
+                className={`px-6 py-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'BOOKINGS' ? 'border-brand-600 text-brand-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              >
+                <CheckCircle size={16} /> Confirmed Bookings
+              </button>
+              <button 
+                onClick={() => setActiveTab('WALLET')}
+                className={`px-6 py-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'WALLET' ? 'border-brand-600 text-brand-600 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              >
+                <History size={16} /> Wallet Ledger
+              </button>
+          </div>
+          
+          {/* Quote Search Filter */}
+          {activeTab === 'QUOTES' && (
+              <div className="relative">
+                  <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Quote ID..." 
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                    value={quoteSearch}
+                    onChange={(e) => setQuoteSearch(e.target.value)}
+                  />
+              </div>
+          )}
         </div>
 
         <div className="p-0">
@@ -261,7 +301,7 @@ export const AgentProfile: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {quotes.map(q => {
+                    {filteredQuotes.map(q => {
                         const net = q.price || 0; // B2B Price
                         const sell = q.sellingPrice || 0;
                         const markup = sell - net;
@@ -294,17 +334,27 @@ export const AgentProfile: React.FC = () => {
                               </span>
                             </td>
                             <td className="px-6 py-3 text-right">
-                                <button 
-                                    onClick={() => navigate(`/quote/${q.id}`)}
-                                    className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded"
-                                >
-                                    <Eye size={16} />
-                                </button>
+                                <div className="flex justify-end gap-2">
+                                    <button 
+                                        onClick={() => navigate(`/quote/${q.id}`)}
+                                        className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded"
+                                        title="View/Edit"
+                                    >
+                                        <Eye size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDeleteQuote(q.id)}
+                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                        title="Delete Quote"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </td>
                           </tr>
                         );
                     })}
-                    {quotes.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-slate-400">No quotes found.</td></tr>}
+                    {filteredQuotes.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-slate-400">No quotes found.</td></tr>}
                   </tbody>
                 </table>
               </div>

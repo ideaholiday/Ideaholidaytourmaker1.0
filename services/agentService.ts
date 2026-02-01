@@ -13,6 +13,10 @@ class AgentService {
       return await dbHelper.getWhere<Quote>(COLLECTION, 'agentId', '==', agentId);
   }
 
+  async getQuoteById(id: string): Promise<Quote | null> {
+      return await dbHelper.getById<Quote>(COLLECTION, id);
+  }
+
   // Backwards compatibility for components not yet async
   getQuotes(agentId: string): Quote[] { 
       return []; 

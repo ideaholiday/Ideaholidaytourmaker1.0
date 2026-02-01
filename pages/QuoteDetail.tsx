@@ -6,10 +6,11 @@ import { agentService } from '../../services/agentService';
 import { adminService } from '../../services/adminService';
 import { bookingService } from '../../services/bookingService';
 import { paymentService } from '../../services/paymentService'; // Import payment service
-import { Quote, ItineraryItem, UserRole } from '../../types';
+import { Quote, ItineraryItem, UserRole, PricingBreakdown, Message } from '../../types';
 import { ItineraryView } from '../components/ItineraryView';
 import { PriceSummary } from '../components/PriceSummary';
-import { ArrowLeft, Edit2, Download, Share2, GitBranch, Link as LinkIcon, CheckCircle, Trash2, UserPlus, Truck, Phone, MessageCircle, CreditCard, Save } from 'lucide-react';
+import { ChatPanel } from '../components/ChatPanel'; // Restored Import
+import { ArrowLeft, Edit2, Download, Share2, GitBranch, Link as LinkIcon, CheckCircle, Trash2, UserPlus, Truck, Phone, MessageCircle, CreditCard, Save, Eye, EyeOff, FileText } from 'lucide-react';
 import { usePricingEngine } from '../hooks/usePricingEngine';
 import { ItineraryBuilder } from '../components/ItineraryBuilder';
 import { generateQuotePDF } from '../utils/pdfGenerator';
@@ -25,6 +26,11 @@ export const QuoteDetail: React.FC = () => {
   const [isEditingItinerary, setIsEditingItinerary] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  
+  // View Mode: Allows Admin/Agent to see "Client View" (hides internal data)
+  const [viewMode, setViewMode] = useState<'INTERNAL' | 'CLIENT'>('INTERNAL');
+  const [publicNote, setPublicNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
   
   // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -45,25 +51,36 @@ export const QuoteDetail: React.FC = () => {
     setIsLoading(true);
 
     try {
-        const allQuotes = await agentService.fetchQuotes(user.id);
-        const found = allQuotes.find(q => q.id === id);
+        // Fetch by ID directly to support Admin access
+        const found = await agentService.getQuoteById(id);
 
         if (found) {
-            setQuote(found);
-            initPricingEngine(found);
-            if (found.operationalDetails) {
-                setAdminPaymentStatus(found.operationalDetails.paymentStatus || 'PENDING');
-                setAdminPaymentNote(found.operationalDetails.paymentNotes || '');
+            // Permission Logic: Who can see this?
+            let hasAccess = false;
+            
+            if (user.role === UserRole.ADMIN || user.role === UserRole.STAFF) {
+                // Admin/Staff see ALL
+                hasAccess = true;
+            } else if (user.role === UserRole.AGENT && found.agentId === user.id) {
+                // Agents see only their own
+                hasAccess = true;
+            } else if (user.role === UserRole.OPERATOR && found.operatorId === user.id) {
+                // Operators see assigned
+                hasAccess = true;
             }
-        } else {
-             // ... existing fallback code ...
-             const storedQuotes = localStorage.getItem('iht_agent_quotes');
-             const parsedQuotes: Quote[] = storedQuotes ? JSON.parse(storedQuotes) : [];
-             const localFound = parsedQuotes.find(q => q.id === id);
-             if (localFound) {
-                 setQuote(localFound);
-                 initPricingEngine(localFound);
-             }
+
+            if (hasAccess) {
+                setQuote(found);
+                initPricingEngine(found);
+                setPublicNote(found.publicNote || '');
+                if (found.operationalDetails) {
+                    setAdminPaymentStatus(found.operationalDetails.paymentStatus || 'PENDING');
+                    setAdminPaymentNote(found.operationalDetails.paymentNotes || '');
+                }
+            } else {
+                console.error("Access denied: User does not have permission to view this quote.");
+                setQuote(null);
+            }
         }
     } catch (e) {
         console.error("Error loading quote:", e);
@@ -92,6 +109,8 @@ export const QuoteDetail: React.FC = () => {
 
   const isAgent = user?.role === UserRole.AGENT;
   const isAdminOrStaff = user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF;
+  const canToggleView = isAgent || isAdminOrStaff;
+  const showInternal = canToggleView && viewMode === 'INTERNAL';
   
   const hasValidPrice = (quote.sellingPrice !== undefined && quote.sellingPrice > 0);
   const isBooked = quote.status === 'BOOKED' || quote.status === 'CONFIRMED';
@@ -218,6 +237,14 @@ export const QuoteDetail: React.FC = () => {
       loadQuote();
   };
 
+  const handleSavePublicNote = async () => {
+      if (!quote) return;
+      setIsSavingNote(true);
+      await agentService.updateQuote({ ...quote, publicNote });
+      setIsSavingNote(false);
+      alert("Client note saved.");
+  };
+
   const handleShareWhatsApp = () => {
      const mockBreakdown: any = {
          finalPrice: quote.sellingPrice || 0,
@@ -236,6 +263,23 @@ export const QuoteDetail: React.FC = () => {
       alert("Public Link copied to clipboard!\n\n" + url);
   };
   
+  const handleDownloadPDF = () => {
+       if (!user || !quote) return;
+       
+       const breakdown: PricingBreakdown = {
+          finalPrice: quote.sellingPrice || 0,
+          perPersonPrice: quote.paxCount > 0 ? (quote.sellingPrice || 0) / quote.paxCount : 0,
+          supplierCost: 0,
+          companyMarkupValue: 0,
+          platformNetCost: 0,
+          agentMarkupValue: 0,
+          subtotal: 0,
+          gstAmount: 0
+       };
+       
+       generateQuotePDF(quote, breakdown, user.role, user);
+  };
+
   const handleCreateRevision = async () => {
       if (!user) return;
       if (confirm("Create a new version to edit? The current version will remain locked as history.")) {
@@ -246,11 +290,59 @@ export const QuoteDetail: React.FC = () => {
       }
   };
 
+  // --- MESSAGING ---
+  const handleSendMessage = async (text: string) => {
+    if (!user || !quote) return;
+    
+    const newMessage: Message = {
+        id: `msg_${Date.now()}`,
+        senderId: user.id,
+        senderName: user.name,
+        senderRole: user.role,
+        content: text,
+        timestamp: new Date().toISOString(),
+        isSystem: false
+    };
+    
+    // Optimistic update
+    const updatedMessages = [...(quote.messages || []), newMessage];
+    const updatedQuote = { ...quote, messages: updatedMessages };
+    
+    await agentService.updateQuote(updatedQuote);
+    setQuote(updatedQuote);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
-        <button onClick={() => navigate(-1)} className="flex items-center text-slate-500 mb-4 hover:text-slate-800">
-            <ArrowLeft size={18} className="mr-1" /> Back
-        </button>
+        <div className="flex justify-between items-center mb-4">
+            <button onClick={() => navigate(-1)} className="flex items-center text-slate-500 hover:text-slate-800">
+                <ArrowLeft size={18} className="mr-1" /> Back
+            </button>
+            
+            {canToggleView && (
+                <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <button 
+                        onClick={() => setViewMode('INTERNAL')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition ${viewMode === 'INTERNAL' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <Eye size={14} /> Internal View
+                    </button>
+                    <button 
+                        onClick={() => setViewMode('CLIENT')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition ${viewMode === 'CLIENT' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <EyeOff size={14} /> Client View
+                    </button>
+                </div>
+            )}
+        </div>
+
+        {!showInternal && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
+                <EyeOff size={18} />
+                <strong>Client Preview Mode:</strong> Viewing as your customer sees it. Internal costs and chats are hidden.
+            </div>
+        )}
 
         {/* HEADER */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
@@ -271,7 +363,7 @@ export const QuoteDetail: React.FC = () => {
                         <span>{quote.paxCount} Pax</span>
                         <span>•</span>
                         <span>{new Date(quote.travelDate).toLocaleDateString()}</span>
-                        {quote.operatorName && (
+                        {showInternal && quote.operatorName && (
                             <span className="text-purple-600 font-medium ml-2 border-l border-slate-300 pl-3">
                                 Op: {quote.operatorName} ({quote.operatorStatus || 'Assigned'})
                             </span>
@@ -280,9 +372,8 @@ export const QuoteDetail: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
-                    
-                    {/* ADMIN: ASSIGN OPERATOR */}
-                    {isAdminOrStaff && !isBooked && (
+                    {/* Actions */}
+                    {showInternal && isAdminOrStaff && !isBooked && (
                         <button 
                             onClick={() => setIsAssignModalOpen(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg hover:bg-purple-100 text-sm font-bold transition"
@@ -291,8 +382,7 @@ export const QuoteDetail: React.FC = () => {
                         </button>
                     )}
 
-                    {/* BOOK BUTTON (Updated to open Modal) */}
-                    {!isBooked && hasValidPrice && isAgent && (
+                    {!isBooked && hasValidPrice && isAgent && showInternal && (
                         <button 
                             onClick={handleBookClick} 
                             className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg shadow-sm font-bold transition transform hover:-translate-y-0.5"
@@ -301,39 +391,38 @@ export const QuoteDetail: React.FC = () => {
                         </button>
                     )}
 
-                    {/* Edit Action */}
-                    {!quote.isLocked && (isAgent || isAdminOrStaff) && !isEditingItinerary && (
+                    {!quote.isLocked && showInternal && (isAgent || isAdminOrStaff) && !isEditingItinerary && (
                          <button onClick={() => setIsEditingItinerary(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium">
                             <Edit2 size={16} /> Edit Itinerary
                         </button>
                     )}
                     
-                    {/* Versioning if Locked */}
-                    {quote.isLocked && isAgent && !isBooked && (
+                    {/* ENHANCED: Allow Admin to create revisions too */}
+                    {quote.isLocked && showInternal && (isAgent || isAdminOrStaff) && !isBooked && (
                         <button onClick={handleCreateRevision} className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 text-sm font-bold transition">
                             <GitBranch size={16} /> New Version
                         </button>
                     )}
 
-                    {/* Share / PDF */}
                     {hasValidPrice && (
                         <>
                             <button onClick={handleCopyLink} className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-bold transition">
                                 <LinkIcon size={16} /> Copy Link
                             </button>
-                            <button onClick={handleShareWhatsApp} className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 text-sm font-bold transition">
-                                <Share2 size={16} /> WhatsApp
-                            </button>
+                            {showInternal && (
+                                <button onClick={handleShareWhatsApp} className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 text-sm font-bold transition">
+                                    <Share2 size={16} /> WhatsApp
+                                </button>
+                            )}
                             {user && (
-                                <button onClick={() => generateQuotePDF(quote, null, user.role, user)} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-bold transition shadow-sm">
+                                <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-bold transition shadow-sm">
                                     <Download size={16} /> Download PDF
                                 </button>
                             )}
                         </>
                     )}
 
-                    {/* Delete Action */}
-                    {!isBooked && (isAgent || isAdminOrStaff) && (
+                    {!isBooked && showInternal && (isAgent || isAdminOrStaff) && (
                         <button onClick={handleDelete} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-lg hover:bg-red-100 text-sm font-bold transition" title="Delete Quote">
                             <Trash2 size={16} />
                         </button>
@@ -354,7 +443,7 @@ export const QuoteDetail: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     {/* GROUND OPERATIONS INFO (ADMIN ONLY) */}
-                    {isAdminOrStaff && quote.operatorId && (
+                    {showInternal && isAdminOrStaff && quote.operatorId && (
                          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-indigo-500">
                              {/* ... existing ops content ... */}
                              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -427,28 +516,77 @@ export const QuoteDetail: React.FC = () => {
                              </div>
                          </div>
                     )}
+                    
+                    {/* Public Note / Client Remarks */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
+                             <FileText size={18} className="text-slate-400" /> 
+                             {showInternal ? "Remarks for Client" : "Important Notes"}
+                        </h2>
+                        {showInternal ? (
+                            <div>
+                                <textarea 
+                                    className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none mb-2"
+                                    rows={3}
+                                    placeholder="Enter notes visible to the client (e.g. Flight rates subject to change...)"
+                                    value={publicNote}
+                                    onChange={(e) => setPublicNote(e.target.value)}
+                                />
+                                <div className="flex justify-end">
+                                    <button 
+                                        onClick={handleSavePublicNote}
+                                        disabled={isSavingNote}
+                                        className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded font-bold transition disabled:opacity-50"
+                                    >
+                                        {isSavingNote ? 'Saving...' : 'Save Note'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            publicNote ? (
+                                <p className="text-sm text-slate-600 whitespace-pre-line bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                    {publicNote}
+                                </p>
+                            ) : (
+                                <p className="text-sm text-slate-400 italic">No additional notes.</p>
+                            )
+                        )}
+                    </div>
 
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h2 className="text-lg font-bold mb-4">Itinerary</h2>
                         <ItineraryView itinerary={quote.itinerary} />
                     </div>
                 </div>
+                
                 {user && (
                     <div className="lg:col-span-1 space-y-6">
                         <PriceSummary 
                             breakdown={{
-                                supplierCost: quote.cost || 0,
-                                platformNetCost: quote.price || 0,
+                                supplierCost: showInternal ? (quote.cost || 0) : 0, // HIDE Supplier Cost in Client View
+                                platformNetCost: showInternal ? (quote.price || 0) : 0, // HIDE Platform Cost in Client View
                                 finalPrice: quote.sellingPrice || 0,
-                                agentMarkupValue: (quote.sellingPrice || 0) - (quote.price || 0),
+                                agentMarkupValue: showInternal ? ((quote.sellingPrice || 0) - (quote.price || 0)) : 0, // HIDE Markup in Client View
                                 gstAmount: 0, 
-                                companyMarkupValue: (quote.price || 0) - (quote.cost || 0),
+                                companyMarkupValue: showInternal ? ((quote.price || 0) - (quote.cost || 0)) : 0, // HIDE Company Margin
                                 subtotal: quote.sellingPrice || 0,
                                 perPersonPrice: quote.paxCount > 0 ? (quote.sellingPrice || 0) / quote.paxCount : 0
                             }}
-                            role={user.role}
+                            role={showInternal ? user.role : UserRole.AGENT} // Force Agent role logic in Client view to show basic summary
                             currency={quote.currency || 'INR'}
                         />
+                        
+                        {/* CHAT PANEL: Visible to Admins and Agents even if quote is Booked */}
+                        {showInternal && (
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[500px]">
+                                <ChatPanel 
+                                    user={user} 
+                                    messages={quote.messages || []} 
+                                    onSendMessage={handleSendMessage} 
+                                    className="h-full border-none shadow-none rounded-none"
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
