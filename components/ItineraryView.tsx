@@ -3,7 +3,7 @@ import React from 'react';
 import { ItineraryItem } from '../types';
 import { 
   CheckCircle, Car, Hotel, Camera, Calendar, 
-  MapPin, Coffee, Utensils, Flag, Clock, Users, Briefcase, Info
+  MapPin, Utensils, Clock, Users, Info, Flag
 } from 'lucide-react';
 
 interface Props {
@@ -106,11 +106,12 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 uppercase tracking-wide shrink-0">{svc.type}</span>
                                                 </div>
                                                 
-                                                {/* Service Description (New) */}
+                                                {/* Service Description (Rich Text Support) */}
                                                 {svc.meta?.description && (
-                                                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                                                        {svc.meta.description}
-                                                    </p>
+                                                    <div 
+                                                        className="text-xs text-slate-500 mt-2 leading-relaxed prose prose-sm max-w-none [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1"
+                                                        dangerouslySetInnerHTML={{ __html: svc.meta.description }}
+                                                    />
                                                 )}
 
                                                 <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
@@ -130,27 +131,21 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                                                         </span>
                                                     )}
                                                     
-                                                    {/* Pax Count Badges for Activities & Transfers (New) */}
+                                                    {/* Pax Count Badges for Activities & Transfers */}
                                                     {svc.meta?.paxDetails && (
                                                         <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100" title="Passengers">
                                                             <Users size={10} /> {svc.meta.paxDetails.adult}A {svc.meta.paxDetails.child > 0 ? `+ ${svc.meta.paxDetails.child}C` : ''}
                                                         </span>
                                                     )}
-                                                    {/* Vehicle Count for Transfers (New) */}
+                                                    {/* Vehicle Count for Transfers */}
                                                     {svc.type === 'TRANSFER' && svc.quantity > 1 && (
                                                         <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
                                                             <Car size={10} /> {svc.quantity} Vehicles
                                                         </span>
                                                     )}
-
-                                                    {svc.meta?.type && svc.type === 'ACTIVITY' && (
-                                                        <span className="text-xs text-slate-500 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100">
-                                                            <Camera size={10} /> {svc.meta.type}
-                                                        </span>
-                                                    )}
                                                 </div>
 
-                                                {/* Internal Note (New) */}
+                                                {/* Internal Note */}
                                                 {svc.meta?.notes && (
                                                     <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-100">
                                                         <Info size={10} className="mt-0.5 shrink-0"/> {svc.meta.notes}

@@ -1,3 +1,4 @@
+
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { Quote, PricingBreakdown, UserRole, User, Booking, PaymentEntry, GSTRecord, GSTCreditNote } from '../types';
@@ -19,14 +20,24 @@ interface BrandingOptions {
 }
 
 // --- TEXT SANITIZATION HELPER ---
-// jsPDF standard fonts do not support Emojis or advanced Unicode symbols. 
-// We strip unsupported characters but MUST preserve formatting (newlines).
+// Improved to handle HTML content from Rich Text Editor
 const cleanText = (text: string | undefined | null): string => {
     if (!text) return '';
     
     let clean = text;
 
-    // 1. Replace common symbols with ASCII approximations
+    // 1. Strip HTML Tags (Simple Regex for client-side PDF safety)
+    // Replaces tags with space to prevent words merging (e.g. </p><p>)
+    clean = clean.replace(/<[^>]*>/g, ' ');
+
+    // 2. Decode common HTML entities that might remain
+    clean = clean.replace(/&nbsp;/g, ' ')
+                 .replace(/&amp;/g, '&')
+                 .replace(/&lt;/g, '<')
+                 .replace(/&gt;/g, '>')
+                 .replace(/&quot;/g, '"');
+
+    // 3. Replace common symbols with ASCII approximations
     clean = clean.replace(/→/g, '->')
                  .replace(/←/g, '<-')
                  .replace(/↔/g, '<->')
@@ -39,16 +50,14 @@ const cleanText = (text: string | undefined | null): string => {
                  .replace(/‘/g, "'")
                  .replace(/’/g, "'");
 
-    // 2. Remove Emojis and Pictographs (Ranges for common emojis)
-    // This prevents the 'ð' and other mojibake characters in the PDF
+    // 4. Remove Emojis and Pictographs (Ranges for common emojis)
     const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
     clean = clean.replace(emojiRegex, '');
 
-    // 3. Normalize spacing BUT PRESERVE NEWLINES
-    // Replace multiple horizontal spaces (not newlines) with single space
-    clean = clean.replace(/[ \t\u00A0]+/g, ' '); 
+    // 5. Normalize spacing
+    clean = clean.replace(/[ \t\u00A0]+/g, ' ').trim(); 
 
-    return clean.trim();
+    return clean;
 };
 
 // Helper: Resolve Branding
@@ -252,7 +261,7 @@ export const generateQuotePDF = (
                   finalContent += `\n[ ${detailsParts.join(' | ')} ]`;
               }
               
-              // Add Description (Preserving Newlines)
+              // Add Description (Cleaned)
               if (svc.meta?.description) {
                   const desc = cleanText(svc.meta.description);
                   if (desc) finalContent += `\n\n${desc}`;
@@ -307,7 +316,6 @@ export const generateQuotePDF = (
   }
 
   // --- PRICE BOX ---
-  // Only show if price exists and is > 0
   const displayPrice = quote.sellingPrice || quote.price || 0;
   
   if (displayPrice > 0) {
@@ -356,17 +364,7 @@ export const generateQuotePDF = (
   doc.save(`Itinerary_${quote.uniqueRefNo}.pdf`);
 };
 
-export const generateReceiptPDF = (booking: Booking, payment: PaymentEntry, user: User) => {
-    // Placeholder - would implement similar branding logic
-    console.log("Generating Receipt PDF", booking.id, payment.id);
-};
-
-export const generateInvoicePDF = (invoice: GSTRecord, booking: Booking) => {
-    // Placeholder
-    console.log("Generating Invoice PDF", invoice.id, booking.id);
-};
-
-export const generateCreditNotePDF = (creditNote: GSTCreditNote, booking: Booking) => {
-    // Placeholder
-    console.log("Generating Credit Note PDF", creditNote.id, booking.id);
-};
+// ... other exports remain unchanged ...
+export const generateReceiptPDF = (booking: Booking, payment: PaymentEntry, user: User) => { console.log("Generating Receipt PDF", booking.id, payment.id); };
+export const generateInvoicePDF = (invoice: GSTRecord, booking: Booking) => { console.log("Generating Invoice PDF", invoice.id, booking.id); };
+export const generateCreditNotePDF = (creditNote: GSTCreditNote, booking: Booking) => { console.log("Generating Credit Note PDF", creditNote.id, booking.id); };

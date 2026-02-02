@@ -1,15 +1,160 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { inventoryService } from '../../services/inventoryService';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { OperatorInventoryItem, ActivityTransferOptions, Destination } from '../../types';
 import { InventoryStatusBadge } from '../../components/inventory/InventoryStatusBadge';
-import { Plus, Save, X, Box, GitBranch, DollarSign, Bus, Car, Ticket, Edit2, Trash2, Search, Filter } from 'lucide-react';
+import { 
+    Plus, Save, X, Box, GitBranch, DollarSign, Bus, Car, Ticket, 
+    Edit2, Trash2, Search, Filter, Image as ImageIcon, MapPin, 
+    Calendar, FileText, Bold, Italic, Underline, Strikethrough, 
+    AlignLeft, AlignCenter, AlignRight, AlignJustify, 
+    List as ListIcon, ListOrdered, Link as LinkIcon, 
+    Heading1, Heading2, Eraser, Undo, Redo, Type, Check
+} from 'lucide-react';
 
 const DEFAULT_TRANSFER_OPTS: ActivityTransferOptions = {
     sic: { enabled: false, costPerPerson: 0 },
     pvt: { enabled: false, costPerVehicle: 0, vehicleCapacity: 4 }
+};
+
+type ModalTab = 'GENERAL' | 'PRICING' | 'MEDIA';
+
+// --- PROFESSIONAL WYSIWYG EDITOR ---
+const RichTextEditor: React.FC<{
+    label: string;
+    value: string;
+    onChange: (val: string) => void;
+    placeholder?: string;
+    height?: string;
+}> = ({ label, value, onChange, placeholder, height = "h-64" }) => {
+    const editorRef = useRef<HTMLDivElement>(null);
+    const [activeFormats, setActiveFormats] = useState<string[]>([]);
+
+    // Sync external value to internal HTML only if completely different/empty
+    useEffect(() => {
+        if (editorRef.current && editorRef.current.innerHTML !== value) {
+             if (!editorRef.current.innerHTML || value === '') {
+                 editorRef.current.innerHTML = value;
+             }
+        }
+    }, [value]);
+
+    const updateActiveFormats = () => {
+        const formats: string[] = [];
+        if (document.queryCommandState('bold')) formats.push('bold');
+        if (document.queryCommandState('italic')) formats.push('italic');
+        if (document.queryCommandState('underline')) formats.push('underline');
+        if (document.queryCommandState('strikeThrough')) formats.push('strikeThrough');
+        if (document.queryCommandState('justifyLeft')) formats.push('justifyLeft');
+        if (document.queryCommandState('justifyCenter')) formats.push('justifyCenter');
+        if (document.queryCommandState('justifyRight')) formats.push('justifyRight');
+        if (document.queryCommandState('insertUnorderedList')) formats.push('insertUnorderedList');
+        if (document.queryCommandState('insertOrderedList')) formats.push('insertOrderedList');
+        setActiveFormats(formats);
+    };
+
+    const exec = (command: string, value: string | undefined = undefined) => {
+        document.execCommand(command, false, value);
+        editorRef.current?.focus();
+        updateActiveFormats();
+        if (editorRef.current) {
+            onChange(editorRef.current.innerHTML);
+        }
+    };
+
+    const ToolbarButton = ({ onClick, icon, title, formatKey }: any) => {
+        const isActive = formatKey && activeFormats.includes(formatKey);
+        return (
+            <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+                className={`p-1.5 rounded-md transition-all duration-200 ${
+                    isActive 
+                    ? 'bg-brand-100 text-brand-700 shadow-inner' 
+                    : 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+                title={title}
+            >
+                {icon}
+            </button>
+        );
+    };
+
+    const Separator = () => <div className="w-px h-5 bg-slate-300 mx-1.5 self-center opacity-50"></div>;
+
+    return (
+        <div className="w-full group">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">{label}</label>
+            <div className="border border-slate-300 rounded-xl overflow-hidden bg-white shadow-sm transition-all focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500">
+                
+                {/* CKEditor-style Toolbar */}
+                <div className="flex flex-wrap items-center gap-0.5 p-2 bg-slate-100 border-b border-slate-200 sticky top-0 z-10">
+                    
+                    {/* Headings */}
+                    <div className="flex gap-0.5 bg-white rounded-lg p-0.5 border border-slate-200 shadow-sm">
+                        <ToolbarButton onClick={() => exec('formatBlock', 'P')} icon={<Type size={16} />} title="Normal Text" />
+                        <ToolbarButton onClick={() => exec('formatBlock', 'H3')} icon={<Heading1 size={16} />} title="Heading 1" />
+                        <ToolbarButton onClick={() => exec('formatBlock', 'H4')} icon={<Heading2 size={16} />} title="Heading 2" />
+                    </div>
+                    <Separator />
+
+                    {/* Formatting */}
+                    <div className="flex gap-0.5 bg-white rounded-lg p-0.5 border border-slate-200 shadow-sm">
+                        <ToolbarButton onClick={() => exec('bold')} icon={<Bold size={16} />} title="Bold" formatKey="bold" />
+                        <ToolbarButton onClick={() => exec('italic')} icon={<Italic size={16} />} title="Italic" formatKey="italic" />
+                        <ToolbarButton onClick={() => exec('underline')} icon={<Underline size={16} />} title="Underline" formatKey="underline" />
+                        <ToolbarButton onClick={() => exec('strikeThrough')} icon={<Strikethrough size={16} />} title="Strikethrough" formatKey="strikeThrough" />
+                    </div>
+                    <Separator />
+
+                    {/* Lists */}
+                    <div className="flex gap-0.5 bg-white rounded-lg p-0.5 border border-slate-200 shadow-sm">
+                        <ToolbarButton onClick={() => exec('insertUnorderedList')} icon={<ListIcon size={16} />} title="Bullet List" formatKey="insertUnorderedList" />
+                        <ToolbarButton onClick={() => exec('insertOrderedList')} icon={<ListOrdered size={16} />} title="Numbered List" formatKey="insertOrderedList" />
+                    </div>
+                    <Separator />
+                    
+                    {/* Alignment */}
+                    <div className="flex gap-0.5 bg-white rounded-lg p-0.5 border border-slate-200 shadow-sm">
+                        <ToolbarButton onClick={() => exec('justifyLeft')} icon={<AlignLeft size={16} />} title="Align Left" formatKey="justifyLeft" />
+                        <ToolbarButton onClick={() => exec('justifyCenter')} icon={<AlignCenter size={16} />} title="Align Center" formatKey="justifyCenter" />
+                        <ToolbarButton onClick={() => exec('justifyRight')} icon={<AlignRight size={16} />} title="Align Right" formatKey="justifyRight" />
+                    </div>
+                    
+                     <div className="flex-1"></div>
+
+                    {/* Utilities */}
+                    <div className="flex gap-0.5">
+                        <ToolbarButton onClick={() => {
+                            const url = prompt('Enter URL:');
+                            if(url) exec('createLink', url);
+                        }} icon={<LinkIcon size={16} />} title="Link" />
+                        <ToolbarButton onClick={() => exec('removeFormat')} icon={<Eraser size={16} />} title="Clear Formatting" />
+                        <ToolbarButton onClick={() => exec('undo')} icon={<Undo size={16} />} title="Undo" />
+                        <ToolbarButton onClick={() => exec('redo')} icon={<Redo size={16} />} title="Redo" />
+                    </div>
+                </div>
+                
+                {/* Editor Content Area */}
+                <div 
+                    ref={editorRef}
+                    contentEditable
+                    className={`w-full p-6 text-sm outline-none overflow-y-auto prose prose-sm max-w-none ${height} cursor-text bg-white`}
+                    onInput={(e) => onChange(e.currentTarget.innerHTML)}
+                    onKeyUp={updateActiveFormats}
+                    onMouseUp={updateActiveFormats}
+                    data-placeholder={placeholder}
+                    style={{ minHeight: '150px' }}
+                />
+            </div>
+            <div className="flex justify-between mt-1 px-1">
+                <p className="text-[10px] text-slate-400">Word-style editor active</p>
+                <p className="text-[10px] text-slate-400">{value.length} chars</p>
+            </div>
+        </div>
+    );
 };
 
 export const InventoryManager: React.FC = () => {
@@ -20,6 +165,7 @@ export const InventoryManager: React.FC = () => {
   
   // Modal & Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<ModalTab>('GENERAL');
   const [editingItem, setEditingItem] = useState<OperatorInventoryItem | null>(null);
   const [formData, setFormData] = useState<Partial<OperatorInventoryItem>>({});
   const [transferOpts, setTransferOpts] = useState<ActivityTransferOptions>(DEFAULT_TRANSFER_OPTS);
@@ -28,6 +174,7 @@ export const InventoryManager: React.FC = () => {
   // Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'HOTEL' | 'ACTIVITY' | 'TRANSFER'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'APPROVED' | 'PENDING' | 'REJECTED'>('ALL');
 
   useEffect(() => {
     const init = async () => {
@@ -53,6 +200,7 @@ export const InventoryManager: React.FC = () => {
   };
 
   const handleOpenModal = (item?: OperatorInventoryItem) => {
+      setActiveTab('GENERAL');
       if (item) {
           // EDIT MODE
           setEditingItem(item);
@@ -106,9 +254,7 @@ export const InventoryManager: React.FC = () => {
 
   const handleDelete = async (id: string) => {
       if(confirm("Are you sure? This will remove the item permanently.")) {
-          // Assuming service has delete, if not we mark inactive
-          // inventoryService.deleteItem(id); 
-          alert("Deletion logic to be implemented in service.");
+          alert("Deletion logic pending implementation in service.");
       }
   };
 
@@ -121,9 +267,18 @@ export const InventoryManager: React.FC = () => {
   };
 
   const filteredItems = items.filter(i => {
-      const matchSearch = i.name.toLowerCase().includes(searchTerm.toLowerCase());
+      // Fix: Safe access to name property
+      const name = i.name || '';
+      const matchSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
+      
       const matchType = typeFilter === 'ALL' || i.type === typeFilter;
-      return matchSearch && matchType;
+      
+      let matchStatus = true;
+      if (statusFilter === 'APPROVED') matchStatus = i.status === 'APPROVED';
+      if (statusFilter === 'PENDING') matchStatus = i.status === 'PENDING_APPROVAL';
+      if (statusFilter === 'REJECTED') matchStatus = i.status === 'REJECTED';
+
+      return matchSearch && matchType && matchStatus;
   });
 
   return (
@@ -137,34 +292,48 @@ export const InventoryManager: React.FC = () => {
         </div>
         <button 
             onClick={() => handleOpenModal()}
-            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition shadow-lg shadow-brand-200 font-bold"
+            className="bg-brand-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-brand-700 transition shadow-lg shadow-brand-200 font-bold transform hover:-translate-y-0.5"
         >
             <Plus size={18} /> Add New Item
         </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row gap-4 items-center">
-          <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-              <input 
-                  type="text" 
-                  placeholder="Search your inventory..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-              />
-          </div>
-          <div className="flex bg-slate-100 p-1 rounded-lg">
-              {(['ALL', 'HOTEL', 'ACTIVITY', 'TRANSFER'] as const).map(type => (
-                  <button
-                    key={type}
-                    onClick={() => setTypeFilter(type)}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition ${typeFilter === type ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                      {type}
-                  </button>
-              ))}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 space-y-4">
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              
+              {/* Type Filter */}
+              <div className="flex bg-slate-100 p-1 rounded-lg">
+                  {(['ALL', 'HOTEL', 'ACTIVITY', 'TRANSFER'] as const).map(type => (
+                      <button
+                        key={type}
+                        onClick={() => setTypeFilter(type)}
+                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition ${typeFilter === type ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          {type === 'ALL' ? 'All Types' : type}
+                      </button>
+                  ))}
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex bg-slate-100 p-1 rounded-lg">
+                  <button onClick={() => setStatusFilter('ALL')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>All Status</button>
+                  <button onClick={() => setStatusFilter('APPROVED')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'APPROVED' ? 'bg-green-100 text-green-700' : 'text-slate-500'}`}>Live</button>
+                  <button onClick={() => setStatusFilter('PENDING')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'text-slate-500'}`}>Pending</button>
+                  <button onClick={() => setStatusFilter('REJECTED')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'REJECTED' ? 'bg-red-100 text-red-700' : 'text-slate-500'}`}>Rejected</button>
+              </div>
+
+              {/* Search */}
+              <div className="relative w-full md:w-64">
+                  <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                  <input 
+                      type="text" 
+                      placeholder="Search items..." 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                  />
+              </div>
           </div>
       </div>
 
@@ -172,9 +341,10 @@ export const InventoryManager: React.FC = () => {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 uppercase text-xs">
             <tr>
+              <th className="px-6 py-4 font-semibold w-16">Image</th>
               <th className="px-6 py-4 font-semibold">Service Name</th>
               <th className="px-6 py-4 font-semibold">Type</th>
-              <th className="px-6 py-4 font-semibold">Pricing</th>
+              <th className="px-6 py-4 font-semibold">Net Pricing</th>
               <th className="px-6 py-4 font-semibold">Status</th>
               <th className="px-6 py-4 font-semibold text-right">Actions</th>
             </tr>
@@ -183,19 +353,30 @@ export const InventoryManager: React.FC = () => {
             {filteredItems.map(item => (
               <tr key={item.id} className="hover:bg-slate-50 transition">
                 <td className="px-6 py-4">
-                    <div className="font-bold text-slate-900 text-base">{item.name}</div>
-                    <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
-                        <GitBranch size={10} /> v{item.version}
-                        <span className="text-slate-300">|</span>
-                        {item.description ? item.description.substring(0, 40) + '...' : 'No description'}
+                    <div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center border border-slate-200">
+                        {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                            <ImageIcon size={16} className="text-slate-400" />
+                        )}
                     </div>
                 </td>
                 <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold border ${
+                    <div className="font-bold text-slate-900 text-base">{item.name}</div>
+                    <div className="text-xs text-slate-500 flex items-center gap-2 mt-1">
+                        <GitBranch size={10} /> v{item.version}
+                        {item.type === 'HOTEL' && <span className="bg-slate-100 px-1.5 rounded">{item.category}</span>}
+                    </div>
+                </td>
+                <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold border flex items-center w-fit gap-1 ${
                         item.type === 'HOTEL' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
                         item.type === 'ACTIVITY' ? 'bg-pink-50 text-pink-700 border-pink-100' :
                         'bg-blue-50 text-blue-700 border-blue-100'
                     }`}>
+                        {item.type === 'HOTEL' && <Box size={10}/>}
+                        {item.type === 'ACTIVITY' && <Ticket size={10}/>}
+                        {item.type === 'TRANSFER' && <Car size={10}/>}
                         {item.type}
                     </span>
                 </td>
@@ -231,7 +412,8 @@ export const InventoryManager: React.FC = () => {
             ))}
             {filteredItems.length === 0 && (
                 <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                    <td colSpan={6} className="px-6 py-16 text-center text-slate-400 italic">
+                        <Box size={40} className="mx-auto mb-3 opacity-20" />
                         No inventory items found. Click "Add New Item" to start.
                     </td>
                 </tr>
@@ -243,195 +425,266 @@ export const InventoryManager: React.FC = () => {
       {/* --- ADD/EDIT MODAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-xl max-w-2xl w-full p-0 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col">
+          <div className="bg-white rounded-2xl max-w-4xl w-full p-0 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col">
             
             {/* Header */}
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h2 className="text-xl font-bold text-slate-900">
-                  {editingItem ? 'Edit Inventory Item' : 'Submit New Inventory'}
-              </h2>
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0 z-20">
+              <div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                      {editingItem ? 'Edit Inventory Item' : 'Submit New Inventory'}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">Changes require Admin approval before going live.</p>
+              </div>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition"><X size={24}/></button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 overflow-y-auto">
-                
-                {/* 1. Common Fields */}
-                <div className="grid grid-cols-2 gap-5">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Service Type</label>
-                        <select 
-                            className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none"
-                            value={formData.type}
-                            onChange={e => setFormData({...formData, type: e.target.value as any})}
-                            disabled={!!editingItem} // Cannot change type on edit
-                        >
-                            <option value="HOTEL">Hotel</option>
-                            <option value="ACTIVITY">Activity / Tour</option>
-                            <option value="TRANSFER">Transfer</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Destination</label>
-                        <select 
-                            className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none"
-                            value={formData.destinationId}
-                            onChange={e => setFormData({...formData, destinationId: e.target.value})}
-                            required
-                        >
-                            <option value="">Select City...</option>
-                            {destinations.map(d => <option key={d.id} value={d.id}>{d.city}, {d.country}</option>)}
-                        </select>
-                    </div>
-                </div>
+            {/* TABS */}
+            <div className="flex border-b border-slate-200 px-6 sticky top-[80px] z-10 bg-white">
+                <button 
+                    onClick={() => setActiveTab('GENERAL')}
+                    className={`px-4 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'GENERAL' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    <FileText size={16} /> General Info
+                </button>
+                <button 
+                    onClick={() => setActiveTab('PRICING')}
+                    className={`px-4 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'PRICING' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    <DollarSign size={16} /> Pricing & Config
+                </button>
+                <button 
+                    onClick={() => setActiveTab('MEDIA')}
+                    className={`px-4 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'MEDIA' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    <ImageIcon size={16} /> Media
+                </button>
+            </div>
 
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Service Name</label>
-                    <input 
-                        required
-                        type="text" 
-                        className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium"
-                        placeholder={formData.type === 'HOTEL' ? 'e.g. Marina Byblos Hotel' : 'e.g. Desert Safari'}
-                        value={formData.name || ''}
-                        onChange={e => setFormData({...formData, name: e.target.value})}
-                    />
-                </div>
-
-                {/* 2. Dynamic Type-Specific Fields */}
-                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+                <div className="p-6 space-y-6">
                     
-                    {/* A. ACTIVITY FORM */}
-                    {formData.type === 'ACTIVITY' && (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 mb-2 text-brand-700 font-bold text-sm">
-                                <Ticket size={16} /> Activity Pricing (INR)
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+                    {/* TAB: GENERAL */}
+                    {activeTab === 'GENERAL' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <div className="grid grid-cols-2 gap-5">
                                 <div>
-                                    <label className="block text-xs text-slate-500 mb-1">Adult Price</label>
-                                    <input required type="number" min="0" value={formData.costAdult} onChange={e => setFormData({...formData, costAdult: Number(e.target.value), costPrice: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Service Type</label>
+                                    <select 
+                                        className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none"
+                                        value={formData.type}
+                                        onChange={e => setFormData({...formData, type: e.target.value as any})}
+                                        disabled={!!editingItem} 
+                                    >
+                                        <option value="HOTEL">Hotel</option>
+                                        <option value="ACTIVITY">Activity / Tour</option>
+                                        <option value="TRANSFER">Transfer</option>
+                                    </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-slate-500 mb-1">Child Price</label>
-                                    <input required type="number" min="0" value={formData.costChild} onChange={e => setFormData({...formData, costChild: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Destination</label>
+                                    <select 
+                                        className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none"
+                                        value={formData.destinationId}
+                                        onChange={e => setFormData({...formData, destinationId: e.target.value})}
+                                        required
+                                    >
+                                        <option value="">Select City...</option>
+                                        {destinations.map(d => <option key={d.id} value={d.id}>{d.city}, {d.country}</option>)}
+                                    </select>
                                 </div>
                             </div>
 
-                            <hr className="border-slate-200" />
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Service Name</label>
+                                <input 
+                                    required
+                                    type="text" 
+                                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                                    placeholder={formData.type === 'HOTEL' ? 'e.g. Marina Byblos Hotel' : 'e.g. Desert Safari'}
+                                    value={formData.name || ''}
+                                    onChange={e => setFormData({...formData, name: e.target.value})}
+                                />
+                            </div>
+
+                            <RichTextEditor 
+                                label="Description & Inclusions"
+                                value={formData.description || ''}
+                                onChange={val => setFormData({...formData, description: val})}
+                                placeholder="Provide detailed description of amenities, timings, and inclusions..."
+                                height="h-64"
+                            />
+                        </div>
+                    )}
+
+                    {/* TAB: PRICING */}
+                    {activeTab === 'PRICING' && (
+                        <div className="space-y-6 animate-in fade-in">
                             
-                            {/* Transfer Toggles */}
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                   <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
-                                       <input type="checkbox" checked={transferOpts.sic.enabled} onChange={e => updateSic('enabled', e.target.checked)} className="rounded text-brand-600 focus:ring-brand-500" />
-                                       <Bus size={16} className="text-blue-500"/> Enable Shared Transfer (SIC)
-                                   </label>
-                                   {transferOpts.sic.enabled && (
-                                       <div className="flex items-center gap-2">
-                                           <span className="text-xs text-slate-500">Cost/Pax:</span>
-                                           <input type="number" min="0" value={transferOpts.sic.costPerPerson} onChange={e => updateSic('costPerPerson', Number(e.target.value))} className="w-24 border border-slate-300 rounded p-1.5 font-mono text-sm" />
-                                       </div>
-                                   )}
-                                </div>
+                            {/* A. ACTIVITY FORM */}
+                            {formData.type === 'ACTIVITY' && (
+                                <div className="space-y-4">
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Base Ticket Pricing (INR)</h4>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs text-slate-500 mb-1">Adult Price</label>
+                                                <input required type="number" min="0" value={formData.costAdult} onChange={e => setFormData({...formData, costAdult: Number(e.target.value), costPrice: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-slate-500 mb-1">Child Price</label>
+                                                <input required type="number" min="0" value={formData.costChild} onChange={e => setFormData({...formData, costChild: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Transfer Toggles */}
+                                    <div className="space-y-3 p-4 border border-slate-200 rounded-xl">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Transfer Add-ons</h4>
+                                        
+                                        <div className="flex items-center justify-between">
+                                        <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                                            <input type="checkbox" checked={transferOpts.sic.enabled} onChange={e => updateSic('enabled', e.target.checked)} className="rounded text-brand-600 focus:ring-brand-500" />
+                                            <Bus size={16} className="text-blue-500"/> Enable Shared Transfer (SIC)
+                                        </label>
+                                        {transferOpts.sic.enabled && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-slate-500">Cost/Pax:</span>
+                                                <input type="number" min="0" value={transferOpts.sic.costPerPerson} onChange={e => updateSic('costPerPerson', Number(e.target.value))} className="w-24 border border-slate-300 rounded p-1.5 font-mono text-sm" />
+                                            </div>
+                                        )}
+                                        </div>
 
-                                <div className="flex items-center justify-between">
-                                   <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
-                                       <input type="checkbox" checked={transferOpts.pvt.enabled} onChange={e => updatePvt('enabled', e.target.checked)} className="rounded text-brand-600 focus:ring-brand-500" />
-                                       <Car size={16} className="text-purple-500"/> Enable Private Transfer (PVT)
-                                   </label>
+                                        <div className="flex items-center justify-between">
+                                        <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                                            <input type="checkbox" checked={transferOpts.pvt.enabled} onChange={e => updatePvt('enabled', e.target.checked)} className="rounded text-brand-600 focus:ring-brand-500" />
+                                            <Car size={16} className="text-purple-500"/> Enable Private Transfer (PVT)
+                                        </label>
+                                        </div>
+                                        {transferOpts.pvt.enabled && (
+                                            <div className="pl-6 grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                <div>
+                                                <label className="block text-xs text-slate-500 mb-1">Cost Per Vehicle</label>
+                                                <input type="number" min="0" value={transferOpts.pvt.costPerVehicle} onChange={e => updatePvt('costPerVehicle', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 font-mono text-sm" />
+                                                </div>
+                                                <div>
+                                                <label className="block text-xs text-slate-500 mb-1">Vehicle Capacity</label>
+                                                <input type="number" min="1" value={transferOpts.pvt.vehicleCapacity} onChange={e => updatePvt('vehicleCapacity', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 font-mono text-sm" />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                {transferOpts.pvt.enabled && (
-                                    <div className="pl-6 grid grid-cols-2 gap-4 bg-white p-3 rounded-lg border border-slate-200">
-                                        <div>
-                                           <label className="block text-xs text-slate-500 mb-1">Cost Per Vehicle</label>
-                                           <input type="number" min="0" value={transferOpts.pvt.costPerVehicle} onChange={e => updatePvt('costPerVehicle', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 font-mono text-sm" />
+                            )}
+
+                            {/* B. TRANSFER FORM */}
+                            {formData.type === 'TRANSFER' && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehicle Type</label>
+                                            <input required type="text" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="e.g. Toyota Innova" value={formData.vehicleType || ''} onChange={e => setFormData({...formData, vehicleType: e.target.value})} />
                                         </div>
                                         <div>
-                                           <label className="block text-xs text-slate-500 mb-1">Vehicle Capacity</label>
-                                           <input type="number" min="1" value={transferOpts.pvt.vehicleCapacity} onChange={e => updatePvt('vehicleCapacity', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 font-mono text-sm" />
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Max Pax</label>
+                                            <input required type="number" min="1" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" value={formData.maxPassengers || ''} onChange={e => setFormData({...formData, maxPassengers: Number(e.target.value)})} />
                                         </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Luggage Bags</label>
+                                            <input required type="number" min="0" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" value={formData.luggageCapacity || ''} onChange={e => setFormData({...formData, luggageCapacity: Number(e.target.value)})} />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cost Per Vehicle (INR)</label>
+                                            <input required type="number" min="0" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold font-mono" value={formData.costPrice || ''} onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* C. HOTEL FORM */}
+                            {formData.type === 'HOTEL' && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Star Category</label>
+                                            <select className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as any})}>
+                                                <option>3 Star</option><option>4 Star</option><option>5 Star</option><option>Luxury</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Meal Plan</label>
+                                            <select className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white" value={formData.mealPlan} onChange={e => setFormData({...formData, mealPlan: e.target.value as any})}>
+                                                <option>RO</option><option>BB</option><option>HB</option><option>FB</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Net Cost Per Room (INR)</label>
+                                            <input 
+                                                required
+                                                type="number" 
+                                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono font-bold"
+                                                placeholder="0.00"
+                                                value={formData.costPrice || ''}
+                                                onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})}
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Room Type</label>
+                                            <input required type="text" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="e.g. Deluxe Sea View" value={formData.roomType || ''} onChange={e => setFormData({...formData, roomType: e.target.value})} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                             {/* Date Validity */}
+                             <div className="grid grid-cols-2 gap-4 mt-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valid From</label>
+                                    <input type="date" className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={formData.validFrom || ''} onChange={e => setFormData({...formData, validFrom: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valid To</label>
+                                    <input type="date" className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={formData.validTo || ''} onChange={e => setFormData({...formData, validTo: e.target.value})} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TAB: MEDIA */}
+                    {activeTab === 'MEDIA' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Image URL</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        value={formData.imageUrl || ''} 
+                                        onChange={e => setFormData({...formData, imageUrl: e.target.value})} 
+                                        className="flex-1 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                                        placeholder="https://example.com/image.jpg"
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-400 mt-1">Paste a public URL for the main image.</p>
+                            </div>
+
+                            {/* Preview */}
+                            <div className="bg-slate-50 rounded-xl border border-slate-200 h-48 flex items-center justify-center overflow-hidden">
+                                {formData.imageUrl ? (
+                                    <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="text-center text-slate-300">
+                                        <ImageIcon size={32} className="mx-auto mb-2" />
+                                        <span className="text-sm">Image Preview</span>
                                     </div>
                                 )}
                             </div>
                         </div>
                     )}
 
-                    {/* B. TRANSFER FORM */}
-                    {formData.type === 'TRANSFER' && (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 mb-2 text-blue-700 font-bold text-sm">
-                                <Car size={16} /> Fleet Details
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="col-span-2">
-                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehicle Type</label>
-                                     <input required type="text" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="e.g. Toyota Innova" value={formData.vehicleType || ''} onChange={e => setFormData({...formData, vehicleType: e.target.value})} />
-                                </div>
-                                <div>
-                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Max Pax</label>
-                                     <input required type="number" min="1" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" value={formData.maxPassengers || ''} onChange={e => setFormData({...formData, maxPassengers: Number(e.target.value)})} />
-                                </div>
-                                <div>
-                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Luggage Bags</label>
-                                     <input required type="number" min="0" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" value={formData.luggageCapacity || ''} onChange={e => setFormData({...formData, luggageCapacity: Number(e.target.value)})} />
-                                </div>
-                                 <div className="col-span-2">
-                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cost Per Vehicle (INR)</label>
-                                     <input required type="number" min="0" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold font-mono" value={formData.costPrice || ''} onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})} />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* C. HOTEL FORM */}
-                    {formData.type === 'HOTEL' && (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 mb-2 text-indigo-700 font-bold text-sm">
-                                <DollarSign size={16} /> Hotel Rate
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Star Category</label>
-                                    <select className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as any})}>
-                                        <option>3 Star</option><option>4 Star</option><option>5 Star</option><option>Luxury</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Meal Plan</label>
-                                    <select className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white" value={formData.mealPlan} onChange={e => setFormData({...formData, mealPlan: e.target.value as any})}>
-                                        <option>RO</option><option>BB</option><option>HB</option><option>FB</option>
-                                    </select>
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Net Cost Per Room (INR)</label>
-                                    <input 
-                                        required
-                                        type="number" 
-                                        className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono font-bold"
-                                        placeholder="0.00"
-                                        value={formData.costPrice || ''}
-                                        onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
-
-                {/* 3. Description */}
-                <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
-                    <textarea 
-                        className="w-full border border-slate-300 p-2.5 rounded-lg h-24 resize-none text-sm focus:ring-2 focus:ring-brand-500 outline-none"
-                        placeholder="Key highlights, timings, or meeting points..."
-                        value={formData.description || ''}
-                        onChange={e => setFormData({...formData, description: e.target.value})}
-                    />
-                </div>
-
             </form>
 
             {/* Footer */}
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-2xl sticky bottom-0 z-20">
                 <button 
                     type="button" 
                     onClick={() => setIsModalOpen(false)} 

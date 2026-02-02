@@ -4,6 +4,7 @@ import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, FixedPackage, ItineraryItem, ItineraryService } from '../../types';
 import { Edit2, Trash2, Plus, X, Package, Calendar, Image as ImageIcon, Tag, Check, MapPin, Layers, FileText, DollarSign, Hotel } from 'lucide-react';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
 type ModalTab = 'OVERVIEW' | 'ITINERARY' | 'PRICING';
 
@@ -366,14 +367,12 @@ export const FixedPackages: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description</label>
-                                <textarea 
-                                    rows={3}
-                                    className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
-                                    placeholder="Brief summary of the package..."
+                            <div className="space-y-4">
+                                <RichTextEditor 
+                                    label="Description"
                                     value={formData.description || ''}
-                                    onChange={e => setFormData({...formData, description: e.target.value})}
+                                    onChange={(val) => setFormData({...formData, description: val})}
+                                    placeholder="Brief summary of the package..."
                                 />
                             </div>
 
@@ -422,13 +421,15 @@ export const FixedPackages: React.FC = () => {
                                                 placeholder="Day Title"
                                             />
                                         </div>
-                                        <textarea 
-                                            rows={2}
-                                            value={day.description} 
-                                            onChange={e => handleUpdateDay(dIdx, 'description', e.target.value)}
-                                            className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-brand-500 outline-none resize-none mb-3"
-                                            placeholder="Day description..."
-                                        />
+                                        <div className="mb-3">
+                                            <RichTextEditor 
+                                                label=""
+                                                value={day.description || ''}
+                                                onChange={(val) => handleUpdateDay(dIdx, 'description', val)}
+                                                placeholder="Day description..."
+                                                height="h-32"
+                                            />
+                                        </div>
 
                                         {/* Services */}
                                         <div className="space-y-2 pl-4 border-l-2 border-slate-100">

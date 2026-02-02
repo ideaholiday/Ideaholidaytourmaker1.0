@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
 import { adminService } from '../../services/adminService';
-import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book, Loader2, Package, Layout, FileCheck, Wallet } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Clock, DollarSign, ChevronRight, Map, Palette, TrendingUp, Book, Loader2, Package, Layout, FileCheck, Wallet, Search } from 'lucide-react';
 import { Quote, FixedPackage, SystemNotification } from '../../types';
 import { NotificationTicker } from '../../components/ui/NotificationTicker';
 
@@ -17,7 +17,8 @@ export const AgentDashboard: React.FC = () => {
       totalRevenue: 0,
       conversionRate: 0
   });
-  const [recentQuotes, setRecentQuotes] = useState<Quote[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [featuredPackages, setFeaturedPackages] = useState<FixedPackage[]>([]);
   const [notifications, setNotifications] = useState<SystemNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +30,7 @@ export const AgentDashboard: React.FC = () => {
                   const s = await agentService.getStats(user.id);
                   setStats(s);
                   const q = await agentService.fetchQuotes(user.id);
-                  setRecentQuotes(q.slice(0, 5));
+                  setQuotes(q);
                   
                   // Load featured packages
                   const pkgs = await adminService.getFixedPackages();
@@ -70,6 +71,14 @@ export const AgentDashboard: React.FC = () => {
   );
 
   const walletBalance = user.walletBalance || 0;
+
+  const displayedQuotes = searchTerm 
+    ? quotes.filter(q => 
+        (q.uniqueRefNo?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+        (q.destination?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (q.status?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+      )
+    : quotes.slice(0, 5);
 
   return (
     <div className="container mx-auto px-4 py-8 pb-16">
@@ -139,11 +148,23 @@ export const AgentDashboard: React.FC = () => {
               
               {/* Recent Activity Table */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50">
                   <h2 className="font-bold text-slate-800">Recent Quotations</h2>
-                  <Link to="/agent/quotes" className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center gap-1">
-                    View Full History <ChevronRight size={16} />
-                  </Link>
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                      <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                      <input 
+                        type="text" 
+                        placeholder="Search quotes..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                      />
+                    </div>
+                    <Link to="/agent/quotes" className="text-sm text-brand-600 hover:text-brand-700 font-medium flex items-center gap-1 whitespace-nowrap">
+                      View Full History <ChevronRight size={16} />
+                    </Link>
+                  </div>
                 </div>
                 
                 <div className="overflow-x-auto">
@@ -157,7 +178,7 @@ export const AgentDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {recentQuotes.map((quote) => (
+                      {displayedQuotes.map((quote) => (
                         <tr key={quote.id} className="hover:bg-slate-50 transition">
                           <td className="px-6 py-4 font-mono text-slate-600">{quote.uniqueRefNo}</td>
                           <td className="px-6 py-4 font-medium text-slate-900">{quote.destination}</td>
@@ -177,10 +198,11 @@ export const AgentDashboard: React.FC = () => {
                           </td>
                         </tr>
                       ))}
-                      {recentQuotes.length === 0 && (
+                      {displayedQuotes.length === 0 && (
                         <tr>
                           <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                            No quotes generated yet. <Link to="/agent/create" className="text-brand-600 hover:underline">Create your first one.</Link>
+                            {searchTerm ? 'No quotes found matching your search.' : 'No quotes generated yet.'}
+                            {!searchTerm && <Link to="/agent/create" className="text-brand-600 hover:underline ml-1">Create your first one.</Link>}
                           </td>
                         </tr>
                       )}

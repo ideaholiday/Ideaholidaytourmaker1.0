@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole, Hotel, Destination } from '../../types';
 import { Edit2, Plus, X, Search, Hotel as HotelIcon, Calendar, DollarSign, Image as ImageIcon, Phone, Mail, MapPin } from 'lucide-react';
 import { InventoryImportExport } from '../../components/admin/InventoryImportExport';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
 export const Hotels: React.FC = () => {
   const { user } = useAuth();
@@ -232,7 +233,7 @@ export const Hotels: React.FC = () => {
 
       {isModalOpen && canEdit && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-0 overflow-hidden transform scale-100 transition-all max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-0 overflow-hidden transform scale-100 transition-all max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10 backdrop-blur-md">
               <h2 className="text-xl font-bold text-slate-900">{editingHotel ? 'Edit Rate' : 'Add Hotel Rate'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition"><X size={24}/></button>
@@ -285,15 +286,13 @@ export const Hotels: React.FC = () => {
                   <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                       <HotelIcon size={14} /> Description & Contact
                   </h3>
-                  <div>
-                      <textarea 
-                          rows={2}
-                          value={formData.description || ''} 
-                          onChange={e => setFormData({...formData, description: e.target.value})} 
-                          className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none bg-white shadow-sm"
-                          placeholder="Short description of the property..."
-                      />
-                  </div>
+                  
+                  <RichTextEditor 
+                      label="Description"
+                      value={formData.description || ''}
+                      onChange={(val) => setFormData({...formData, description: val})}
+                      placeholder="Detailed description of hotel amenities, location, and features..."
+                  />
                   
                   <div className="grid grid-cols-2 gap-4">
                       <div className="relative">
