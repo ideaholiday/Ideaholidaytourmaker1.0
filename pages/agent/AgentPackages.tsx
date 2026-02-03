@@ -344,7 +344,7 @@ export const AgentPackages: React.FC = () => {
                        {/* PRICE RIBBON - Floating Design */}
                        <div className="absolute top-[-50px] right-12 bg-white px-10 py-6 rounded-t-2xl shadow-[0_-10px_30px_rgba(0,0,0,0.1)] text-center border-t-8" style={{ borderColor: brandColor }}>
                            <p className="text-slate-400 text-lg uppercase font-bold tracking-widest mb-1">Starting From</p>
-                           <p className="text-6xl font-extrabold text-slate-900 leading-none mb-1">₹ {flyerData.fixedPrice.toLocaleString()}</p>
+                           <p className="text-6xl font-extrabold text-slate-900 leading-none mb-2">₹ {flyerData.fixedPrice.toLocaleString()}</p>
                            <p className="text-slate-500 text-sm font-medium">Per Person</p>
                        </div>
 
