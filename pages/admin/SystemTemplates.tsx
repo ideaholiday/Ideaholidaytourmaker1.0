@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
 import { ItineraryTemplate, TemplateDay, TemplateServiceSlot } from '../../types';
 import { Edit2, Trash2, Plus, X, Layers, Save, Tag, Calendar, MapPin, ArrowRight } from 'lucide-react';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
 export const SystemTemplates: React.FC = () => {
   const [templates, setTemplates] = useState<ItineraryTemplate[]>([]);
@@ -217,9 +218,20 @@ export const SystemTemplates: React.FC = () => {
                                         <span className="text-xs font-bold bg-slate-200 text-slate-700 px-3 py-1 rounded-full">Day {day.day}</span>
                                     </div>
                                     
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <input type="text" value={day.title} onChange={e => updateDay(dIdx, 'title', e.target.value)} className="border border-slate-300 p-2 rounded text-sm outline-none focus:border-brand-500" placeholder="Day Title (e.g. Arrival)" />
-                                        <input type="text" value={day.description} onChange={e => updateDay(dIdx, 'description', e.target.value)} className="border border-slate-300 p-2 rounded text-sm outline-none focus:border-brand-500" placeholder="Brief description..." />
+                                    <div className="grid grid-cols-1 gap-4 mb-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Title</label>
+                                            <input type="text" value={day.title} onChange={e => updateDay(dIdx, 'title', e.target.value)} className="w-full border border-slate-300 p-2 rounded text-sm outline-none focus:border-brand-500" placeholder="Day Title (e.g. Arrival)" />
+                                        </div>
+                                        <div>
+                                            <RichTextEditor 
+                                                label="Day Description"
+                                                value={day.description || ''}
+                                                onChange={(val) => updateDay(dIdx, 'description', val)}
+                                                height="h-24"
+                                                placeholder="Describe the day's agenda..."
+                                            />
+                                        </div>
                                     </div>
 
                                     {/* Slots */}

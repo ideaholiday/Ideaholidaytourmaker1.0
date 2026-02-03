@@ -1,7 +1,7 @@
 
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
-import { Quote, PricingBreakdown, UserRole, User, Booking, PaymentEntry, GSTRecord, GSTCreditNote } from '../types';
+import { Quote, PricingBreakdown, UserRole, User, Booking, PaymentEntry, GSTRecord, GSTCreditNote, FixedPackage } from '../types';
 import { BRANDING } from '../constants';
 
 // --- STYLING CONSTANTS ---
@@ -20,42 +20,32 @@ interface BrandingOptions {
 }
 
 // --- TEXT SANITIZATION HELPER ---
-// Improved to handle HTML content from Rich Text Editor
 const cleanText = (text: string | undefined | null): string => {
     if (!text) return '';
     
     let clean = text;
 
-    // 1. Strip HTML Tags (Simple Regex for client-side PDF safety)
-    // Replaces tags with space to prevent words merging (e.g. </p><p>)
-    clean = clean.replace(/<[^>]*>/g, ' ');
+    // 1. Convert block tags to newlines for formatting
+    clean = clean.replace(/<\/p>/gi, '\n')
+                 .replace(/<br\s*\/?>/gi, '\n')
+                 .replace(/<\/div>/gi, '\n')
+                 .replace(/<\/li>/gi, '\n')
+                 .replace(/<li>/gi, '• ');
 
-    // 2. Decode common HTML entities that might remain
+    // 2. Strip HTML Tags
+    clean = clean.replace(/<[^>]*>/g, '');
+
+    // 3. Decode common HTML entities
     clean = clean.replace(/&nbsp;/g, ' ')
                  .replace(/&amp;/g, '&')
                  .replace(/&lt;/g, '<')
                  .replace(/&gt;/g, '>')
-                 .replace(/&quot;/g, '"');
+                 .replace(/&quot;/g, '"')
+                 .replace(/&#39;/g, "'");
 
-    // 3. Replace common symbols with ASCII approximations
-    clean = clean.replace(/→/g, '->')
-                 .replace(/←/g, '<-')
-                 .replace(/↔/g, '<->')
-                 .replace(/•/g, '-')
-                 .replace(/—/g, '-')
-                 .replace(/–/g, '-')
-                 .replace(/…/g, '...')
-                 .replace(/“/g, '"')
-                 .replace(/”/g, '"')
-                 .replace(/‘/g, "'")
-                 .replace(/’/g, "'");
-
-    // 4. Remove Emojis and Pictographs (Ranges for common emojis)
-    const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
-    clean = clean.replace(emojiRegex, '');
-
-    // 5. Normalize spacing
-    clean = clean.replace(/[ \t\u00A0]+/g, ' ').trim(); 
+    // 4. Cleanup Whitespace
+    clean = clean.replace(/\n\s*\n/g, '\n'); // Remove multiple empty lines
+    clean = clean.trim();
 
     return clean;
 };
@@ -96,6 +86,7 @@ const hexToRgb = (hex: string): [number, number, number] => {
     ] : DEFAULT_PRIMARY;
 };
 
+// --- QUOTE PDF GENERATOR ---
 export const generateQuotePDF = (
   quote: Quote, 
   breakdown: PricingBreakdown | null,
@@ -106,11 +97,9 @@ export const generateQuotePDF = (
   const branding = resolveBranding(role, agentProfile);
   const primaryRGB = hexToRgb(branding.primaryColorHex);
   
-  // Font Upgrade: Use standard serif font (Times) as a proxy for elegant typography
   doc.setFont("times", "normal");
 
   // --- HEADER ---
-  // Solid Brand Color Header Background
   doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
   doc.rect(0, 0, 210, 40, 'F'); 
 
@@ -120,22 +109,19 @@ export const generateQuotePDF = (
   
   if (branding.logoUrl) {
       try {
-          // Attempt to add logo. If format isn't supported or URL fails (CORS), it will throw.
           doc.addImage(branding.logoUrl, 'PNG', 16, 11, 23, 23, undefined, 'FAST');
       } catch (e) {
-          // Fallback Initials
           doc.setFontSize(20);
           doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
           doc.text(branding.companyName.charAt(0), 27.5, 26, { align: 'center' });
       }
   } else {
-      // Initials Fallback
       doc.setFontSize(20);
       doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
       doc.text(branding.companyName.charAt(0), 27.5, 26, { align: 'center' });
   }
 
-  // Company Info (Right Side of Header)
+  // Company Info
   doc.setFontSize(22);
   doc.setTextColor(255, 255, 255);
   doc.text("TRAVEL ITINERARY", 195, 20, { align: 'right' });
@@ -144,10 +130,10 @@ export const generateQuotePDF = (
   doc.text(`Ref: ${cleanText(quote.uniqueRefNo)}`, 195, 28, { align: 'right' });
   doc.text(`Date: ${new Date().toLocaleDateString()}`, 195, 33, { align: 'right' });
 
-  // --- AGENCY CONTACT INFO (Under Header) ---
+  // --- AGENCY CONTACT INFO ---
   let yPos = 50;
   doc.setFontSize(16);
-  doc.setTextColor(SECONDARY[0], SECONDARY[1], SECONDARY[2]); // Slate Dark
+  doc.setTextColor(SECONDARY[0], SECONDARY[1], SECONDARY[2]); 
   doc.setFont("times", "bold");
   doc.text(cleanText(branding.companyName), 15, yPos);
   
@@ -166,14 +152,15 @@ export const generateQuotePDF = (
   yPos += 5;
   if(branding.phone) doc.text(`Phone: ${cleanText(branding.phone)}`, 15, yPos);
   yPos += 5;
-  if(branding.website) doc.text(`Web: ${cleanText(branding.website)}`, 15, yPos);
 
-  // --- TRIP DETAILS (Right Side Box) ---
-  yPos = 50; // Reset for right column
+  // --- TRIP DETAILS BOX ---
+  yPos = 50; 
   doc.setDrawColor(200, 200, 200);
   doc.setFillColor(250, 250, 250);
-  doc.rect(120, yPos - 5, 75, 40, 'F');
-  doc.rect(120, yPos - 5, 75, 40, 'S');
+  // Increase height to accommodate more details
+  const boxHeight = 55;
+  doc.rect(120, yPos - 5, 75, boxHeight, 'F');
+  doc.rect(120, yPos - 5, 75, boxHeight, 'S');
 
   doc.setFontSize(11);
   doc.setTextColor(0, 0, 0);
@@ -186,9 +173,27 @@ export const generateQuotePDF = (
   doc.text(`Destination: ${city}`, 125, yPos + 8);
   doc.text(`Travel Date: ${new Date(quote.travelDate).toLocaleDateString()}`, 125, yPos + 14);
   doc.text(`Guests: ${quote.paxCount} Pax`, 125, yPos + 20);
-  if(quote.leadGuestName) doc.text(`Guest Name: ${cleanText(quote.leadGuestName)}`, 125, yPos + 26);
+  
+  // Calculate Duration
+  const durationNights = quote.itinerary.length > 1 ? quote.itinerary.length - 1 : 1;
+  doc.text(`Duration: ${durationNights} Nights / ${durationNights + 1} Days`, 125, yPos + 26);
 
-  yPos = 100; // Start of Table
+  // Find Hotels
+  const hotels = new Set<string>();
+  quote.itinerary.forEach(day => {
+      day.services?.forEach(svc => {
+          if (svc.type === 'HOTEL') hotels.add(svc.name);
+      });
+  });
+  const hotelStr = hotels.size > 0 ? Array.from(hotels).join(', ') : 'NA';
+  
+  // Hotel Display (Wrapped)
+  const splitHotel = doc.splitTextToSize(`Hotel: ${hotelStr}`, 65);
+  doc.text(splitHotel, 125, yPos + 32);
+
+  if(quote.leadGuestName) doc.text(`Guest Name: ${cleanText(quote.leadGuestName)}`, 125, yPos + 32 + (splitHotel.length * 5));
+
+  yPos = 115; 
 
   // --- ITINERARY TABLE ---
   if (quote.itinerary && quote.itinerary.length > 0) {
@@ -196,20 +201,17 @@ export const generateQuotePDF = (
     const startDate = new Date(quote.travelDate);
     
     quote.itinerary.forEach(item => {
-      // Date Calc
       const currentDate = new Date(startDate);
       currentDate.setDate(startDate.getDate() + (item.day - 1));
       const dateStr = currentDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', weekday: 'short' });
 
-      // Group Row (Day Header)
-      const dayTitleClean = cleanText(item.title);
-      
+      // Group Row
       tableBody.push([{ 
-          content: `Day ${item.day} | ${dateStr} | ${dayTitleClean}`, 
+          content: `Day ${item.day} | ${dateStr} | ${cleanText(item.title)}`, 
           colSpan: 2, 
           styles: { 
               fontStyle: 'bold', 
-              fillColor: [240, 240, 240], // Light Grey
+              fillColor: [240, 240, 240], 
               textColor: [50, 50, 50],
               halign: 'left',
               fontSize: 10
@@ -228,49 +230,22 @@ export const generateQuotePDF = (
       // Services
       if(item.services && item.services.length > 0) {
           item.services.forEach(svc => {
-              let typeLabel: string = svc.type;
-              
+              let typeLabel = svc.type;
               let detailsParts: string[] = [];
 
-              // 1. Core Meta (Room/Meal/Vehicle)
               if (svc.meta?.roomType) detailsParts.push(`Room: ${svc.meta.roomType}`);
               if (svc.meta?.mealPlan) detailsParts.push(`Meal: ${svc.meta.mealPlan}`);
-              if (svc.meta?.vehicle) detailsParts.push(`Vehicle: ${svc.meta.vehicle}`);
-              if (svc.meta?.type && svc.type === 'ACTIVITY') detailsParts.push(`Type: ${svc.meta.type}`);
               
-              // 2. Quantity Logic for Transfers
-              if (svc.type === 'TRANSFER' && svc.quantity > 1) {
-                  detailsParts.push(`${svc.quantity} Vehicles`);
-              }
-              
-              // 3. Pax Details (New)
-              if (svc.meta?.paxDetails) {
-                  const { adult, child } = svc.meta.paxDetails;
-                  let paxStr = `Pax: ${adult} Adt` + (child > 0 ? `, ${child} Chd` : '');
-                  detailsParts.push(paxStr);
-              }
-
-              // Sanitize Name
               const sanitizedName = cleanText(svc.name);
-              
-              // Construct Body
               let finalContent = sanitizedName;
               
-              // Add Meta Line if exists
               if (detailsParts.length > 0) {
                   finalContent += `\n[ ${detailsParts.join(' | ')} ]`;
               }
               
-              // Add Description (Cleaned)
               if (svc.meta?.description) {
                   const desc = cleanText(svc.meta.description);
                   if (desc) finalContent += `\n\n${desc}`;
-              }
-
-              // Add Notes
-              if (svc.meta?.notes) {
-                  const note = cleanText(svc.meta.notes);
-                  if (note) finalContent += `\n\nNote: ${note}`;
               }
 
               tableBody.push([
@@ -287,29 +262,23 @@ export const generateQuotePDF = (
       body: tableBody,
       theme: 'grid',
       headStyles: { 
-          fillColor: primaryRGB, // Use Agent Primary Color
+          fillColor: primaryRGB,
           textColor: TABLE_HEADER_TEXT, 
           fontStyle: 'bold',
           fontSize: 11
       },
       columnStyles: {
-          0: { cellWidth: 35 }, // Fixed width for type
-          1: { cellWidth: 'auto' } // Flexible width for details
+          0: { cellWidth: 35 }, 
+          1: { cellWidth: 'auto' }
       },
       styles: { 
-          font: 'times', // Apply serif font to table
+          font: 'times',
           cellPadding: 6, 
-          overflow: 'linebreak', // Essential for wrapping long text
+          overflow: 'linebreak',
           fontSize: 10,
           valign: 'top'
       },
       margin: { top: 15, right: 15, bottom: 15, left: 15 }, 
-      didParseCell: (data) => {
-          // Clean grouping rows
-          if (data.section === 'body' && data.row.cells[0].colSpan === 2) {
-             // Let styling handle it
-          }
-      }
     });
     
     yPos = (doc as any).lastAutoTable.finalY + 15;
@@ -319,13 +288,12 @@ export const generateQuotePDF = (
   const displayPrice = quote.sellingPrice || quote.price || 0;
   
   if (displayPrice > 0) {
-      // Check page break
       if (yPos > 240) {
           doc.addPage();
           yPos = 30;
       }
 
-      doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]); // Brand Background
+      doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
       doc.roundedRect(120, yPos, 75, 30, 2, 2, 'F');
       
       doc.setTextColor(255, 255, 255);
@@ -336,35 +304,237 @@ export const generateQuotePDF = (
       doc.setFont("times", "bold");
       const currency = quote.currency || 'INR';
       doc.text(`${currency} ${displayPrice.toLocaleString()}`, 125, yPos + 18);
-      
-      if (breakdown?.perPersonPrice) {
-          doc.setFontSize(9);
-          doc.setFont("times", "normal");
-          doc.text(`(~ ${currency} ${breakdown.perPersonPrice.toLocaleString()} per person)`, 125, yPos + 24);
-      }
   }
 
   // --- FOOTER ---
-  const pageCount = (doc as any).internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    
-    // Bottom Line with Brand Color
-    doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
-    doc.setLineWidth(1);
-    doc.line(15, 280, 195, 280);
-    
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    // Use the Branding Company Name instead of platform hardcode
-    doc.text(`Prepared by ${cleanText(branding.companyName)}`, 15, 286);
-    doc.text(`Page ${i} of ${pageCount}`, 195, 286, { align: 'right' });
-  }
+  addFooter(doc, branding, primaryRGB);
 
   doc.save(`Itinerary_${quote.uniqueRefNo}.pdf`);
 };
 
-// ... other exports remain unchanged ...
-export const generateReceiptPDF = (booking: Booking, payment: PaymentEntry, user: User) => { console.log("Generating Receipt PDF", booking.id, payment.id); };
-export const generateInvoicePDF = (invoice: GSTRecord, booking: Booking) => { console.log("Generating Invoice PDF", invoice.id, booking.id); };
-export const generateCreditNotePDF = (creditNote: GSTCreditNote, booking: Booking) => { console.log("Generating Credit Note PDF", creditNote.id, booking.id); };
+// --- FIXED PACKAGE PDF GENERATOR ---
+export const generateFixedPackagePDF = (
+    pkg: FixedPackage,
+    role: UserRole,
+    agentProfile?: User | null
+) => {
+    const doc = new jsPDF();
+    const branding = resolveBranding(role, agentProfile);
+    const primaryRGB = hexToRgb(branding.primaryColorHex);
+    doc.setFont("times", "normal");
+
+    // 1. Header Banner
+    doc.setFillColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+    doc.rect(0, 0, 210, 50, 'F');
+
+    // Logo
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(15, 15, 30, 30, 2, 2, 'F');
+    if (branding.logoUrl) {
+        try {
+            doc.addImage(branding.logoUrl, 'PNG', 16, 16, 28, 28, undefined, 'FAST');
+        } catch (e) {
+            doc.setFontSize(24);
+            doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+            doc.text(branding.companyName.charAt(0), 30, 35, { align: 'center' });
+        }
+    }
+
+    // Title & Subtitle
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("times", "bold");
+    doc.text(cleanText(pkg.packageName), 55, 25);
+    
+    doc.setFontSize(12);
+    doc.setFont("times", "normal");
+    doc.text(`${pkg.nights} Nights | ${pkg.category || 'Group Tour'} Package`, 55, 33);
+
+    // Price Bubble
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(150, 15, 45, 20, 2, 2, 'F');
+    doc.setTextColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+    doc.setFontSize(10);
+    doc.text("Starting From", 172.5, 21, { align: "center" });
+    doc.setFontSize(16);
+    doc.setFont("times", "bold");
+    doc.text(`INR ${pkg.fixedPrice.toLocaleString()}`, 172.5, 30, { align: "center" });
+
+    let yPos = 65;
+
+    // 2. HIGHLIGHTS BAR (Duration & Hotel)
+    doc.setDrawColor(200, 200, 200);
+    doc.setFillColor(248, 250, 252); // Slate 50
+    doc.rect(15, yPos, 180, 25, 'F');
+    doc.rect(15, yPos, 180, 25, 'S');
+
+    doc.setTextColor(50, 50, 50);
+    
+    // Duration
+    doc.setFontSize(11);
+    doc.setFont("times", "bold");
+    doc.text("Duration:", 25, yPos + 10);
+    doc.setFont("times", "normal");
+    doc.text(`${pkg.nights} Nights / ${pkg.nights + 1} Days`, 25, yPos + 18);
+
+    // Hotel
+    doc.setFont("times", "bold");
+    doc.text("Accommodation:", 80, yPos + 10);
+    doc.setFont("times", "normal");
+    // Explicit Hotel Name Logic
+    const hotelName = cleanText(pkg.hotelDetails) || "NA";
+    doc.text(hotelName, 80, yPos + 18);
+
+    // Validity/Type
+    doc.setFont("times", "bold");
+    doc.text("Travel Validity:", 140, yPos + 10);
+    doc.setFont("times", "normal");
+    const validityText = pkg.dateType === 'DAILY' ? 'Daily Departure' : 'Fixed Dates';
+    doc.text(validityText, 140, yPos + 18);
+
+    yPos += 35;
+
+    // 3. Overview / Description
+    if (pkg.description) {
+        doc.setFontSize(14);
+        doc.setTextColor(SECONDARY[0], SECONDARY[1], SECONDARY[2]);
+        doc.setFont("times", "bold");
+        doc.text("Tour Overview", 15, yPos);
+        yPos += 7;
+
+        doc.setFontSize(10);
+        doc.setFont("times", "normal");
+        doc.setTextColor(80, 80, 80);
+        const descLines = doc.splitTextToSize(cleanText(pkg.description), 180);
+        doc.text(descLines, 15, yPos);
+        yPos += (descLines.length * 5) + 10;
+    }
+
+    // 4. Inclusions & Exclusions (Improved Side by Side)
+    const incExcY = yPos;
+    const boxWidth = 85;
+    const boxHeight = 60; // Fixed height for alignment
+
+    // Inclusions
+    doc.setFillColor(240, 253, 244); // Light Green bg
+    doc.rect(15, incExcY, boxWidth, boxHeight, 'F');
+    doc.setFontSize(12);
+    doc.setTextColor(21, 128, 61); // Green 700
+    doc.setFont("times", "bold");
+    doc.text("Inclusions", 20, incExcY + 8);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    doc.setFont("times", "normal");
+    let currentIncY = incExcY + 15;
+    pkg.inclusions.forEach(inc => {
+        if(currentIncY < incExcY + boxHeight - 5) {
+            const lines = doc.splitTextToSize(`• ${cleanText(inc)}`, boxWidth - 10);
+            doc.text(lines, 20, currentIncY);
+            currentIncY += (lines.length * 4) + 1;
+        }
+    });
+
+    // Exclusions
+    doc.setFillColor(254, 242, 242); // Light Red bg
+    doc.rect(110, incExcY, boxWidth, boxHeight, 'F');
+    doc.setFontSize(12);
+    doc.setTextColor(185, 28, 28); // Red 700
+    doc.setFont("times", "bold");
+    doc.text("Exclusions", 115, incExcY + 8);
+
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    doc.setFont("times", "normal");
+    let currentExcY = incExcY + 15;
+    pkg.exclusions.forEach(exc => {
+        if(currentExcY < incExcY + boxHeight - 5) {
+             const lines = doc.splitTextToSize(`• ${cleanText(exc)}`, boxWidth - 10);
+             doc.text(lines, 115, currentExcY);
+             currentExcY += (lines.length * 4) + 1;
+        }
+    });
+
+    yPos = incExcY + boxHeight + 15;
+
+    // 5. Itinerary Table
+    if (pkg.itinerary && pkg.itinerary.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(SECONDARY[0], SECONDARY[1], SECONDARY[2]);
+        doc.setFont("times", "bold");
+        doc.text("Detailed Itinerary", 15, yPos);
+        yPos += 5;
+
+        const tableBody = pkg.itinerary.map(day => [
+            `Day ${day.day}`,
+            cleanText(day.title),
+            cleanText(day.description)
+        ]);
+
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Day', 'Title', 'Details']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: {
+                fillColor: primaryRGB,
+                textColor: 255,
+                fontStyle: 'bold',
+                fontSize: 10
+            },
+            columnStyles: {
+                0: { cellWidth: 15, fontStyle: 'bold' },
+                1: { cellWidth: 50, fontStyle: 'bold' },
+                2: { cellWidth: 'auto' }
+            },
+            styles: {
+                font: 'times',
+                fontSize: 9,
+                cellPadding: 4,
+                overflow: 'linebreak'
+            }
+        });
+
+        yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 6. Contact / Booking Footer
+    addFooter(doc, branding, primaryRGB);
+
+    doc.save(`Package_${pkg.packageName.replace(/\s+/g, '_')}.pdf`);
+};
+
+// --- SHARED FOOTER ---
+const addFooter = (doc: jsPDF, branding: BrandingOptions, primaryRGB: [number, number, number]) => {
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        
+        const pageHeight = doc.internal.pageSize.height;
+        
+        doc.setDrawColor(primaryRGB[0], primaryRGB[1], primaryRGB[2]);
+        doc.setLineWidth(1);
+        doc.line(15, pageHeight - 20, 195, pageHeight - 20);
+        
+        doc.setFontSize(10);
+        doc.setFont("times", "bold");
+        doc.setTextColor(50, 50, 50);
+        doc.text(branding.companyName, 15, pageHeight - 14);
+        
+        doc.setFontSize(9);
+        doc.setFont("times", "normal");
+        doc.setTextColor(100, 100, 100);
+        
+        let contactText = "";
+        if (branding.phone) contactText += `Phone: ${branding.phone}  `;
+        if (branding.email) contactText += `Email: ${branding.email}`;
+        
+        doc.text(contactText, 15, pageHeight - 9);
+        
+        doc.text(`Page ${i} of ${pageCount}`, 195, pageHeight - 9, { align: 'right' });
+    }
+};
+
+export const generateReceiptPDF = (booking: Booking, payment: PaymentEntry, user: User) => { console.log("Receipt PDF Placeholder"); };
+export const generateInvoicePDF = (invoice: GSTRecord, booking: Booking) => { console.log("Invoice PDF Placeholder"); };
+export const generateCreditNotePDF = (creditNote: GSTCreditNote, booking: Booking) => { console.log("Credit Note PDF Placeholder"); };

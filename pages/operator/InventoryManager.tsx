@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { inventoryService } from '../../services/inventoryService';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
@@ -11,7 +10,8 @@ import {
     Calendar, FileText, Bold, Italic, Underline, Strikethrough, 
     AlignLeft, AlignCenter, AlignRight, AlignJustify, 
     List as ListIcon, ListOrdered, Link as LinkIcon, 
-    Heading1, Heading2, Eraser, Undo, Redo, Type, Check
+    Heading1, Heading2, Eraser, Undo, Redo, Type, Check,
+    ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, Square, RefreshCcw
 } from 'lucide-react';
 
 const DEFAULT_TRANSFER_OPTS: ActivityTransferOptions = {
@@ -20,6 +20,7 @@ const DEFAULT_TRANSFER_OPTS: ActivityTransferOptions = {
 };
 
 type ModalTab = 'GENERAL' | 'PRICING' | 'MEDIA';
+type SortKey = 'name' | 'costPrice' | 'createdAt' | 'status';
 
 // --- PROFESSIONAL WYSIWYG EDITOR ---
 const RichTextEditor: React.FC<{
@@ -171,10 +172,16 @@ export const InventoryManager: React.FC = () => {
   const [transferOpts, setTransferOpts] = useState<ActivityTransferOptions>(DEFAULT_TRANSFER_OPTS);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Filter State
+  // Filter & Sort State
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'HOTEL' | 'ACTIVITY' | 'TRANSFER'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'APPROVED' | 'PENDING' | 'REJECTED'>('ALL');
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
+
+  // Bulk Action State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkRate, setBulkRate] = useState<string>('');
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -196,8 +203,104 @@ export const InventoryManager: React.FC = () => {
       if(user) {
           const data = await inventoryService.getItemsByOperator(user.id);
           setItems(data);
+          setSelectedIds(new Set()); // Clear selection on refresh
+          setIsBulkEditOpen(false);
       }
   };
+
+  const handleSort = (key: SortKey) => {
+      setSortConfig(current => ({
+          key,
+          direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+      }));
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.checked) {
+          setSelectedIds(new Set(processedItems.map(i => i.id)));
+      } else {
+          setSelectedIds(new Set());
+      }
+  };
+
+  const handleSelectRow = (id: string) => {
+      const newSet = new Set(selectedIds);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      setSelectedIds(newSet);
+  };
+
+  const handleBulkUpdateRate = async () => {
+      if (!bulkRate || isNaN(Number(bulkRate))) return alert("Please enter a valid rate");
+      if (!user) return;
+      if (!confirm(`Update rates for ${selectedIds.size} items? This will reset their status to Pending Approval.`)) return;
+
+      setIsSaving(true);
+      try {
+          // Process in parallel chunks could be better, but loop is fine for now
+          for (const id of Array.from(selectedIds)) {
+              const item = items.find(i => i.id === id);
+              if (item) {
+                  // For Activity, update costAdult. For others, costPrice.
+                  const updates: any = {};
+                  if (item.type === 'ACTIVITY') {
+                      updates.costAdult = Number(bulkRate);
+                  } else {
+                      updates.costPrice = Number(bulkRate);
+                  }
+                  await inventoryService.updateItem(id, updates, user);
+              }
+          }
+          await refreshList();
+          alert("Bulk update complete.");
+      } catch (e: any) {
+          alert("Bulk update failed: " + e.message);
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
+  const processedItems = useMemo(() => {
+      let filtered = items.filter(i => {
+          const name = i.name || '';
+          const matchSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchType = typeFilter === 'ALL' || i.type === typeFilter;
+          
+          let matchStatus = true;
+          if (statusFilter === 'APPROVED') matchStatus = i.status === 'APPROVED';
+          if (statusFilter === 'PENDING') matchStatus = i.status === 'PENDING_APPROVAL';
+          if (statusFilter === 'REJECTED') matchStatus = i.status === 'REJECTED';
+
+          return matchSearch && matchType && matchStatus;
+      });
+
+      return filtered.sort((a, b) => {
+          const key = sortConfig.key as keyof OperatorInventoryItem;
+          
+          const multiplier = sortConfig.direction === 'asc' ? 1 : -1;
+
+          // Handle dates string comparison
+          if (key === 'createdAt') {
+              const dateA = new Date(a.createdAt).getTime();
+              const dateB = new Date(b.createdAt).getTime();
+              return (dateA - dateB) * multiplier;
+          }
+
+          const aVal = a[key];
+          const bVal = b[key];
+
+          if (aVal === bVal) return 0;
+          
+          // Handle numbers
+          if (key === 'costPrice') {
+             const costA = a.type === 'ACTIVITY' ? (a.costAdult || 0) : (a.costPrice || 0);
+             const costB = b.type === 'ACTIVITY' ? (b.costAdult || 0) : (b.costPrice || 0);
+             return (costA - costB) * multiplier;
+          }
+          
+          return ((aVal as any) > (bVal as any) ? 1 : -1) * multiplier;
+      });
+  }, [items, searchTerm, typeFilter, statusFilter, sortConfig]);
 
   const handleOpenModal = (item?: OperatorInventoryItem) => {
       setActiveTab('GENERAL');
@@ -205,7 +308,6 @@ export const InventoryManager: React.FC = () => {
           // EDIT MODE
           setEditingItem(item);
           setFormData({ ...item });
-          // Load complex nested state safely
           setTransferOpts(item.transferOptions || DEFAULT_TRANSFER_OPTS);
       } else {
           // CREATE MODE
@@ -228,13 +330,9 @@ export const InventoryManager: React.FC = () => {
       setIsSaving(true);
       try {
           const payload = { ...formData };
-          
-          // Attach complex objects for Activity
           if (payload.type === 'ACTIVITY') {
               payload.transferOptions = transferOpts;
           }
-          
-          // Ensure Currency is INR (Project Standard)
           payload.currency = 'INR';
 
           if (editingItem) {
@@ -258,32 +356,19 @@ export const InventoryManager: React.FC = () => {
       }
   };
 
-  const updateSic = (field: string, value: any) => {
-      setTransferOpts(prev => ({ ...prev, sic: { ...prev.sic, [field]: value } }));
+  // ... (Helper updateSic/updatePvt functions remain same) ...
+  const updateSic = (field: string, value: any) => setTransferOpts(prev => ({ ...prev, sic: { ...prev.sic, [field]: value } }));
+  const updatePvt = (field: string, value: any) => setTransferOpts(prev => ({ ...prev, pvt: { ...prev.pvt, [field]: value } }));
+
+
+  const SortIcon = ({ col }: { col: SortKey }) => {
+      if (sortConfig.key !== col) return <ArrowUpDown size={14} className="text-slate-300 ml-1" />;
+      return sortConfig.direction === 'asc' ? <ArrowUp size={14} className="text-brand-600 ml-1" /> : <ArrowDown size={14} className="text-brand-600 ml-1" />;
   };
-
-  const updatePvt = (field: string, value: any) => {
-      setTransferOpts(prev => ({ ...prev, pvt: { ...prev.pvt, [field]: value } }));
-  };
-
-  const filteredItems = items.filter(i => {
-      // Fix: Safe access to name property
-      const name = i.name || '';
-      const matchSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchType = typeFilter === 'ALL' || i.type === typeFilter;
-      
-      let matchStatus = true;
-      if (statusFilter === 'APPROVED') matchStatus = i.status === 'APPROVED';
-      if (statusFilter === 'PENDING') matchStatus = i.status === 'PENDING_APPROVAL';
-      if (statusFilter === 'REJECTED') matchStatus = i.status === 'REJECTED';
-
-      return matchSearch && matchType && matchStatus;
-  });
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Box className="text-brand-600" /> Inventory Management
@@ -297,6 +382,37 @@ export const InventoryManager: React.FC = () => {
             <Plus size={18} /> Add New Item
         </button>
       </div>
+
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+          <div className="bg-brand-50 border border-brand-200 p-4 rounded-xl mb-6 flex items-center justify-between animate-in slide-in-from-top-2">
+              <div className="flex items-center gap-4">
+                  <span className="bg-brand-600 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-sm">{selectedIds.size} Selected</span>
+                  <div className="h-6 w-px bg-brand-200"></div>
+                  {isBulkEditOpen ? (
+                      <div className="flex items-center gap-2">
+                          <input 
+                              type="number" 
+                              placeholder="New Rate" 
+                              value={bulkRate} 
+                              onChange={e => setBulkRate(e.target.value)} 
+                              className="w-32 px-3 py-1.5 border border-brand-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                              autoFocus
+                          />
+                          <button onClick={handleBulkUpdateRate} disabled={isSaving} className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 shadow-sm disabled:opacity-50">
+                              {isSaving ? 'Updating...' : 'Confirm'}
+                          </button>
+                          <button onClick={() => setIsBulkEditOpen(false)} className="p-1.5 text-brand-700 hover:bg-brand-100 rounded"><X size={16}/></button>
+                      </div>
+                  ) : (
+                      <button onClick={() => setIsBulkEditOpen(true)} className="flex items-center gap-2 text-sm font-bold text-brand-700 hover:text-brand-900 transition">
+                          <DollarSign size={16} /> Bulk Update Rates
+                      </button>
+                  )}
+              </div>
+              <button onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-500 hover:text-slate-800">Deselect All</button>
+          </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 space-y-4">
@@ -317,10 +433,10 @@ export const InventoryManager: React.FC = () => {
 
               {/* Status Filter */}
               <div className="flex bg-slate-100 p-1 rounded-lg">
-                  <button onClick={() => setStatusFilter('ALL')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>All Status</button>
-                  <button onClick={() => setStatusFilter('APPROVED')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'APPROVED' ? 'bg-green-100 text-green-700' : 'text-slate-500'}`}>Live</button>
-                  <button onClick={() => setStatusFilter('PENDING')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'text-slate-500'}`}>Pending</button>
-                  <button onClick={() => setStatusFilter('REJECTED')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'REJECTED' ? 'bg-red-100 text-red-700' : 'text-slate-500'}`}>Rejected</button>
+                  <button onClick={() => setStatusFilter('ALL')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>All</button>
+                  <button onClick={() => setStatusFilter('APPROVED')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'APPROVED' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-slate-500'}`}>Approved</button>
+                  <button onClick={() => setStatusFilter('PENDING')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'PENDING' ? 'bg-amber-100 text-amber-700 shadow-sm' : 'text-slate-500'}`}>Pending</button>
+                  <button onClick={() => setStatusFilter('REJECTED')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${statusFilter === 'REJECTED' ? 'bg-red-100 text-red-700 shadow-sm' : 'text-slate-500'}`}>Rejected</button>
               </div>
 
               {/* Search */}
@@ -341,17 +457,42 @@ export const InventoryManager: React.FC = () => {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 uppercase text-xs">
             <tr>
+              <th className="px-6 py-4 w-10">
+                  <div className="flex items-center justify-center">
+                    <input 
+                        type="checkbox" 
+                        onChange={handleSelectAll} 
+                        checked={processedItems.length > 0 && selectedIds.size === processedItems.length}
+                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer" 
+                    />
+                  </div>
+              </th>
               <th className="px-6 py-4 font-semibold w-16">Image</th>
-              <th className="px-6 py-4 font-semibold">Service Name</th>
+              <th className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort('name')}>
+                  <div className="flex items-center">Service Name <SortIcon col='name'/></div>
+              </th>
               <th className="px-6 py-4 font-semibold">Type</th>
-              <th className="px-6 py-4 font-semibold">Net Pricing</th>
+              <th className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort('costPrice')}>
+                  <div className="flex items-center">Net Rate <SortIcon col='costPrice'/></div>
+              </th>
               <th className="px-6 py-4 font-semibold">Status</th>
+              <th className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort('createdAt')}>
+                   <div className="flex items-center">Last Updated <SortIcon col='createdAt'/></div>
+              </th>
               <th className="px-6 py-4 font-semibold text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredItems.map(item => (
-              <tr key={item.id} className="hover:bg-slate-50 transition">
+            {processedItems.map(item => (
+              <tr key={item.id} className={`transition ${selectedIds.has(item.id) ? 'bg-brand-50/50' : 'hover:bg-slate-50'}`}>
+                <td className="px-6 py-4 text-center">
+                    <input 
+                        type="checkbox" 
+                        checked={selectedIds.has(item.id)} 
+                        onChange={() => handleSelectRow(item.id)}
+                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer" 
+                    />
+                </td>
                 <td className="px-6 py-4">
                     <div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center border border-slate-200">
                         {item.imageUrl ? (
@@ -386,7 +527,9 @@ export const InventoryManager: React.FC = () => {
                 </td>
                 <td className="px-6 py-4">
                     <InventoryStatusBadge status={item.status} reason={item.rejectionReason} />
-                    {item.isCurrent && <span className="text-[9px] text-green-600 font-bold ml-1 uppercase tracking-wide">Live</span>}
+                </td>
+                <td className="px-6 py-4 text-xs text-slate-500">
+                    {new Date(item.createdAt).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
@@ -410,9 +553,9 @@ export const InventoryManager: React.FC = () => {
                 </td>
               </tr>
             ))}
-            {filteredItems.length === 0 && (
+            {processedItems.length === 0 && (
                 <tr>
-                    <td colSpan={6} className="px-6 py-16 text-center text-slate-400 italic">
+                    <td colSpan={8} className="px-6 py-16 text-center text-slate-400 italic">
                         <Box size={40} className="mx-auto mb-3 opacity-20" />
                         No inventory items found. Click "Add New Item" to start.
                     </td>

@@ -3,8 +3,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, FixedPackage, ItineraryItem, ItineraryService } from '../../types';
-import { Edit2, Trash2, Plus, X, Package, Calendar, Image as ImageIcon, Tag, Check, MapPin, Layers, FileText, DollarSign, Hotel } from 'lucide-react';
+import { Edit2, Trash2, Plus, X, Package, Calendar, Image as ImageIcon, Tag, Check, MapPin, Layers, FileText, DollarSign, Hotel, Download } from 'lucide-react';
 import { RichTextEditor } from '../../components/ui/RichTextEditor';
+import { generateFixedPackagePDF } from '../../utils/pdfGenerator';
 
 type ModalTab = 'OVERVIEW' | 'ITINERARY' | 'PRICING';
 
@@ -91,11 +92,8 @@ export const FixedPackages: React.FC = () => {
     const exclusions = formData.exclusionsText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
     const validDates = formData.datesText.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
-    // Ensure itinerary has correct number of days based on nights
-    // Typically Itinerary Days = Nights + 1 (Departure)
     let finalItinerary = formData.itinerary || [];
     
-    // Save
     await adminService.saveFixedPackage({
       id: editingPkg?.id || '',
       packageName: formData.packageName!,
@@ -126,6 +124,12 @@ export const FixedPackages: React.FC = () => {
       await adminService.deleteFixedPackage(id);
       await refreshData();
     }
+  };
+
+  const handleDownload = (pkg: FixedPackage) => {
+      if (user) {
+        generateFixedPackagePDF(pkg, user.role, user);
+      }
   };
 
   // --- ITINERARY BUILDER HELPERS ---
@@ -195,17 +199,16 @@ export const FixedPackages: React.FC = () => {
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200">
             <tr>
               <th className="px-6 py-4">Package Name</th>
-              <th className="px-6 py-4">Details</th>
+              <th className="px-6 py-4">Hotel / Details</th>
               <th className="px-6 py-4">Price</th>
-              <th className="px-6 py-4">Next Departure</th>
+              <th className="px-6 py-4">Availability</th>
               <th className="px-6 py-4">Status</th>
-              {canEdit && <th className="px-6 py-4 text-right">Actions</th>}
+              <th className="px-6 py-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {packages.map((pkg) => {
               const dest = allDestinations.find(d => d.id === pkg.destinationId);
-              // Find next date
               const nextDate = pkg.validDates
                   .map(d => new Date(d))
                   .sort((a,b) => a.getTime() - b.getTime())
@@ -215,8 +218,8 @@ export const FixedPackages: React.FC = () => {
                 <tr key={pkg.id} className="hover:bg-slate-50 transition">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                            <Package size={20} />
+                        <div className="w-12 h-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 overflow-hidden">
+                            {pkg.imageUrl ? <img src={pkg.imageUrl} alt="" className="w-full h-full object-cover" /> : <Package size={20} />}
                         </div>
                         <div>
                             <p className="font-bold text-slate-900 text-base">{pkg.packageName}</p>
@@ -227,15 +230,23 @@ export const FixedPackages: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                      <div className="flex gap-2 mb-1">
+                      {pkg.hotelDetails ? (
+                         <div className="flex items-center gap-1.5 text-slate-700 font-medium mb-1">
+                             <Hotel size={14} className="text-slate-400" />
+                             {pkg.hotelDetails}
+                         </div>
+                      ) : (
+                          <div className="text-slate-400 text-xs italic mb-1">Hotel: NA</div>
+                      )}
+                      
+                      <div className="flex flex-wrap gap-2">
                           <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-bold border border-slate-200">{pkg.nights} Nights</span>
                           {pkg.category && <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-xs font-bold border border-purple-100">{pkg.category}</span>}
                       </div>
-                      <p className="text-xs text-slate-400">{pkg.inclusions.length} Inclusions</p>
                   </td>
                   <td className="px-6 py-4">
                     <span className="font-mono font-bold text-slate-900 text-lg">₹ {pkg.fixedPrice.toLocaleString()}</span>
-                    <span className="block text-[10px] text-slate-400">per person (base {pkg.basePax || 2} pax)</span>
+                    <span className="block text-[10px] text-slate-400">per person</span>
                   </td>
                   <td className="px-6 py-4">
                      {pkg.dateType === 'DAILY' ? (
@@ -259,18 +270,28 @@ export const FixedPackages: React.FC = () => {
                       {pkg.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  {canEdit && (
-                    <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                            <button onClick={() => handleOpenModal(pkg)} className="p-2 text-slate-500 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition">
-                                <Edit2 size={16} />
-                            </button>
-                            <button onClick={() => handleDelete(pkg.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-slate-100 rounded-lg transition">
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                    </td>
-                  )}
+                  <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                          <button 
+                              onClick={() => handleDownload(pkg)} 
+                              className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition border border-transparent hover:border-blue-200"
+                              title="Download Flyer"
+                          >
+                              <Download size={16} />
+                          </button>
+                          
+                          {canEdit && (
+                              <>
+                                  <button onClick={() => handleOpenModal(pkg)} className="p-2 text-slate-500 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition">
+                                      <Edit2 size={16} />
+                                  </button>
+                                  <button onClick={() => handleDelete(pkg.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-slate-100 rounded-lg transition">
+                                      <Trash2 size={16} />
+                                  </button>
+                              </>
+                          )}
+                      </div>
+                  </td>
                 </tr>
               );
             })}
@@ -362,7 +383,7 @@ export const FixedPackages: React.FC = () => {
                                         value={formData.hotelDetails || ''} 
                                         onChange={e => setFormData({...formData, hotelDetails: e.target.value})} 
                                         className="w-full pl-9 border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
-                                        placeholder="e.g. 3 Star - Citymax Hotel or similar"
+                                        placeholder="e.g. 3 Star - Citymax Hotel or similar (Leave blank for NA)"
                                     />
                                 </div>
                             </div>
@@ -549,12 +570,12 @@ export const FixedPackages: React.FC = () => {
 
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Internal Notes / Policy</label>
-                                <textarea 
-                                    rows={2}
-                                    className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
-                                    placeholder="Cancellation policy, internal remarks..."
+                                <RichTextEditor
+                                    label=""
                                     value={formData.notes || ''}
-                                    onChange={e => setFormData({...formData, notes: e.target.value})}
+                                    onChange={(val) => setFormData({...formData, notes: val})}
+                                    placeholder="Cancellation policy, internal remarks..."
+                                    height="h-32"
                                 />
                             </div>
 

@@ -4,6 +4,7 @@ import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, Visa } from '../../types';
 import { Edit2, Trash2, Plus, X, FileText, CheckCircle, Clock, BookOpen, AlertCircle } from 'lucide-react';
+import { RichTextEditor } from '../../components/ui/RichTextEditor';
 
 export const VisaPage: React.FC = () => {
   const { user } = useAuth();
@@ -177,7 +178,7 @@ export const VisaPage: React.FC = () => {
 
       {isModalOpen && canEdit && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-slate-900">{editingVisa ? 'Edit' : 'Add'} Visa Requirement</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
@@ -218,18 +219,17 @@ export const VisaPage: React.FC = () => {
               </div>
 
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Description / Notes</label>
-                <textarea 
-                  rows={2}
-                  value={formData.description || ''} 
-                  onChange={e => setFormData({...formData, description: e.target.value})} 
-                  className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none"
-                  placeholder="Additional details..."
+                <RichTextEditor
+                    label="Description / Notes"
+                    value={formData.description || ''}
+                    onChange={(val) => setFormData({...formData, description: val})}
+                    placeholder="Additional details, embassy requirements..."
+                    height="h-32"
                 />
               </div>
 
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Documents Required (One per line)</label>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Documents Required (One per line)</label>
                 <textarea 
                   rows={4}
                   value={formData.documentsText} 
@@ -247,8 +247,8 @@ export const VisaPage: React.FC = () => {
               </div>
 
               <div className="col-span-2 pt-4 border-t flex justify-end gap-3">
-                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-                 <button type="submit" className="px-4 py-2 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700">Save Visa</button>
+                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200">Cancel</button>
+                 <button type="submit" className="px-6 py-2 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700 shadow-sm font-bold">Save Visa</button>
               </div>
             </form>
           </div>

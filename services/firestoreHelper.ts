@@ -57,6 +57,10 @@ export const dbHelper = {
     },
 
     async getWhere<T>(collectionName: string, field: string, operator: any, value: any): Promise<T[]> {
+        if (value === undefined) {
+            console.warn(`Query on ${collectionName} skipped due to undefined value for field ${field}`);
+            return [];
+        }
         try {
             const q = query(collection(db, collectionName), where(field, operator, value));
             const querySnapshot = await getDocs(q);
