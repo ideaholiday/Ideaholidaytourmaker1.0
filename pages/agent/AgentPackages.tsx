@@ -5,7 +5,7 @@ import { adminService } from '../../services/adminService';
 import { agentService } from '../../services/agentService';
 import { useAuth } from '../../context/AuthContext';
 import { FixedPackage, Quote, ItineraryItem } from '../../types';
-import { Package, Calendar, MapPin, CheckCircle, ArrowRight, Loader2, Info, X, User, Download, FileText, Hotel, ChevronDown, Image as ImageIcon, Phone, Mail, Globe, Star } from 'lucide-react';
+import { Package, Calendar, MapPin, CheckCircle, ArrowRight, Loader2, Info, X, User, Download, FileText, Hotel, ChevronDown, Image as ImageIcon, Phone, Mail, Globe, Star, XCircle, Clock } from 'lucide-react';
 import { generateFixedPackagePDF } from '../../utils/pdfGenerator';
 import html2canvas from 'html2canvas';
 
@@ -254,6 +254,7 @@ export const AgentPackages: React.FC = () => {
   // Resolve Branding Colors
   const brandColor = user?.agentBranding?.primaryColor || '#0ea5e9';
   const secondaryColor = user?.agentBranding?.secondaryColor || '#0f172a';
+  const agencyName = user?.agentBranding?.agencyName || user?.companyName || user?.name || 'Travel Partner';
 
   return (
     <div className="container mx-auto px-4 py-8 relative">
@@ -270,26 +271,36 @@ export const AgentPackages: React.FC = () => {
                   className="w-[1080px] h-[1920px] bg-white font-sans relative flex flex-col overflow-hidden"
               >
                   {/* 1. Header Section (Agent Branding) */}
-                  <div className="bg-white px-10 py-12 flex flex-col items-center justify-center border-b border-slate-100 relative">
+                  <div className="bg-white pt-16 pb-10 px-12 flex flex-col items-center justify-center border-b border-slate-100 relative shadow-sm z-20">
                        {/* Color Accent Top */}
-                       <div className="absolute top-0 left-0 w-full h-4" style={{ backgroundColor: brandColor }}></div>
+                       <div className="absolute top-0 left-0 w-full h-5" style={{ backgroundColor: brandColor }}></div>
                        
-                       {user?.agentBranding?.logoUrl ? (
-                           <img src={user.agentBranding.logoUrl} className="h-32 object-contain mb-4" alt="Agency Logo" crossOrigin="anonymous" />
-                       ) : (
-                           <div className="text-5xl font-extrabold text-slate-800 mb-2 uppercase tracking-wide">
-                               {user?.companyName || user?.name || 'Travel Partner'}
-                           </div>
-                       )}
-                       {user?.agentBranding?.website && (
-                           <div className="text-xl text-slate-500 font-medium tracking-wide flex items-center gap-2">
-                               <Globe size={24} className="text-slate-400" /> {user.agentBranding.website}
-                           </div>
-                       )}
+                       {/* LOGO AREA */}
+                       <div className="mb-6 h-36 flex items-center justify-center">
+                            {user?.agentBranding?.logoUrl ? (
+                                <img 
+                                    src={user.agentBranding.logoUrl} 
+                                    className="h-full w-auto object-contain" 
+                                    alt="Agency Logo" 
+                                    crossOrigin="anonymous" 
+                                />
+                            ) : (
+                                <div className="bg-slate-100 h-32 w-32 rounded-full flex items-center justify-center text-4xl font-bold text-slate-400">
+                                    {agencyName.charAt(0)}
+                                </div>
+                            )}
+                       </div>
+                       
+                       <div 
+                           className="text-5xl font-black text-slate-800 uppercase tracking-wide text-center leading-tight"
+                           style={{ color: secondaryColor }}
+                       >
+                           {agencyName}
+                       </div>
                   </div>
 
-                  {/* 2. Hero Image Section (Large Impact) */}
-                  <div className="relative h-[700px] w-full overflow-hidden">
+                  {/* 2. Hero Image Section (Visual Impact) */}
+                  <div className="relative h-[650px] w-full overflow-hidden">
                       {flyerData.imageUrl ? (
                           <img 
                             src={flyerData.imageUrl} 
@@ -303,81 +314,114 @@ export const AgentPackages: React.FC = () => {
                           </div>
                       )}
                       
-                      {/* Gradient Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                      {/* Dark Gradient Overlay for text contrast */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-90"></div>
 
                       {/* Package Title Overlay */}
-                      <div className="absolute bottom-0 left-0 w-full p-12 text-white">
-                           <span className="inline-block px-4 py-2 bg-white/20 backdrop-blur-md rounded-lg text-lg font-bold mb-4 border border-white/30 uppercase tracking-widest">
-                               {flyerData.category || 'Special Offer'}
-                           </span>
-                           <h1 className="text-7xl font-extrabold leading-tight mb-4 drop-shadow-md">
+                      <div className="absolute bottom-0 left-0 w-full px-12 pb-14 text-white">
+                           <div className="flex items-center gap-4 mb-4">
+                                <span className="px-5 py-2 bg-white/20 backdrop-blur-md rounded-lg text-xl font-bold border border-white/30 uppercase tracking-widest">
+                                    {flyerData.category || 'Special Package'}
+                                </span>
+                           </div>
+                           
+                           <h1 className="text-7xl font-extrabold leading-tight mb-4 drop-shadow-xl" style={{ textShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>
                                {flyerData.packageName}
                            </h1>
-                           <div className="flex items-center gap-6 text-2xl font-medium">
-                               <span className="flex items-center gap-2"><MapPin size={28} /> {getDestinationName(flyerData.destinationId)}</span>
-                               <span className="flex items-center gap-2"><Calendar size={28} /> {flyerData.nights} Nights / {flyerData.nights + 1} Days</span>
+                           
+                           <div className="flex items-center gap-8 text-2xl font-medium opacity-95">
+                               <span className="flex items-center gap-3 bg-black/30 px-4 py-2 rounded-lg backdrop-blur-sm">
+                                   <MapPin size={28} className="text-brand-400" style={{ color: brandColor }} /> 
+                                   {getDestinationName(flyerData.destinationId)}
+                               </span>
                            </div>
                       </div>
                   </div>
 
                   {/* 3. Main Content & Pricing */}
-                  <div className="flex-1 px-12 py-10 bg-slate-50 flex flex-col justify-start relative">
-                       {/* Price Badge - Floating */}
-                       <div className="absolute top-[-50px] right-12 bg-white px-10 py-6 rounded-2xl shadow-2xl text-center border-b-8" style={{ borderColor: brandColor }}>
+                  <div className="flex-1 px-12 py-10 bg-white flex flex-col justify-start relative">
+                       
+                       {/* PRICE RIBBON - Floating Design */}
+                       <div className="absolute top-[-50px] right-12 bg-white px-10 py-6 rounded-t-2xl shadow-[0_-10px_30px_rgba(0,0,0,0.1)] text-center border-t-8" style={{ borderColor: brandColor }}>
                            <p className="text-slate-400 text-lg uppercase font-bold tracking-widest mb-1">Starting From</p>
-                           <p className="text-6xl font-extrabold text-slate-900">₹ {flyerData.fixedPrice.toLocaleString()}</p>
-                           <p className="text-slate-400 text-sm mt-1">Per Person</p>
+                           <p className="text-6xl font-extrabold text-slate-900 leading-none mb-1">₹ {flyerData.fixedPrice.toLocaleString()}</p>
+                           <p className="text-slate-500 text-sm font-medium">Per Person</p>
                        </div>
 
-                       <div className="mt-16 space-y-8">
-                            {/* Inclusions Grid */}
-                            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                       {/* ADDED SPACING: Margin top increased to prevent overlap with price ribbon */}
+                       <div className="mt-12 space-y-10">
+                            
+                            {/* Key Stats Row */}
+                            <div className="flex justify-between items-start pt-6 border-b border-slate-100 pb-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-blue-50 p-4 rounded-2xl text-blue-600"><Clock size={36}/></div>
+                                    <div>
+                                        <p className="text-slate-400 text-sm font-bold uppercase">Duration</p>
+                                        <p className="text-2xl font-bold text-slate-800">{flyerData.nights} Nights / {flyerData.nights + 1} Days</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4 max-w-[500px]">
+                                    <div className="bg-purple-50 p-4 rounded-2xl text-purple-600"><Hotel size={36}/></div>
+                                    <div>
+                                        <p className="text-slate-400 text-sm font-bold uppercase">Accommodation</p>
+                                        <p className="text-xl font-bold text-slate-800 leading-tight">{flyerData.hotelDetails || 'Standard Hotel'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Inclusions Grid - FULL CONTENT */}
+                            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
                                 <h3 className="text-3xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-                                    <Star size={32} fill={brandColor} stroke={brandColor} /> Highlights
+                                    <CheckCircle size={32} fill={brandColor} stroke="#fff" /> Inclusions
                                 </h3>
-                                <div className="space-y-4">
-                                     <div className="flex items-start gap-4">
-                                          <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><Hotel size={32}/></div>
-                                          <div>
-                                              <p className="text-lg font-bold text-slate-700">Accommodation</p>
-                                              <p className="text-xl text-slate-900">{flyerData.hotelDetails || 'Standard Hotel'}</p>
-                                          </div>
-                                     </div>
-                                     {flyerData.inclusions.slice(0, 4).map((inc, i) => (
-                                         <div key={i} className="flex items-center gap-4 text-xl text-slate-700">
-                                              <CheckCircle size={28} className="text-green-500 shrink-0" />
-                                              <span>{inc}</span>
+                                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                                     {flyerData.inclusions.map((inc, i) => (
+                                         <div key={i} className="flex items-start gap-3 text-xl text-slate-700">
+                                              <div className="mt-1.5 w-2 h-2 rounded-full bg-slate-400 shrink-0"></div>
+                                              <span className="leading-snug">{inc}</span>
                                          </div>
                                      ))}
                                 </div>
                             </div>
 
-                            {/* Description Snippet */}
-                            <div className="px-2">
-                                <p className="text-2xl text-slate-600 leading-relaxed italic">
-                                    "{flyerData.description ? flyerData.description.replace(/<[^>]*>?/gm, '').substring(0, 180) + '...' : 'Experience an unforgettable journey with us.'}"
-                                </p>
-                            </div>
+                            {/* Exclusions (If present) */}
+                            {flyerData.exclusions && flyerData.exclusions.length > 0 && (
+                                <div className="px-4">
+                                    <h4 className="text-xl font-bold text-slate-400 mb-3 uppercase tracking-wider flex items-center gap-2">
+                                        <XCircle size={20} /> Exclusions
+                                    </h4>
+                                    <div className="flex flex-wrap gap-x-6 gap-y-2 text-lg text-slate-500">
+                                        {flyerData.exclusions.slice(0, 4).map((exc, i) => (
+                                            <span key={i}>• {exc}</span>
+                                        ))}
+                                        {flyerData.exclusions.length > 4 && <span>...and more</span>}
+                                    </div>
+                                </div>
+                            )}
                        </div>
                   </div>
 
-                  {/* 4. Footer CTA (High Visibility) */}
-                  <div className="px-12 py-10" style={{ backgroundColor: secondaryColor }}>
-                       <div className="flex items-center justify-between">
-                            <div className="text-white">
-                                <p className="text-lg opacity-80 uppercase tracking-widest mb-2 font-bold">Book Your Trip Now</p>
-                                <div className="flex items-center gap-4 text-4xl font-bold">
-                                    <Phone size={36} /> {user?.agentBranding?.contactPhone || user?.phone}
-                                </div>
-                                <div className="flex items-center gap-4 text-2xl font-medium mt-3 opacity-90">
-                                    <Mail size={24} /> {user?.agentBranding?.email || user?.email}
-                                </div>
-                            </div>
+                  {/* 4. Footer Contact - Using Brand Color Background */}
+                  <div className="px-12 py-14 text-white" style={{ backgroundColor: brandColor }}>
+                       <div className="flex flex-col items-center justify-center text-center gap-6">
                             
-                            {/* QR Placeholder or Logo mark */}
-                            <div className="h-32 w-32 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
-                                <Globe size={64} className="text-white/50" />
+                            {/* Contact Grid */}
+                            <div className="grid grid-cols-1 gap-4 w-full">
+                                <div className="flex items-center justify-center gap-4">
+                                    <Phone size={36} className="opacity-80" /> 
+                                    <span className="text-4xl font-bold tracking-tight">{user?.agentBranding?.contactPhone || user?.phone}</span>
+                                </div>
+                                
+                                <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-2xl font-medium opacity-90">
+                                    <div className="flex items-center gap-3">
+                                        <Mail size={28} /> {user?.agentBranding?.email || user?.email}
+                                    </div>
+                                    {user?.agentBranding?.website && (
+                                        <div className="flex items-center gap-3 border-l-2 border-white/30 pl-8">
+                                            <Globe size={28} /> {user.agentBranding.website}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                        </div>
                   </div>
