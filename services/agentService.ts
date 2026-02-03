@@ -42,7 +42,9 @@ class AgentService {
       agentId: agent.id,
       agentName: agent.name,
       status: 'DRAFT',
-      messages: []
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     
     await dbHelper.save(COLLECTION, newQuote);
@@ -121,7 +123,8 @@ class AgentService {
   }
   
   async updateQuote(quote: Quote) {
-    await dbHelper.save(COLLECTION, quote);
+    const updated = { ...quote, updatedAt: new Date().toISOString() };
+    await dbHelper.save(COLLECTION, updated);
   }
 
   async deleteQuote(quoteId: string) {
@@ -133,7 +136,7 @@ class AgentService {
   }
 
   async bookQuote(quoteId: string, user: User) {
-    await dbHelper.save(COLLECTION, { id: quoteId, status: 'BOOKED', isLocked: true });
+    await dbHelper.save(COLLECTION, { id: quoteId, status: 'BOOKED', isLocked: true, updatedAt: new Date().toISOString() });
 
     auditLogService.logAction({
         entityType: 'QUOTE',
@@ -159,7 +162,8 @@ class AgentService {
           operatorId,
           operatorName,
           operatorStatus: 'ASSIGNED',
-          operatorDeclineReason: undefined // Clear any previous decline
+          operatorDeclineReason: undefined, // Clear any previous decline
+          updatedAt: new Date().toISOString()
       };
 
       if (options.priceMode === 'FIXED_PRICE') {
@@ -206,7 +210,7 @@ class AgentService {
           ...details
       };
       
-      await dbHelper.save(COLLECTION, { id: quoteId, operationalDetails: updatedDetails });
+      await dbHelper.save(COLLECTION, { id: quoteId, operationalDetails: updatedDetails, updatedAt: new Date().toISOString() });
   }
 
   async getOperatorAssignments(operatorId: string): Promise<Quote[]> {
@@ -235,7 +239,14 @@ class AgentService {
       const original = await dbHelper.getById<Quote>(COLLECTION, originalId);
       if (!original) return null;
       
-      const copy = { ...original, id: `rev_${Date.now()}`, version: original.version + 1, isLocked: false };
+      const copy = { 
+          ...original, 
+          id: `rev_${Date.now()}`, 
+          version: original.version + 1, 
+          isLocked: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+      };
       await dbHelper.save(COLLECTION, copy);
       return copy;
   }
@@ -244,7 +255,15 @@ class AgentService {
       const original = await dbHelper.getById<Quote>(COLLECTION, originalId);
       if (!original) return null;
       
-      const copy = { ...original, id: `copy_${Date.now()}`, uniqueRefNo: `COPY-${Date.now()}`, status: 'DRAFT' as const, isLocked: false };
+      const copy = { 
+          ...original, 
+          id: `copy_${Date.now()}`, 
+          uniqueRefNo: `COPY-${Date.now()}`, 
+          status: 'DRAFT' as const, 
+          isLocked: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+      };
       await dbHelper.save(COLLECTION, copy);
       return copy;
   }
@@ -267,6 +286,35 @@ class AgentService {
       await dbHelper.save('users', { id: agentId, ...updates });
       
       return newBalance;
+  }
+
+  /**
+   * Automatically deletes 'DRAFT' quotes older than 30 days.
+   * This should be called periodically or on dashboard load.
+   */
+  async cleanupOldDrafts(agentId: string) {
+    try {
+        const quotes = await this.fetchQuotes(agentId);
+        
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - 30);
+        
+        const draftsToDelete = quotes.filter(q => {
+            if (q.status !== 'DRAFT') return false;
+            // If createdAt is missing, we assume it's new/safe unless we want to purge undated items.
+            // Keeping safe: only delete if definitely old.
+            if (!q.createdAt) return false; 
+            return new Date(q.createdAt) < cutoffDate;
+        });
+
+        if (draftsToDelete.length > 0) {
+            console.log(`[Auto-Cleanup] Deleting ${draftsToDelete.length} expired draft quotes.`);
+            // Execute deletions in parallel
+            await Promise.all(draftsToDelete.map(q => this.deleteQuote(q.id)));
+        }
+    } catch (e) {
+        console.warn("Auto-delete drafts failed", e);
+    }
   }
 }
 

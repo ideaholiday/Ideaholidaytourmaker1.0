@@ -15,68 +15,70 @@ export interface AgentBranding {
   primaryColor?: string;
   secondaryColor?: string;
   contactPhone?: string;
+  email?: string;
   website?: string;
   officeAddress?: string;
   whatsappNumber?: string;
 }
 
 export interface BankDetails {
-  accountName: string;
-  accountNumber: string;
-  bankName: string;
-  branchName: string;
-  swiftCode?: string;
-  ifscCode?: string; // For India
-  currency: string;
+    currency: string;
+    accountName?: string;
+    accountNumber?: string;
+    bankName?: string;
+    branchName?: string;
+    ifscCode?: string;
+    swiftCode?: string;
 }
-
-export type Permission = 
-  | 'CREATE_QUOTE' 
-  | 'EDIT_QUOTE' 
-  | 'ASSIGN_OPERATOR' 
-  | 'VIEW_NET_COST' 
-  | 'SET_OPERATOR_PRICE' 
-  | 'APPROVE_BOOKING' 
-  | 'APPROVE_CANCELLATION' 
-  | 'VIEW_PAYMENTS' 
-  | 'MODIFY_PAYMENTS' 
-  | 'VIEW_AUDIT_LOGS' 
-  | 'MANAGE_COMPANIES' 
-  | 'EXPORT_ACCOUNTING' 
-  | 'VIEW_FINANCE_REPORTS'
-  | 'APPROVE_INVENTORY'
-  | 'MANAGE_CONTRACTS'
-  | 'APPROVE_CONTRACTS';
 
 export interface User {
   id: string;
-  uniqueId?: string; // e.g. AG-IH-000123
+  uniqueId?: string; // e.g. AG-IH-0001
   name: string;
   email: string;
   role: UserRole;
-  dashboardRoute?: string; // Backend-determined entry point
   isVerified: boolean;
-  status?: UserStatus;
   companyName?: string;
   phone?: string;
   city?: string;
   state?: string;
-  creditLimit?: number; // Post-paid limit assigned by admin
-  walletBalance?: number; // Pre-paid funds loaded by agent
-  permissions?: Permission[];
-  assignedDestinations?: string[]; // For Operator
-  serviceLocations?: string[];
-  linkedInventoryIds?: string[]; // For Hotel Partner
-  partnerType?: 'HOTEL' | 'TRANSPORT';
-  agentBranding?: AgentBranding;
-  bankDetails?: BankDetails; // For Hotel Partners
+  status?: UserStatus;
+  password?: string; // Optional for types, usually handled by Auth
+  
+  // Agent Specific
+  creditLimit?: number;
+  walletBalance?: number;
   customDomain?: string;
-  logoUrl?: string; // Legacy
+  logoUrl?: string;
+  agentBranding?: AgentBranding;
+
+  // Operator Specific
+  assignedDestinations?: string[]; // IDs of destinations
+  serviceLocations?: string[];
+
+  // Staff Specific
+  permissions?: Permission[];
+
+  // Partner Specific
+  partnerType?: 'HOTEL' | 'TRANSPORT';
+  linkedInventoryIds?: string[];
+  bankDetails?: BankDetails;
+
   joinedAt?: string;
   updatedAt?: string;
-  password?: string; // Mock only
+  dashboardRoute?: string;
+  
+  // Email logic
   welcomeEmailSent?: boolean;
+  welcomeEmailSentAt?: any;
 }
+
+export type Permission = 
+  | 'CREATE_QUOTE' | 'EDIT_QUOTE' | 'ASSIGN_OPERATOR' | 'VIEW_NET_COST'
+  | 'SET_OPERATOR_PRICE' | 'APPROVE_BOOKING' | 'APPROVE_CANCELLATION'
+  | 'VIEW_PAYMENTS' | 'MODIFY_PAYMENTS' | 'VIEW_AUDIT_LOGS'
+  | 'MANAGE_COMPANIES' | 'EXPORT_ACCOUNTING' | 'VIEW_FINANCE_REPORTS'
+  | 'APPROVE_INVENTORY';
 
 export interface Message {
   id: string;
@@ -88,69 +90,6 @@ export interface Message {
   isSystem: boolean;
 }
 
-export interface SystemNotification {
-  id: string;
-  content: string;
-  link?: string;
-  type: 'INFO' | 'URGENT' | 'PROMO' | 'MEETING';
-  isActive: boolean;
-  createdAt: string;
-}
-
-export interface ItineraryService {
-  id: string;
-  inventory_id?: string; // New: Link to source inventory item
-  type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER' | 'VISA' | 'OTHER'; // Added VISA
-  name: string; // SNAPSHOT: Name at time of booking
-  cost: number; // SNAPSHOT: Net Cost at time of booking
-  price: number; // SNAPSHOT: Selling Price at time of booking
-  isRef?: boolean;
-  currency?: string;
-  meta?: any; // SNAPSHOT: Room type, meal plan, etc.
-  isOperatorInventory?: boolean; 
-  operatorName?: string; 
-  contractId?: string; // New: Link to contract snapshot
-  duration_nights?: number;
-  quantity?: number;
-}
-
-export interface ItineraryItem {
-  day: number;
-  title: string;
-  description: string;
-  inclusions?: string[];
-  services?: ItineraryService[];
-  cityId?: string;
-}
-
-export interface CityVisit {
-  id: string;
-  cityId: string;
-  cityName: string;
-  nights: number;
-  hotelId?: string;
-  hotelName?: string;
-}
-
-export interface Traveler {
-  title: string;
-  firstName: string;
-  lastName: string;
-  type: 'ADULT' | 'CHILD' | 'INFANT';
-  passportNo?: string;
-}
-
-export type QuoteType = 'DETAILED' | 'QUICK';
-
-export interface QuickQuoteInputs {
-  hotelCategory: '3 Star' | '4 Star' | '5 Star' | 'Luxury';
-  mealPlan: 'RO' | 'BB' | 'HB' | 'FB' | 'AI';
-  transfersIncluded: boolean;
-  sightseeingIntensity: 'None' | 'Standard' | 'Premium';
-  rooms: number;
-  budgetPerPerson?: number;
-}
-
 export interface OperationalDetails {
   tripManagerName?: string;
   tripManagerPhone?: string;
@@ -159,17 +98,67 @@ export interface OperationalDetails {
   vehicleModel?: string;
   vehicleNumber?: string;
   whatsappGroupLink?: string;
-  // Payment from Admin to Operator
-  paymentStatus?: 'PENDING' | 'PARTIAL' | 'CLEARED'; 
+  paymentStatus?: 'PENDING' | 'PARTIAL' | 'CLEARED';
   paymentNotes?: string;
+  otherNotes?: string;
+}
+
+export type QuoteType = 'QUICK' | 'DETAILED';
+
+export interface QuickQuoteInputs {
+  hotelCategory: '3 Star' | '4 Star' | '5 Star' | 'Luxury';
+  mealPlan: 'RO' | 'BB' | 'HB' | 'FB' | 'AI';
+  transfersIncluded: boolean;
+  sightseeingIntensity: 'None' | 'Standard' | 'Premium';
+  rooms: number;
+}
+
+export interface CityVisit {
+  id: string;
+  cityId: string;
+  cityName: string;
+  nights: number;
+}
+
+export interface Traveler {
+  title: string;
+  firstName: string;
+  lastName: string;
+  type: 'ADULT' | 'CHILD' | 'INFANT';
+  passportNo?: string;
+  age?: number;
+}
+
+export interface ItineraryService {
+    id: string;
+    inventory_id?: string;
+    type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER' | 'CUSTOM' | 'OTHER' | 'VISA';
+    name: string;
+    description?: string;
+    cost: number;
+    price: number;
+    currency: string;
+    quantity: number;
+    duration_nights?: number;
+    isRef?: boolean; // If reference only (not booked)
+    meta?: any; // For storing roomType, mealPlan, vehicle etc.
+}
+
+export interface ItineraryItem {
+  day: number;
+  title: string;
+  description: string;
+  cityId?: string; // Optional context
+  inclusions?: string[];
+  services?: ItineraryService[];
 }
 
 export interface Quote {
   id: string;
   uniqueRefNo: string;
-  version: number; // VERSIONING: v1, v2, v3
-  isLocked: boolean; // VERSIONING: True if Approved/Booked
-  previousVersionId?: string; // Chain reference
+  version: number;
+  isLocked: boolean;
+  previousVersionId?: string;
   
   leadGuestName?: string;
   destination: string;
@@ -178,10 +167,9 @@ export interface Quote {
   serviceDetails: string;
   itinerary: ItineraryItem[];
   
-  // Financial Snapshots
-  price?: number; // B2B Price / Net Cost for Agent
-  cost?: number; // System Net Cost (Admin View)
-  sellingPrice?: number; // Agent Selling Price (Client View)
+  price?: number; // Net B2B Cost
+  cost?: number; // System Net Cost (Supplier)
+  sellingPrice?: number; // Agent Selling Price
   markup?: number;
   currency: string;
   
@@ -196,14 +184,16 @@ export interface Quote {
   operatorPrice?: number;
   operatorDeclineReason?: string;
   netCostVisibleToOperator?: boolean;
+  operatorAssignedBy?: string;
+  operatorAssignedAt?: string;
+  operatorInstruction?: string;
   
-  // New Operational Data
   operationalDetails?: OperationalDetails;
   
-  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'PENDING' | 'CONFIRMED' | 'BOOKED' | 'CANCELLED' | 'IN_PROGRESS' | 'COMPLETED' | 'ESTIMATE';
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'PENDING' | 'CONFIRMED' | 'BOOKED' | 'CANCELLED' | 'IN_PROGRESS' | 'COMPLETED' | 'ESTIMATE' | 'REJECTED';
   
   messages: Message[];
-  publicNote?: string; // Note visible to client
+  publicNote?: string;
   
   hotelMode?: 'CMS' | 'REF';
   childCount?: number;
@@ -211,136 +201,26 @@ export interface Quote {
   cityVisits?: CityVisit[];
   travelers?: Traveler[];
   
-  // Quick Quote Specific
   type?: QuoteType;
   quickQuoteInputs?: QuickQuoteInputs;
-  templateId?: string; // If created from a template
+  templateId?: string;
+
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export type BookingStatus = 'REQUESTED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED_NO_REFUND' | 'CANCELLED_WITH_REFUND' | 'CANCELLATION_REQUESTED' | 'ON_HOLD' | 'REJECTED';
-
-export type PaymentStatus = 'PENDING' | 'ADVANCE_PAID' | 'PARTIALLY_PAID' | 'PAID_IN_FULL' | 'OVERDUE' | 'REFUNDED';
-
-export type PaymentMode = 'BANK_TRANSFER' | 'UPI' | 'CASH' | 'ONLINE' | 'CREDIT_LIMIT' | 'WALLET';
-
-export interface PaymentEntry {
-  id: string;
-  type: 'ADVANCE' | 'FULL' | 'BALANCE' | 'REFUND' | 'WALLET_TOPUP';
-  amount: number;
-  date: string;
-  mode: PaymentMode;
-  reference: string;
-  receiptNumber?: string;
-  recordedBy: string;
-  companyId?: string;
-  verificationStatus?: 'VERIFIED' | 'FAILED_VERIFY' | 'PENDING';
-  source?: 'WEBHOOK' | 'MANUAL' | 'SYSTEM';
-}
-
-export type CancellationType = 'FREE' | 'PARTIAL' | 'NON_REFUNDABLE';
-export type RefundStatus = 'PENDING' | 'PROCESSED' | 'NOT_APPLICABLE';
-
-export interface CancellationDetails {
-  requestedBy: string;
-  requestedAt: string;
-  reason: string;
-  processedBy?: string;
-  processedAt?: string;
-  type?: CancellationType;
-  penaltyAmount?: number;
-  refundAmount?: number;
-  refundStatus: RefundStatus;
-  adminNote?: string;
-}
-
-export interface DriverDetails {
-  name: string;
-  phone: string;
-  vehicleModel: string;
-  vehicleNumber: string;
-}
-
-// Enhanced Ops Details for Booking
-export interface BookingOpsDetails {
-  driverName?: string;
-  driverPhone?: string;
-  vehicleModel?: string;
-  vehicleNumber?: string;
-  tourGuideName?: string;
-  tourGuidePhone?: string;
-  tourManagerName?: string;
-  tourManagerPhone?: string;
-  otherNotes?: string;
-}
-
-export interface Booking {
-  id: string;
-  quoteId: string;
-  uniqueRefNo: string;
-  status: BookingStatus;
-  
-  destination: string;
-  travelDate: string;
-  paxCount: number;
-  travelers: Traveler[];
-  itinerary: ItineraryItem[];
-  
-  netCost: number;
-  sellingPrice: number;
-  currency: string;
-  
-  paymentStatus: PaymentStatus;
-  totalAmount: number;
-  advanceAmount: number;
-  paidAmount: number;
-  balanceAmount: number;
-  payments: PaymentEntry[];
-
-  agentId: string;
-  agentName: string;
-  staffId?: string;
-  
-  operatorId?: string;
-  operatorName?: string;
-  operatorStatus?: 'ASSIGNED' | 'ACCEPTED' | 'DECLINED';
-  operatorPrice?: number;
-  operatorAssignedBy?: string;
-  operatorAssignedAt?: string;
-  operatorDeclineReason?: string;
-  operatorInstruction?: string;
-  netCostVisibleToOperator?: boolean;
-  
-  companyId?: string;
-
-  comments: Message[];
-  publicNote?: string; // Note visible to client
-  
-  // Ops Info
-  opsDetails?: BookingOpsDetails;
-  
-  createdAt: string;
-  updatedAt: string;
-  
-  cancellation?: CancellationDetails;
-  driverDetails?: DriverDetails; // Legacy (can map to opsDetails)
-  remindersDisabled?: boolean;
-}
-
-// --- Inventory ---
+// Admin / Inventory Types
 
 export interface Destination {
   id: string;
-  country: string;
   city: string;
+  country: string;
   currency: string;
   timezone: string;
   isActive: boolean;
-  imageUrl?: string; // Enhanced
+  imageUrl?: string;
   createdBy?: string;
 }
-
-// Reusing InventoryStatus for all items
-export type InventoryStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 
 export interface Hotel {
   id: string;
@@ -351,47 +231,27 @@ export interface Hotel {
   mealPlan: 'RO' | 'BB' | 'HB' | 'FB' | 'AI';
   cost: number;
   costType: 'Per Room' | 'Per Person';
+  currency: string;
   season: 'Peak' | 'Off-Peak' | 'Shoulder';
-  validFrom: string;
-  validTo: string;
-  currency?: string;
+  validFrom?: string;
+  validTo?: string;
   isActive: boolean;
-  createdBy?: string;
-  blackoutDates?: string[];
-  isOperatorInventory?: boolean;
-  operatorName?: string;
-  contractId?: string; 
-  supplierId?: string;
-  
-  // Enhanced Fields
   description?: string;
   imageUrl?: string;
   address?: string;
   contactPhone?: string;
   email?: string;
   website?: string;
-
-  // Workflow
+  createdBy?: string;
+  
+  // Status workflow
   status?: InventoryStatus;
-  rejectionReason?: string;
-  createdAt?: string; // Added for expiry calculation
-}
-
-// --- ENHANCED ACTIVITY TRANSFER LOGIC ---
-export interface SicOptions {
-  enabled: boolean;
-  costPerPerson: number;
-}
-
-export interface PvtOptions {
-  enabled: boolean;
-  costPerVehicle: number;
-  vehicleCapacity: number;
+  operatorName?: string;
 }
 
 export interface ActivityTransferOptions {
-  sic: SicOptions;
-  pvt: PvtOptions;
+    sic: { enabled: boolean; costPerPerson: number };
+    pvt: { enabled: boolean; costPerVehicle: number; vehicleCapacity?: number };
 }
 
 export interface Activity {
@@ -399,40 +259,24 @@ export interface Activity {
   activityName: string;
   destinationId: string;
   activityType: 'City Tour' | 'Adventure' | 'Cruise' | 'Show' | 'Theme Park' | 'Other';
-  
-  // SPLIT PRICING
   costAdult: number;
   costChild: number;
-  
-  // TRANSFER CONFIG
-  transferOptions: ActivityTransferOptions;
-
+  currency: string;
   ticketIncluded: boolean;
-  transferIncluded: boolean; // Legacy flag
+  transferIncluded: boolean; // Legacy
+  transferOptions?: ActivityTransferOptions;
   isActive: boolean;
-  createdBy?: string;
-  currency?: string;
   description?: string;
   notes?: string;
-  isOperatorInventory?: boolean;
-  operatorName?: string;
-  contractId?: string; 
-  supplierId?: string;
-  
-  // Enhanced Visibility Fields
-  duration?: string;       // e.g. "4 Hours", "Full Day"
-  startTime?: string;      // e.g. "09:00 AM", "Flexible"
-  imageUrl?: string;       // URL for thumbnail
-  
-  // Validity
+  duration?: string;
+  startTime?: string;
+  imageUrl?: string;
   season?: 'Peak' | 'Off-Peak' | 'Shoulder' | 'All Year';
   validFrom?: string;
   validTo?: string;
-
-  // Workflow
+  createdBy?: string;
+  // Status workflow (if operator created)
   status?: InventoryStatus;
-  rejectionReason?: string;
-  createdAt?: string;
 }
 
 export interface Transfer {
@@ -442,34 +286,22 @@ export interface Transfer {
   transferType: 'PVT' | 'SIC';
   vehicleType: string;
   maxPassengers: number;
+  luggageCapacity?: number;
   cost: number;
+  currency: string;
   costBasis: 'Per Vehicle' | 'Per Person';
   nightSurcharge: number;
   isActive: boolean;
-  createdBy?: string;
   description?: string;
   notes?: string;
-  blackoutDates?: string[];
-  currency?: string;
-  isOperatorInventory?: boolean;
-  operatorName?: string;
-  contractId?: string; 
-  supplierId?: string;
-
-  // Enhanced Visibility Fields
-  luggageCapacity?: number; // Number of bags
-  meetingPoint?: string;    // e.g. "Gate 4, Pillar B"
-  imageUrl?: string;        // Vehicle image
-  
-  // Validity
+  meetingPoint?: string;
+  imageUrl?: string;
   season?: 'Peak' | 'Off-Peak' | 'Shoulder' | 'All Year';
   validFrom?: string;
   validTo?: string;
-
-  // Workflow
+  createdBy?: string;
+  // Status workflow
   status?: InventoryStatus;
-  rejectionReason?: string;
-  createdAt?: string;
 }
 
 export interface Visa {
@@ -478,14 +310,12 @@ export interface Visa {
   visaType: string;
   processingTime: string;
   cost: number;
+  validity?: string;
+  entryType?: 'Single' | 'Double' | 'Multiple';
+  description?: string;
   documentsRequired: string[];
   isActive: boolean;
   createdBy?: string;
-  
-  // Enhanced Fields
-  validity?: string; // e.g. "60 Days"
-  entryType?: 'Single' | 'Double' | 'Multiple';
-  description?: string;
 }
 
 export interface FixedPackage {
@@ -493,27 +323,72 @@ export interface FixedPackage {
   packageName: string;
   destinationId: string;
   nights: number;
+  basePax?: number;
+  fixedPrice: number;
   inclusions: string[];
   exclusions: string[];
-  fixedPrice: number;
-  validDates: string[];
-  isActive: boolean;
-  createdBy?: string;
-  
-  // Enhanced Fields
+  validDates: string[]; // ISO Date strings
+  dateType?: 'SPECIFIC' | 'DAILY';
   description?: string;
   imageUrl?: string;
-  category?: string; // e.g. "Honeymoon", "Family"
-  
-  // New Fields for Detailed Itinerary
+  category?: string;
   hotelDetails?: string;
-  basePax?: number; // No of adults base
-  itinerary?: ItineraryItem[];
   notes?: string;
-  dateType?: 'SPECIFIC' | 'DAILY';
+  itinerary?: ItineraryItem[];
+  isActive: boolean;
+  createdBy?: string;
 }
 
-// --- System ---
+export interface TemplateServiceSlot {
+  type: 'ACTIVITY' | 'TRANSFER';
+  category?: string;
+  keywords?: string[];
+  timeSlot?: 'Morning' | 'Afternoon' | 'Evening' | 'Full Day';
+  isArrival?: boolean;
+  isDeparture?: boolean;
+}
+
+export interface TemplateDay {
+  day: number;
+  title: string;
+  description: string;
+  slots: TemplateServiceSlot[];
+}
+
+export interface ItineraryTemplate {
+  id: string;
+  name: string;
+  destinationKeyword: string;
+  nights: number;
+  tags: string[];
+  days: TemplateDay[];
+}
+
+export interface AgentFavoriteTemplate {
+    id: string;
+    agentId: string;
+    templateName: string;
+    destinationName: string;
+    nights: number;
+    itinerary: ItineraryItem[];
+    note?: string;
+    createdAt: string;
+}
+
+export interface QuickQuoteTemplate {
+    id: string;
+    name: string;
+    description: string;
+    destination: string;
+    nights: number;
+    defaultPax: { adults: number; children: number };
+    inputs: QuickQuoteInputs;
+    tags: string[];
+    isSystem: boolean;
+    createdBy: string;
+    createdAt: string;
+    basePriceEstimate?: number;
+}
 
 export interface PricingRule {
   id: string;
@@ -523,32 +398,137 @@ export interface PricingRule {
   agentMarkup: number;
   gstPercentage: number;
   roundOff: 'Nearest 1' | 'Nearest 10' | 'Nearest 100' | 'None';
-  baseCurrency?: string; // Added baseCurrency
   isActive: boolean;
 }
 
 export interface PricingInput {
-  targetCurrency: string; // The currency we want the output in (e.g. Quote Currency)
+  targetCurrency: string;
   travelers: { adults: number; children: number; infants: number };
   hotel: { nights: number; cost: number; costType: 'Per Room' | 'Per Person'; rooms: number; currency: string };
-  transfers: { cost: number; quantity: number; costBasis: 'Per Vehicle' | 'Per Person'; currency: string }[];
+  transfers: { cost: number; costBasis: 'Per Vehicle' | 'Per Person'; quantity: number; currency: string }[];
   activities: { costAdult: number; costChild: number; currency: string }[];
   visa: { costPerPerson: number; enabled: boolean; currency: string };
   rules: PricingRule;
 }
 
 export interface PricingBreakdown {
-  supplierCost: number;      // Raw Cost (Admin Only)
-  companyMarkupValue: number;// Platform Margin
-  platformNetCost: number;   // Agent's Buying Price (Supplier + Platform Margin)
-  agentMarkupValue: number;  // Agent's Margin
-  subtotal: number;          // Before Tax (Platform Net + Agent Markup)
-  gstAmount: number;         // Tax
-  finalPrice: number;        // Client Price
+  supplierCost: number;
+  companyMarkupValue: number;
+  platformNetCost: number;
+  agentMarkupValue: number;
+  subtotal: number;
+  gstAmount: number;
+  finalPrice: number;
   perPersonPrice: number;
-  
-  // Legacy support
-  netCost?: number;          // Alias for platformNetCost in some contexts
+  netCost?: number; // Alias for platformNetCost
+}
+
+export interface SystemNotification {
+    id: string;
+    content: string;
+    type: 'INFO' | 'URGENT' | 'PROMO' | 'MEETING';
+    link?: string;
+    isActive: boolean;
+    createdAt?: string;
+}
+
+// Booking & Finance Types
+
+export type BookingStatus = 'REQUESTED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED_NO_REFUND' | 'CANCELLED_WITH_REFUND' | 'REJECTED' | 'ON_HOLD' | 'CANCELLATION_REQUESTED';
+export type PaymentStatus = 'PENDING' | 'ADVANCE_PAID' | 'PARTIALLY_PAID' | 'PAID_IN_FULL' | 'OVERDUE';
+export type PaymentMode = 'BANK_TRANSFER' | 'UPI' | 'CASH' | 'ONLINE' | 'CREDIT_LIMIT' | 'WALLET';
+export type CancellationType = 'FREE' | 'PARTIAL' | 'NON_REFUNDABLE';
+
+export interface DriverDetails {
+    name: string;
+    phone: string;
+    vehicleModel: string;
+    vehicleNumber: string;
+}
+
+export interface BookingOpsDetails {
+    driverName?: string;
+    driverPhone?: string;
+    vehicleModel?: string;
+    vehicleNumber?: string;
+    tourManagerName?: string;
+    tourManagerPhone?: string;
+    tourGuideName?: string;
+    otherNotes?: string;
+}
+
+export interface PaymentEntry {
+    id: string;
+    type: 'ADVANCE' | 'FULL' | 'BALANCE' | 'REFUND';
+    amount: number;
+    date: string;
+    mode: PaymentMode;
+    reference: string;
+    receiptNumber: string;
+    recordedBy: string; // User ID
+    companyId: string;
+    verificationStatus?: 'VERIFIED' | 'FAILED_VERIFY' | 'PENDING';
+    source?: 'WEBHOOK' | 'MANUAL' | 'SYSTEM' | 'RAZORPAY_WEBHOOK' | 'RAZORPAY_WEBHOOK_VERIFIED';
+}
+
+export interface Booking {
+    id: string;
+    quoteId: string;
+    uniqueRefNo: string;
+    status: BookingStatus;
+    
+    destination: string;
+    travelDate: string;
+    paxCount: number;
+    travelers: Traveler[];
+    itinerary: ItineraryItem[];
+    
+    netCost: number; // Cost to Agent
+    sellingPrice: number; // Client Price
+    currency: string;
+    
+    paymentStatus: PaymentStatus;
+    totalAmount: number; // Usually Net Cost if B2B
+    advanceAmount: number;
+    paidAmount: number;
+    balanceAmount: number;
+    payments: PaymentEntry[];
+    
+    agentId: string;
+    agentName: string;
+    staffId: string | null;
+    
+    operatorId: string | null;
+    operatorName: string | null;
+    operatorStatus?: 'ASSIGNED' | 'ACCEPTED' | 'DECLINED' | 'PENDING';
+    operatorInstruction?: string;
+    operatorDeclineReason?: string;
+    operatorPrice?: number;
+    operatorAssignedBy?: string;
+    operatorAssignedAt?: string;
+    netCostVisibleToOperator?: boolean;
+    
+    driverDetails?: DriverDetails;
+    opsDetails?: BookingOpsDetails;
+
+    companyId: string;
+    publicNote?: string;
+    
+    comments: Message[];
+    
+    cancellation?: {
+        requestedBy: string;
+        requestedAt: string;
+        reason: string;
+        type?: CancellationType;
+        penaltyAmount?: number;
+        refundAmount?: number;
+        refundStatus?: 'PENDING' | 'PROCESSED';
+        adminNote?: string;
+    };
+
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface GSTRecord {
@@ -568,313 +548,257 @@ export interface GSTRecord {
   companyId: string;
   status: 'ACTIVE' | 'CANCELLED' | 'REFUNDED';
   creditNoteId?: string;
-  customerGst?: string;
 }
 
 export interface GSTCreditNote {
-  id: string;
-  originalInvoiceId: string;
-  creditNoteNumber: string;
-  issuedDate: string;
-  refundTaxableAmount: number;
-  refundGstAmount: number;
-  totalRefundAmount: number;
-  companyId: string;
-  reason: string;
+    id: string;
+    originalInvoiceId: string;
+    creditNoteNumber: string;
+    issuedDate: string;
+    reason: string;
+    refundTaxableAmount: number;
+    refundGstAmount: number;
+    totalRefundAmount: number;
+    companyId: string;
 }
 
 export interface CompanyProfile {
-  id: string;
-  companyName: string;
-  brandName: string;
-  gstin: string;
-  email: string;
-  phone: string;
-  address: string;
-  stateCode: string;
-  gstRate: number;
-  gstType: 'CGST_SGST' | 'IGST';
-  invoicePrefix: string;
-  nextInvoiceNumber: number;
-  receiptPrefix: string;
-  nextReceiptNumber: number;
-  creditNotePrefix: string;
-  nextCreditNoteNumber: number;
-  isActive: boolean;
-}
-
-export type EntityType = 'BOOKING' | 'PAYMENT' | 'QUOTE' | 'USER' | 'PERMISSION' | 'OPERATOR_ASSIGNMENT' | 'CANCELLATION' | 'GST_INVOICE' | 'GST_CREDIT_NOTE' | 'ACCOUNTING_EXPORT' | 'PAYMENT_REMINDER' | 'CURRENCY_RATE' | 'SUPPLIER_UPDATE' | 'INVENTORY_APPROVAL' | 'CONTRACT';
-
-export interface AuditLog {
-  id: string;
-  entityType: EntityType;
-  entityId: string;
-  action: string;
-  performedByRole: UserRole;
-  performedById: string;
-  performedByName: string;
-  description: string;
-  previousValue?: any;
-  newValue?: any;
-  timestamp: string;
-}
-
-export interface ExportLog {
-  id: string;
-  type: string;
-  date: string;
-  userId: string;
+    id: string;
+    companyName: string;
+    brandName: string;
+    gstin: string;
+    email: string;
+    phone: string;
+    address: string;
+    stateCode: string;
+    gstRate: number;
+    gstType: 'CGST_SGST' | 'IGST';
+    invoicePrefix: string;
+    nextInvoiceNumber: number;
+    receiptPrefix: string;
+    nextReceiptNumber: number;
+    creditNotePrefix: string;
+    nextCreditNoteNumber: number;
+    isActive: boolean;
 }
 
 export interface LedgerEntry {
-  entryId: string;
-  date: string;
-  voucherType: 'SALES' | 'RECEIPT' | 'PAYMENT' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
-  voucherNumber: string;
-  ledgerDebit: string;
-  ledgerCredit: string;
-  amount: number;
-  narration: string;
-  bookingId?: string;
-  companyId?: string;
-  gstComponent?: { type: 'IGST' | 'CGST' | 'SGST'; amount: number };
+    entryId: string;
+    date: string;
+    voucherType: 'SALES' | 'RECEIPT' | 'CREDIT_NOTE';
+    voucherNumber: string;
+    ledgerDebit: string;
+    ledgerCredit: string;
+    amount: number;
+    narration: string;
+    bookingId?: string;
+    companyId: string;
+    gstComponent?: { type: 'CGST' | 'SGST' | 'IGST'; amount: number };
+}
+
+export interface ExportLog {
+    id: string;
+    type: 'TALLY' | 'ZOHO';
+    generatedAt: string;
+    userId: string;
+    dateRange: { from: string; to: string };
+    recordCount: number;
 }
 
 export interface PLTransaction {
-  id: string;
-  date: string;
-  referenceRef: string;
-  agentName: string;
-  income: number;
-  cogs: number;
-  grossProfit: number;
-  status: string;
-  type: 'INVOICE' | 'CREDIT_NOTE';
+    id: string;
+    date: string;
+    referenceRef: string;
+    agentName: string;
+    income: number;
+    cogs: number;
+    grossProfit: number;
+    status: string;
+    type: 'INVOICE' | 'ADJUSTMENT';
 }
 
 export interface PLSummary {
-  totalRevenue: number;
-  totalCost: number;
-  grossProfit: number;
-  netMarginPercent: number;
-  totalBookings: number;
-  refundedRevenue: number;
+    totalRevenue: number;
+    totalCost: number;
+    grossProfit: number;
+    netMarginPercent: number;
+    totalBookings: number;
+    refundedRevenue: number;
 }
 
+// Common Utility Types
+
 export interface CurrencyConfig {
-  code: string;
-  name: string;
-  symbol: string;
-  rate: number;
-  isBase: boolean;
-  isActive: boolean;
+    code: string;
+    name: string;
+    symbol: string;
+    rate: number;
+    isBase: boolean;
+    isActive: boolean;
+}
+
+export type EntityType = 'BOOKING' | 'PAYMENT' | 'QUOTE' | 'USER' | 'PERMISSION' | 'OPERATOR_ASSIGNMENT' | 'CANCELLATION' | 'INVENTORY_APPROVAL' | 'ACCOUNTING_EXPORT' | 'CONTRACT' | 'GST_INVOICE';
+
+export interface AuditLog {
+    id: string;
+    entityType: EntityType;
+    entityId: string;
+    action: string;
+    performedByRole?: UserRole;
+    performedById?: string;
+    performedByName: string;
+    description: string;
+    previousValue?: any;
+    newValue?: any;
+    timestamp: string;
+}
+
+// Inventory Workflow Types
+export type InventoryStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+
+export interface OperatorInventoryItem {
+    id: string;
+    productId: string; // Grouping revisions
+    version: number;
+    isCurrent: boolean;
+    operatorId: string;
+    operatorName: string;
+    type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER';
+    name: string;
+    destinationId: string;
+    description: string;
+    currency: string;
+    
+    // Union fields for simplicity
+    costPrice: number; // Base cost
+    costAdult?: number;
+    costChild?: number;
+    
+    // Hotel
+    category?: string;
+    roomType?: string;
+    mealPlan?: string;
+    
+    // Transfer
+    vehicleType?: string;
+    maxPassengers?: number;
+    luggageCapacity?: number;
+    
+    // Activity
+    activityType?: string;
+    transferOptions?: ActivityTransferOptions;
+
+    imageUrl?: string;
+    validFrom?: string;
+    validTo?: string;
+
+    status: InventoryStatus;
+    rejectionReason?: string;
+    approvedBy?: string;
+    approvedAt?: string;
+    createdAt: string;
+}
+
+export interface GuideBookEntry {
+    id: string;
+    title: string;
+    category: string; // 'Platform Guide' | 'Destination Info' | 'Policy' | 'Inventory Management'
+    lastUpdated: string;
+    targetRoles: UserRole[];
+    content: string; // Markdown supported
 }
 
 export type ReminderType = 'ADVANCE' | 'BALANCE';
 export type ReminderStage = 'FIRST' | 'SECOND' | 'FINAL';
 
 export interface PaymentReminder {
-  id: string;
-  bookingId: string;
-  bookingRef: string;
-  type: ReminderType;
-  stage: ReminderStage;
-  channel: 'EMAIL' | 'WHATSAPP';
-  sentAt: string;
-  recipientEmail: string;
-  amountDue: number;
-  status: 'SENT' | 'FAILED';
+    id: string;
+    bookingId: string;
+    bookingRef: string;
+    type: ReminderType;
+    stage: ReminderStage;
+    channel: 'EMAIL' | 'WHATSAPP';
+    sentAt: string;
+    recipientEmail?: string;
+    recipientPhone?: string;
+    amountDue: number;
+    status: 'SENT' | 'FAILED';
 }
 
 export interface ReminderConfig {
-  enabled: boolean;
-  firstReminderDays: number;
-  secondReminderDays: number;
-  finalReminderDays: number;
-  includeWhatsApp: boolean;
-}
-
-export interface TravelerInfo {
-  adults: number;
-  children: number;
-  infants: number;
-}
-
-export interface AgentFavoriteTemplate {
-  id: string;
-  agentId: string;
-  templateName: string;
-  note?: string;
-  destinationId: string;
-  destinationName: string;
-  nights: number;
-  itinerary: ItineraryItem[];
-  createdAt: string;
-}
-
-export interface TemplateServiceSlot {
-  type: 'ACTIVITY' | 'TRANSFER';
-  category?: string; // e.g. 'City Tour', 'Adventure', 'Cruise'
-  keywords?: string[]; // fallback matching e.g. ['Airport', 'Arrival']
-  isArrival?: boolean;
-  isDeparture?: boolean;
-  timeSlot?: 'Morning' | 'Afternoon' | 'Evening';
-}
-
-export interface TemplateDay {
-  day: number;
-  title: string;
-  description: string;
-  slots: TemplateServiceSlot[];
-}
-
-export interface ItineraryTemplate {
-  id: string;
-  name: string;
-  destinationKeyword: string; // To match with destination string
-  nights: number;
-  tags?: string[];
-  days: TemplateDay[];
-}
-
-export interface GuideBookEntry {
-  id: string;
-  title: string;
-  category: 'Platform Guide' | 'Destination Info' | 'Sales Tips' | 'Policy' | 'Inventory Management';
-  content: string; // Markdown or HTML
-  lastUpdated: string;
-  targetRoles?: UserRole[]; // Which roles can see this guide
+    enabled: boolean;
+    firstReminderDays: number;
+    secondReminderDays: number;
+    finalReminderDays: number;
+    includeWhatsApp: boolean;
 }
 
 export interface PaymentGateway {
-    key: string;
-}
-
-// --- OPERATOR INVENTORY SYSTEM (VERSIONED) ---
-
-export interface OperatorInventoryItem {
-  id: string; // Version ID (Unique per edit)
-  productId: string; // Logical ID (Constant across versions)
-  version: number;
-  isCurrent: boolean; // Only ONE version is current per productId (the Approved one)
-  
-  operatorId: string;
-  operatorName: string; 
-  type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER';
-  
-  // Common Fields
-  name: string;
-  destinationId: string;
-  description?: string;
-  currency: string;
-  
-  // Pricing
-  costPrice: number;
-  
-  // Hotel Specific
-  category?: '3 Star' | '4 Star' | '5 Star' | 'Luxury';
-  roomType?: string;
-  mealPlan?: 'RO' | 'BB' | 'HB' | 'FB' | 'AI';
-  costType?: 'Per Room' | 'Per Person';
-  
-  // Transfer Specific
-  vehicleType?: string;
-  transferType?: 'PVT' | 'SIC';
-  maxPassengers?: number;
-  costBasis?: 'Per Vehicle' | 'Per Person';
-  luggageCapacity?: number;
-  
-  // Activity Specific
-  activityType?: string;
-  costAdult?: number;
-  costChild?: number;
-  transferOptions?: ActivityTransferOptions;
-  
-  // Approval Workflow
-  status: InventoryStatus;
-  rejectionReason?: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  createdAt: string;
-}
-
-// --- HOTEL PARTNER CONTRACT MODULE ---
-
-export type ContractStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | 'REJECTED';
-export type PricingModel = 'NET' | 'COMMISSION' | 'RATE_CARD';
-
-export interface SupplierContract {
-  id: string;
-  supplierId: string;
-  supplierName: string;
-  contractCode: string; // Unique reference e.g., CTR-2024-001
-  contractType: 'HOTEL' | 'TRANSFER' | 'ACTIVITY' | 'MULTIPLE';
-  applicableCities: string[]; // City IDs
-  
-  validFrom: string; // ISO Date
-  validTo: string; // ISO Date
-  
-  pricingModel: PricingModel;
-  commissionPercentage?: number; // Only for COMMISSION model
-  
-  cancellationPolicy: string; // Text description or policy code
-  paymentTerms: string; // e.g., "Net 30", "Prepaid"
-  
-  blackoutDates: string[]; // ISO Dates
-  taxInclusive: boolean;
-  
-  status: ContractStatus;
-  rejectionReason?: string;
-  
-  createdBy: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-  
-  // Optional file attachment URL (Mock)
-  documentUrl?: string;
-}
-
-export interface QuickQuoteTemplate {
-  id: string;
-  name: string;
-  description?: string;
-  destination: string;
-  nights: number;
-  defaultPax: { adults: number; children: number };
-  inputs: QuickQuoteInputs;
-  tags?: string[];
-  isSystem: boolean;
-  createdBy: string;
-  createdAt: string;
-  basePriceEstimate?: number;
-}
-
-// --- OPS DASHBOARD ---
-
-export interface OpsStats {
-  pendingInventory: number;
-  pendingHotels: number;
-  expiringRates: number;
-  rejectedItems: number;
-}
-
-export interface SystemAlert {
-  id: string;
-  type: 'CRITICAL' | 'WARNING' | 'INFO';
-  title: string;
-  description: string;
-  actionLink?: string;
-  createdAt: string;
+    keyId: string;
+    keySecret: string; // Should be handled securely/backend only usually
+    webhookSecret: string;
 }
 
 export interface ExpiringRate {
-  id: string;
-  type: 'HOTEL_RATE';
-  name: string;
-  details: string;
-  validTo: string;
-  daysRemaining: number;
-  supplierName: string;
+    id: string;
+    type: 'HOTEL_RATE' | 'TRANSFER_RATE';
+    name: string;
+    details: string;
+    validTo: string;
+    daysRemaining: number;
+    supplierName: string;
+}
+
+export interface SystemAlert {
+    id: string;
+    type: 'INFO' | 'WARNING' | 'CRITICAL';
+    title: string;
+    description: string;
+    actionLink?: string;
+    createdAt: string;
+}
+
+export interface OpsStats {
+    pendingInventory: number;
+    pendingHotels: number;
+    expiringRates: number;
+    rejectedItems: number;
+}
+
+export type ContractStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED' | 'EXPIRED' | 'SUSPENDED';
+
+export interface SupplierContract {
+    id: string;
+    contractCode: string;
+    supplierId: string;
+    supplierName: string;
+    status: ContractStatus;
+    
+    contractType: 'HOTEL' | 'TRANSFER' | 'ACTIVITY' | 'MULTIPLE';
+    validFrom: string;
+    validTo: string;
+    
+    pricingModel: 'NET' | 'COMMISSION' | 'RATE_CARD';
+    commissionPercentage?: number;
+    taxInclusive: boolean;
+    
+    applicableCities: string[]; // City IDs
+    blackoutDates: string[]; // ISO Dates
+    
+    cancellationPolicy: string;
+    paymentTerms: string;
+    
+    documentUrl?: string; // PDF Link
+    
+    createdAt: string;
+    updatedAt: string;
+    createdBy: string;
+    approvedBy?: string;
+    rejectionReason?: string;
+}
+
+export interface TravelerInfo { // Alias for Traveler to match import error if any
+    adults: number;
+    children: number;
+    infants: number;
 }

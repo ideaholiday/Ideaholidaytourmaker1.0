@@ -312,12 +312,14 @@ export const generateQuotePDF = (
   doc.save(`Itinerary_${quote.uniqueRefNo}.pdf`);
 };
 
-// --- FIXED PACKAGE PDF GENERATOR ---
-export const generateFixedPackagePDF = (
+// --- FIXED PACKAGE PDF GENERATOR (SPLIT) ---
+
+// 1. Create PDF Object (For Preview/Blobs)
+export const createFixedPackagePDF = (
     pkg: FixedPackage,
     role: UserRole,
     agentProfile?: User | null
-) => {
+): jsPDF => {
     const doc = new jsPDF();
     const branding = resolveBranding(role, agentProfile);
     const primaryRGB = hexToRgb(branding.primaryColorHex);
@@ -410,7 +412,7 @@ export const generateFixedPackagePDF = (
         yPos += (descLines.length * 5) + 10;
     }
 
-    // 4. Inclusions & Exclusions (Improved Side by Side)
+    // 4. Inclusions & Exclusions
     const incExcY = yPos;
     const boxWidth = 85;
     const boxHeight = 60; // Fixed height for alignment
@@ -501,6 +503,16 @@ export const generateFixedPackagePDF = (
     // 6. Contact / Booking Footer
     addFooter(doc, branding, primaryRGB);
 
+    return doc;
+};
+
+// 2. Download/Save Wrapper
+export const generateFixedPackagePDF = (
+    pkg: FixedPackage,
+    role: UserRole,
+    agentProfile?: User | null
+) => {
+    const doc = createFixedPackagePDF(pkg, role, agentProfile);
     doc.save(`Package_${pkg.packageName.replace(/\s+/g, '_')}.pdf`);
 };
 

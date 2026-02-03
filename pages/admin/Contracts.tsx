@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { contractService } from '../../services/contractService';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
-import { SupplierContract, UserRole, User, Destination, PricingModel } from '../../types';
+import { SupplierContract, UserRole, User, Destination } from '../../types';
 import { ContractStatusBadge } from '../../components/contracts/ContractStatusBadge';
 import { Plus, Edit2, Search, Filter, FileText, CheckCircle, X, Save } from 'lucide-react';
 

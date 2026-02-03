@@ -320,6 +320,7 @@ export const seedInternationalInventory = async () => {
             const qq: QuickQuoteTemplate = {
                 id: '',
                 name: q.name,
+                description: `Quick Quote template for ${q.dest} - ${q.nights} Nights`,
                 destination: q.dest,
                 nights: q.nights,
                 defaultPax: { adults: 2, children: 0 },

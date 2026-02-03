@@ -106,6 +106,8 @@ const createServiceFromMatch = (
         name: name,
         cost: cost,
         price: cost, // B2B Price same as cost initially
+        currency: item.currency || 'INR',
+        quantity: 1,
         isRef: false,
         meta: meta
     };

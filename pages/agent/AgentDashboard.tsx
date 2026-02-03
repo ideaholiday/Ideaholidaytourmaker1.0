@@ -27,6 +27,10 @@ export const AgentDashboard: React.FC = () => {
       if (user) {
           const loadData = async () => {
               try {
+                  // Background Task: Auto-delete old drafts (>30 days)
+                  // We don't await this to block the UI, but it runs every dashboard visit.
+                  agentService.cleanupOldDrafts(user.id).catch(console.warn);
+
                   const s = await agentService.getStats(user.id);
                   setStats(s);
                   const q = await agentService.fetchQuotes(user.id);

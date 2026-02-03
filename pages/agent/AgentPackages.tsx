@@ -1,13 +1,12 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import { agentService } from '../../services/agentService';
 import { useAuth } from '../../context/AuthContext';
-import { FixedPackage, Quote, ItineraryItem } from '../../types';
-import { Package, Calendar, MapPin, CheckCircle, ArrowRight, Loader2, Info, X, User, Download, FileText, Hotel, ChevronDown, Image as ImageIcon, Phone, Mail, Globe, Star, XCircle, Clock } from 'lucide-react';
-import { generateFixedPackagePDF } from '../../utils/pdfGenerator';
-import html2canvas from 'html2canvas';
+import { FixedPackage, Quote, ItineraryItem, UserRole } from '../../types';
+import { createFixedPackagePDF } from '../../utils/pdfGenerator';
+import { Package, Calendar, MapPin, ArrowRight, Loader2, Info, X, User, Download, Hotel, ChevronDown, CheckCircle, FileText } from 'lucide-react';
 
 export const AgentPackages: React.FC = () => {
   const { user } = useAuth();
@@ -26,13 +25,7 @@ export const AgentPackages: React.FC = () => {
       children: 0
   });
   const [isCreating, setIsCreating] = useState(false);
-
-  // Dropdown & Flyer State
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
-  const [flyerData, setFlyerData] = useState<FixedPackage | null>(null);
-  const [isGeneratingImg, setIsGeneratingImg] = useState(false);
-  const flyerRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -47,15 +40,6 @@ export const AgentPackages: React.FC = () => {
       setIsLoading(false);
     };
     load();
-
-    // Close dropdown when clicking outside
-    const handleClickOutside = (event: MouseEvent) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-            setOpenDropdownId(null);
-        }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const openBookingModal = (pkg: FixedPackage) => {
@@ -64,12 +48,10 @@ export const AgentPackages: React.FC = () => {
       let defaultDate = '';
       
       if (pkg.dateType === 'DAILY') {
-          // Default to tomorrow for daily
           const tmrw = new Date();
           tmrw.setDate(tmrw.getDate() + 1);
           defaultDate = tmrw.toISOString().split('T')[0];
       } else {
-          // Pre-select first valid future date for specific
           const nextDate = pkg.validDates
             .map(d => new Date(d))
             .sort((a,b) => a.getTime() - b.getTime())
@@ -125,7 +107,6 @@ export const AgentPackages: React.FC = () => {
                     services: [] 
                 });
             }
-            // Add Departure Day
             itinerary.push({
                 day: pkg.nights + 1,
                 title: 'Departure',
@@ -134,7 +115,6 @@ export const AgentPackages: React.FC = () => {
             });
         }
 
-        // 3. Update Quote with Package Specifics
         const totalPax = Number(bookingForm.adults) + Number(bookingForm.children);
         const totalPrice = pkg.fixedPrice * totalPax;
 
@@ -142,8 +122,8 @@ export const AgentPackages: React.FC = () => {
             ...newQuote,
             serviceDetails: `Fixed Package: ${pkg.packageName} (${pkg.nights} Nights). Hotel: ${pkg.hotelDetails || 'Standard'}`,
             itinerary: itinerary,
-            price: totalPrice, // Net Price for Agent
-            sellingPrice: totalPrice, // Suggest same selling initially
+            price: totalPrice,
+            sellingPrice: totalPrice,
             currency: 'INR',
             status: 'DRAFT',
             isLocked: false,
@@ -151,7 +131,6 @@ export const AgentPackages: React.FC = () => {
         };
 
         await agentService.updateQuote(updatedQuote);
-        
         navigate(`/quote/${newQuote.id}`);
 
     } catch (error) {
@@ -163,85 +142,24 @@ export const AgentPackages: React.FC = () => {
     }
   };
 
-  const handleDownloadPDF = (e: React.MouseEvent, pkg: FixedPackage) => {
-    e.stopPropagation(); 
-    setOpenDropdownId(null);
-    try {
-        if(user) {
-            // Generates detailed PDF with itinerary
-            generateFixedPackagePDF(pkg, user.role, user);
-        }
-    } catch(e) {
-        console.error("PDF Generation Error", e);
-        alert("Failed to generate PDF. Please try again.");
-    }
-  };
-
-  const handleDownloadImage = async (e: React.MouseEvent, pkg: FixedPackage) => {
+  const handleOpenPDF = (e: React.MouseEvent, pkg: FixedPackage) => {
       e.stopPropagation();
-      setFlyerData(pkg);
-      setIsGeneratingImg(true);
-      setOpenDropdownId(null);
-      
-      // Allow time for DOM render and image fetch
-      await new Promise(resolve => setTimeout(resolve, 800));
+      setGeneratingPdfId(pkg.id);
 
-      if (!flyerRef.current) {
-          setIsGeneratingImg(false);
-          return;
-      }
-      
-      try {
-          // Preload Images
-          const imagesToLoad = [];
-          if (pkg.imageUrl) imagesToLoad.push(pkg.imageUrl);
-          if (user?.agentBranding?.logoUrl) imagesToLoad.push(user.agentBranding.logoUrl);
-
-          await Promise.all(imagesToLoad.map(src => {
-              return new Promise((resolve) => {
-                  const img = new Image();
-                  img.crossOrigin = 'anonymous';
-                  img.src = src;
-                  img.onload = resolve;
-                  img.onerror = resolve; 
-              });
-          }));
-          
-          await new Promise(resolve => setTimeout(resolve, 500)); // Extra buffer
-
-          // Generate Canvas at 1080x1920 scale
-          const canvas = await html2canvas(flyerRef.current, { 
-              scale: 1, 
-              useCORS: true, 
-              backgroundColor: '#ffffff',
-              width: 1080,
-              height: 1920,
-              windowWidth: 1080,
-              windowHeight: 1920,
-              logging: false
-          });
-          
-          const image = canvas.toDataURL("image/jpeg", 0.95); // High quality JPEG
-          
-          const link = document.createElement("a");
-          link.href = image;
-          link.download = `${pkg.packageName.replace(/[^a-z0-9]/gi, '_')}_Story.jpg`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-      } catch (error) {
-          console.error("Image generation failed", error);
-          alert("Failed to generate image.");
-      } finally {
-          setFlyerData(null);
-          setIsGeneratingImg(false);
-      }
-  };
-
-  const toggleDropdown = (e: React.MouseEvent, id: string) => {
-      e.stopPropagation();
-      setOpenDropdownId(openDropdownId === id ? null : id);
+      // Use timeout to allow UI to render spinner before main thread blocks for PDF gen
+      setTimeout(() => {
+          try {
+              const doc = createFixedPackagePDF(pkg, user?.role || UserRole.AGENT, user);
+              const blob = doc.output('blob');
+              const url = URL.createObjectURL(blob);
+              window.open(url, '_blank');
+          } catch (error) {
+              console.error("PDF Generation failed", error);
+              alert("Failed to generate PDF flyer.");
+          } finally {
+              setGeneratingPdfId(null);
+          }
+      }, 100);
   };
 
   const getDestinationName = (id: string) => {
@@ -250,198 +168,11 @@ export const AgentPackages: React.FC = () => {
   };
 
   const todayStr = new Date().toISOString().split('T')[0];
-  
-  // Resolve Branding Colors
-  const brandColor = user?.agentBranding?.primaryColor || '#0ea5e9';
-  const secondaryColor = user?.agentBranding?.secondaryColor || '#0f172a';
-  const agencyName = user?.agentBranding?.agencyName || user?.companyName || user?.name || 'Travel Partner';
 
   return (
     <div className="container mx-auto px-4 py-8 relative">
       
-      {/* 
-        ------------------------------------------------------------
-        HIDDEN FLYER TEMPLATE (1080x1920px - Social Media Story) 
-        ------------------------------------------------------------
-      */}
-      {flyerData && (
-          <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -100 }}>
-              <div 
-                  ref={flyerRef} 
-                  className="w-[1080px] h-[1920px] bg-white font-sans relative flex flex-col overflow-hidden"
-              >
-                  {/* 1. Header Section (Agent Branding) */}
-                  <div className="bg-white pt-16 pb-10 px-12 flex flex-col items-center justify-center border-b border-slate-100 relative shadow-sm z-20">
-                       {/* Color Accent Top */}
-                       <div className="absolute top-0 left-0 w-full h-5" style={{ backgroundColor: brandColor }}></div>
-                       
-                       {/* LOGO AREA */}
-                       <div className="mb-6 h-36 flex items-center justify-center">
-                            {user?.agentBranding?.logoUrl ? (
-                                <img 
-                                    src={user.agentBranding.logoUrl} 
-                                    className="h-full w-auto object-contain" 
-                                    alt="Agency Logo" 
-                                    crossOrigin="anonymous" 
-                                />
-                            ) : (
-                                <div className="bg-slate-100 h-32 w-32 rounded-full flex items-center justify-center text-4xl font-bold text-slate-400">
-                                    {agencyName.charAt(0)}
-                                </div>
-                            )}
-                       </div>
-                       
-                       <div 
-                           className="text-5xl font-black text-slate-800 uppercase tracking-wide text-center leading-tight"
-                           style={{ color: secondaryColor }}
-                       >
-                           {agencyName}
-                       </div>
-                  </div>
-
-                  {/* 2. Hero Image Section (Visual Impact) */}
-                  <div className="relative h-[650px] w-full overflow-hidden">
-                      {flyerData.imageUrl ? (
-                          <img 
-                            src={flyerData.imageUrl} 
-                            className="w-full h-full object-cover" 
-                            alt="" 
-                            crossOrigin="anonymous"
-                          />
-                      ) : (
-                          <div className="w-full h-full bg-slate-200 flex items-center justify-center">
-                              <ImageIcon size={120} className="text-slate-400" />
-                          </div>
-                      )}
-                      
-                      {/* Dark Gradient Overlay for text contrast */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-90"></div>
-
-                      {/* Package Title Overlay */}
-                      <div className="absolute bottom-0 left-0 w-full px-12 pb-14 text-white">
-                           <div className="flex items-center gap-4 mb-4">
-                                <span className="px-5 py-2 bg-white/20 backdrop-blur-md rounded-lg text-xl font-bold border border-white/30 uppercase tracking-widest">
-                                    {flyerData.category || 'Special Package'}
-                                </span>
-                           </div>
-                           
-                           <h1 className="text-7xl font-extrabold leading-tight mb-4 drop-shadow-xl" style={{ textShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>
-                               {flyerData.packageName}
-                           </h1>
-                           
-                           <div className="flex items-center gap-8 text-2xl font-medium opacity-95">
-                               <span className="flex items-center gap-3 bg-black/30 px-4 py-2 rounded-lg backdrop-blur-sm">
-                                   <MapPin size={28} className="text-brand-400" style={{ color: brandColor }} /> 
-                                   {getDestinationName(flyerData.destinationId)}
-                               </span>
-                           </div>
-                      </div>
-                  </div>
-
-                  {/* 3. Main Content & Pricing */}
-                  <div className="flex-1 px-12 py-10 bg-white flex flex-col justify-start relative">
-                       
-                       {/* PRICE RIBBON - Floating Design */}
-                       <div className="absolute top-[-50px] right-12 bg-white px-10 py-6 rounded-t-2xl shadow-[0_-10px_30px_rgba(0,0,0,0.1)] text-center border-t-8" style={{ borderColor: brandColor }}>
-                           <p className="text-slate-400 text-lg uppercase font-bold tracking-widest mb-1">Starting From</p>
-                           <p className="text-6xl font-extrabold text-slate-900 leading-none mb-2">₹ {flyerData.fixedPrice.toLocaleString()}</p>
-                           <p className="text-slate-500 text-sm font-medium">Per Person</p>
-                       </div>
-
-                       {/* ADDED SPACING: Margin top increased to prevent overlap with price ribbon */}
-                       <div className="mt-12 space-y-10">
-                            
-                            {/* Key Stats Row */}
-                            <div className="flex justify-between items-start pt-6 border-b border-slate-100 pb-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="bg-blue-50 p-4 rounded-2xl text-blue-600"><Clock size={36}/></div>
-                                    <div>
-                                        <p className="text-slate-400 text-sm font-bold uppercase">Duration</p>
-                                        <p className="text-2xl font-bold text-slate-800">{flyerData.nights} Nights / {flyerData.nights + 1} Days</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4 max-w-[500px]">
-                                    <div className="bg-purple-50 p-4 rounded-2xl text-purple-600"><Hotel size={36}/></div>
-                                    <div>
-                                        <p className="text-slate-400 text-sm font-bold uppercase">Accommodation</p>
-                                        <p className="text-xl font-bold text-slate-800 leading-tight">{flyerData.hotelDetails || 'Standard Hotel'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Inclusions Grid - FULL CONTENT */}
-                            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
-                                <h3 className="text-3xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-                                    <CheckCircle size={32} fill={brandColor} stroke="#fff" /> Inclusions
-                                </h3>
-                                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                                     {flyerData.inclusions.map((inc, i) => (
-                                         <div key={i} className="flex items-start gap-3 text-xl text-slate-700">
-                                              <div className="mt-1.5 w-2 h-2 rounded-full bg-slate-400 shrink-0"></div>
-                                              <span className="leading-snug">{inc}</span>
-                                         </div>
-                                     ))}
-                                </div>
-                            </div>
-
-                            {/* Exclusions (If present) */}
-                            {flyerData.exclusions && flyerData.exclusions.length > 0 && (
-                                <div className="px-4">
-                                    <h4 className="text-xl font-bold text-slate-400 mb-3 uppercase tracking-wider flex items-center gap-2">
-                                        <XCircle size={20} /> Exclusions
-                                    </h4>
-                                    <div className="flex flex-wrap gap-x-6 gap-y-2 text-lg text-slate-500">
-                                        {flyerData.exclusions.slice(0, 4).map((exc, i) => (
-                                            <span key={i}>• {exc}</span>
-                                        ))}
-                                        {flyerData.exclusions.length > 4 && <span>...and more</span>}
-                                    </div>
-                                </div>
-                            )}
-                       </div>
-                  </div>
-
-                  {/* 4. Footer Contact - Using Brand Color Background */}
-                  <div className="px-12 py-14 text-white" style={{ backgroundColor: brandColor }}>
-                       <div className="flex flex-col items-center justify-center text-center gap-6">
-                            
-                            {/* Contact Grid */}
-                            <div className="grid grid-cols-1 gap-4 w-full">
-                                <div className="flex items-center justify-center gap-4">
-                                    <Phone size={36} className="opacity-80" /> 
-                                    <span className="text-4xl font-bold tracking-tight">{user?.agentBranding?.contactPhone || user?.phone}</span>
-                                </div>
-                                
-                                <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-2xl font-medium opacity-90">
-                                    <div className="flex items-center gap-3">
-                                        <Mail size={28} /> {user?.agentBranding?.email || user?.email}
-                                    </div>
-                                    {user?.agentBranding?.website && (
-                                        <div className="flex items-center gap-3 border-l-2 border-white/30 pl-8">
-                                            <Globe size={28} /> {user.agentBranding.website}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                       </div>
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {isGeneratingImg && (
-          <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center backdrop-blur-sm">
-              <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center animate-in zoom-in-95">
-                  <div className="relative mb-4">
-                      <div className="w-12 h-12 rounded-full border-4 border-slate-100 border-t-brand-600 animate-spin"></div>
-                      <ImageIcon className="absolute inset-0 m-auto text-brand-600" size={20} />
-                  </div>
-                  <p className="font-bold text-lg text-slate-800">Creating Flyer...</p>
-                  <p className="text-sm text-slate-500 mt-1">Generating HD Story Image (1080x1920)...</p>
-              </div>
-          </div>
-      )}
-
+      {/* Main UI */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Package className="text-brand-600" /> Fixed Departure Packages
@@ -463,7 +194,6 @@ export const AgentPackages: React.FC = () => {
 
                  return (
                     <div key={pkg.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-lg transition group">
-                        {/* Image Header */}
                         <div className="h-48 bg-slate-200 relative overflow-hidden group">
                             {pkg.imageUrl ? (
                                 <img src={pkg.imageUrl} alt={pkg.packageName} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
@@ -485,7 +215,6 @@ export const AgentPackages: React.FC = () => {
                         </div>
 
                         <div className="p-5 flex-1 flex flex-col">
-                            {/* Hotel Info */}
                             <div className="flex items-start gap-2 mb-4 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                                 <Hotel size={16} className="text-slate-400 mt-0.5 shrink-0"/> 
                                 <div>
@@ -494,7 +223,6 @@ export const AgentPackages: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* Tags */}
                             <div className="flex flex-wrap gap-1.5 mb-4">
                                 <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">{pkg.category || 'Group Tour'}</span>
                                 {pkg.dateType === 'DAILY' ? (
@@ -518,46 +246,14 @@ export const AgentPackages: React.FC = () => {
                             </div>
 
                             <div className="flex gap-2">
-                                {/* Flyer Dropdown */}
-                                <div className="relative flex-1" ref={dropdownRef}>
-                                    <button 
-                                        onClick={(e) => toggleDropdown(e, pkg.id)}
-                                        className={`w-full border px-3 py-2.5 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
-                                            openDropdownId === pkg.id 
-                                            ? 'bg-slate-100 border-slate-300 text-slate-900' 
-                                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                                        }`}
-                                    >
-                                        <Download size={16} /> Flyer <ChevronDown size={14} className={`transition-transform duration-200 ${openDropdownId === pkg.id ? 'rotate-180' : ''}`} />
-                                    </button>
-                                    
-                                    {openDropdownId === pkg.id && (
-                                        <div className="absolute bottom-full left-0 w-full mb-2 bg-white border border-slate-200 rounded-xl shadow-xl z-20 overflow-hidden animate-in fade-in zoom-in-95 origin-bottom">
-                                            <div className="p-2 space-y-1">
-                                                <button 
-                                                    onClick={(e) => handleDownloadImage(e, pkg)}
-                                                    className="w-full px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-3 transition"
-                                                >
-                                                    <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md"><ImageIcon size={14} /></div>
-                                                    <div>
-                                                        <span className="block">Download Image</span>
-                                                        <span className="text-[9px] text-slate-400 font-normal">Story Format (1080x1920)</span>
-                                                    </div>
-                                                </button>
-                                                <button 
-                                                    onClick={(e) => handleDownloadPDF(e, pkg)}
-                                                    className="w-full px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-3 transition"
-                                                >
-                                                     <div className="p-1.5 bg-red-50 text-red-600 rounded-md"><FileText size={14} /></div>
-                                                     <div>
-                                                        <span className="block">Download PDF</span>
-                                                        <span className="text-[9px] text-slate-400 font-normal">Full Details Itinerary</span>
-                                                    </div>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                                <button 
+                                    onClick={(e) => handleOpenPDF(e, pkg)}
+                                    disabled={generatingPdfId === pkg.id}
+                                    className="flex-1 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 px-3 py-2.5 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-70"
+                                >
+                                    {generatingPdfId === pkg.id ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} className="text-brand-600" />} 
+                                    Flyer
+                                </button>
 
                                 <button 
                                     onClick={() => openBookingModal(pkg)}
@@ -580,7 +276,7 @@ export const AgentPackages: React.FC = () => {
         </div>
       )}
 
-      {/* CONFIG MODAL */}
+      {/* MODAL */}
       {isModalOpen && selectedPkg && (
           <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-0 overflow-hidden transform scale-100 transition-all">
@@ -591,93 +287,47 @@ export const AgentPackages: React.FC = () => {
                       </div>
                       <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-200 rounded-full transition"><X size={20}/></button>
                   </div>
-
                   <div className="p-6">
                       <form onSubmit={handleCreateQuote} className="space-y-5">
-                          {/* Form inputs remain same */}
                           <div>
                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Select Departure Date</label>
-                              
                               {selectedPkg.dateType === 'DAILY' ? (
                                   <div className="relative">
                                       <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
-                                      <input 
-                                        required
-                                        type="date"
-                                        min={todayStr}
-                                        className="w-full pl-10 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium"
-                                        value={bookingForm.date}
-                                        onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
-                                      />
-                                      <p className="text-[10px] text-green-600 mt-1.5 flex items-center gap-1 font-bold">
-                                          <CheckCircle size={10} /> Daily departures available.
-                                      </p>
+                                      <input required type="date" min={todayStr} className="w-full pl-10 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium" value={bookingForm.date} onChange={e => setBookingForm({...bookingForm, date: e.target.value})} />
+                                      <p className="text-[10px] text-green-600 mt-1.5 flex items-center gap-1 font-bold"><CheckCircle size={10} /> Daily departures available.</p>
                                   </div>
                               ) : (
                                   <div className="relative">
-                                      <select 
-                                        required
-                                        className="w-full border border-slate-300 rounded-xl p-3 pl-4 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white font-medium appearance-none"
-                                        value={bookingForm.date}
-                                        onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
-                                      >
+                                      <select required className="w-full border border-slate-300 rounded-xl p-3 pl-4 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white font-medium appearance-none" value={bookingForm.date} onChange={e => setBookingForm({...bookingForm, date: e.target.value})}>
                                           <option value="">-- Choose Date --</option>
-                                          {selectedPkg.validDates.map(d => (
-                                              <option key={d} value={d}>{new Date(d).toLocaleDateString(undefined, {weekday:'short', year:'numeric', month:'short', day:'numeric'})}</option>
-                                          ))}
+                                          {selectedPkg.validDates.map(d => <option key={d} value={d}>{new Date(d).toLocaleDateString(undefined, {weekday:'short', year:'numeric', month:'short', day:'numeric'})}</option>)}
                                       </select>
                                       <ChevronDown size={16} className="absolute right-4 top-4 text-slate-400 pointer-events-none" />
                                   </div>
                               )}
                           </div>
-
                           <div>
                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Lead Traveler Name</label>
                               <div className="relative">
                                   <User size={18} className="absolute left-3 top-3 text-slate-400" />
-                                  <input 
-                                    required
-                                    type="text"
-                                    className="w-full pl-10 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium"
-                                    placeholder="Mr. John Doe"
-                                    value={bookingForm.guestName}
-                                    onChange={e => setBookingForm({...bookingForm, guestName: e.target.value})}
-                                  />
+                                  <input required type="text" className="w-full pl-10 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium" placeholder="Mr. John Doe" value={bookingForm.guestName} onChange={e => setBookingForm({...bookingForm, guestName: e.target.value})} />
                               </div>
                           </div>
-
                           <div className="grid grid-cols-2 gap-4">
                               <div>
                                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Adults</label>
-                                  <input 
-                                    type="number" 
-                                    min="1" 
-                                    className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium" 
-                                    value={bookingForm.adults}
-                                    onChange={e => setBookingForm({...bookingForm, adults: Number(e.target.value)})}
-                                  />
+                                  <input type="number" min="1" className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium" value={bookingForm.adults} onChange={e => setBookingForm({...bookingForm, adults: Number(e.target.value)})} />
                               </div>
                               <div>
                                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Children</label>
-                                  <input 
-                                    type="number" 
-                                    min="0" 
-                                    className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium" 
-                                    value={bookingForm.children}
-                                    onChange={e => setBookingForm({...bookingForm, children: Number(e.target.value)})}
-                                  />
+                                  <input type="number" min="0" className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium" value={bookingForm.children} onChange={e => setBookingForm({...bookingForm, children: Number(e.target.value)})} />
                               </div>
                           </div>
-
                           <div className="pt-2 flex gap-3">
                               <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-bold transition">Cancel</button>
-                              <button 
-                                type="submit" 
-                                disabled={isCreating}
-                                className="flex-[2] bg-brand-600 text-white py-3 rounded-xl text-sm font-bold hover:bg-brand-700 transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-70"
-                              >
-                                  {isCreating ? <Loader2 size={18} className="animate-spin"/> : <ArrowRight size={18} />}
-                                  Generate Quote
+                              <button type="submit" disabled={isCreating} className="flex-[2] bg-brand-600 text-white py-3 rounded-xl text-sm font-bold hover:bg-brand-700 transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-70">
+                                  {isCreating ? <Loader2 size={18} className="animate-spin"/> : <ArrowRight size={18} />} Generate Quote
                               </button>
                           </div>
                       </form>
