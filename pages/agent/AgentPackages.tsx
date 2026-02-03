@@ -5,7 +5,7 @@ import { adminService } from '../../services/adminService';
 import { agentService } from '../../services/agentService';
 import { useAuth } from '../../context/AuthContext';
 import { FixedPackage, Quote, ItineraryItem } from '../../types';
-import { Package, Calendar, MapPin, CheckCircle, ArrowRight, Loader2, Info, X, User, Download, FileText, Hotel, ChevronDown, Image as ImageIcon, File } from 'lucide-react';
+import { Package, Calendar, MapPin, CheckCircle, ArrowRight, Loader2, Info, X, User, Download, FileText, Hotel, ChevronDown, Image as ImageIcon, Phone, Mail, Globe, Star } from 'lucide-react';
 import { generateFixedPackagePDF } from '../../utils/pdfGenerator';
 import html2canvas from 'html2canvas';
 
@@ -163,57 +163,80 @@ export const AgentPackages: React.FC = () => {
     }
   };
 
-  const handleDownloadPDF = (pkg: FixedPackage) => {
+  const handleDownloadPDF = (e: React.MouseEvent, pkg: FixedPackage) => {
+    e.stopPropagation(); 
+    setOpenDropdownId(null);
     try {
         if(user) {
+            // Generates detailed PDF with itinerary
             generateFixedPackagePDF(pkg, user.role, user);
         }
     } catch(e) {
         console.error("PDF Generation Error", e);
-        alert("Failed to generate PDF.");
+        alert("Failed to generate PDF. Please try again.");
     }
-    setOpenDropdownId(null);
   };
 
-  const handleDownloadImage = async (pkg: FixedPackage) => {
+  const handleDownloadImage = async (e: React.MouseEvent, pkg: FixedPackage) => {
+      e.stopPropagation();
       setFlyerData(pkg);
       setIsGeneratingImg(true);
+      setOpenDropdownId(null);
       
-      // Allow DOM to render hidden flyer and images to load
-      setTimeout(async () => {
-          if (flyerRef.current) {
-              try {
-                  const canvas = await html2canvas(flyerRef.current, { 
-                      scale: 3, // Higher quality
-                      useCORS: true, // Cross-origin images
-                      backgroundColor: '#ffffff',
-                      allowTaint: true,
-                      width: 800, // Fixed width capture
-                      windowWidth: 1200
-                  });
-                  
-                  // Use JPEG for smaller file size, good for WhatsApp
-                  const image = canvas.toDataURL("image/jpeg", 0.9);
-                  
-                  const link = document.createElement("a");
-                  link.href = image;
-                  link.download = `${pkg.packageName.replace(/\s+/g, '_')}_Flyer.jpg`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  
-              } catch (error) {
-                  console.error("Image generation failed", error);
-                  alert("Failed to generate image. Please try again.");
-              } finally {
-                  setFlyerData(null);
-                  setOpenDropdownId(null);
-                  setIsGeneratingImg(false);
-              }
-          } else {
-              setIsGeneratingImg(false);
-          }
-      }, 1500); // 1.5s delay to ensure images load
+      // Allow time for DOM render and image fetch
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      if (!flyerRef.current) {
+          setIsGeneratingImg(false);
+          return;
+      }
+      
+      try {
+          // Preload Images
+          const imagesToLoad = [];
+          if (pkg.imageUrl) imagesToLoad.push(pkg.imageUrl);
+          if (user?.agentBranding?.logoUrl) imagesToLoad.push(user.agentBranding.logoUrl);
+
+          await Promise.all(imagesToLoad.map(src => {
+              return new Promise((resolve) => {
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous';
+                  img.src = src;
+                  img.onload = resolve;
+                  img.onerror = resolve; 
+              });
+          }));
+          
+          await new Promise(resolve => setTimeout(resolve, 500)); // Extra buffer
+
+          // Generate Canvas at 1080x1920 scale
+          const canvas = await html2canvas(flyerRef.current, { 
+              scale: 1, 
+              useCORS: true, 
+              backgroundColor: '#ffffff',
+              width: 1080,
+              height: 1920,
+              windowWidth: 1080,
+              windowHeight: 1920,
+              logging: false
+          });
+          
+          const image = canvas.toDataURL("image/jpeg", 0.95); // High quality JPEG
+          
+          const link = document.createElement("a");
+          link.href = image;
+          link.download = `${pkg.packageName.replace(/[^a-z0-9]/gi, '_')}_Story.jpg`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+      } catch (error) {
+          console.error("Image generation failed", error);
+          alert("Failed to generate image.");
+      } finally {
+          setFlyerData(null);
+          setIsGeneratingImg(false);
+      }
   };
 
   const toggleDropdown = (e: React.MouseEvent, id: string) => {
@@ -227,112 +250,150 @@ export const AgentPackages: React.FC = () => {
   };
 
   const todayStr = new Date().toISOString().split('T')[0];
+  
+  // Resolve Branding Colors
+  const brandColor = user?.agentBranding?.primaryColor || '#0ea5e9';
+  const secondaryColor = user?.agentBranding?.secondaryColor || '#0f172a';
 
   return (
     <div className="container mx-auto px-4 py-8 relative">
-      {/* HIDDEN FLYER TEMPLATE FOR IMAGE GENERATION */}
-      {/* Positioned fixed off-screen so it renders fully but is invisible */}
+      
+      {/* 
+        ------------------------------------------------------------
+        HIDDEN FLYER TEMPLATE (1080x1920px - Social Media Story) 
+        ------------------------------------------------------------
+      */}
       {flyerData && (
           <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -100 }}>
-              <div ref={flyerRef} className="w-[800px] bg-white pb-8 font-sans text-slate-900 relative border border-slate-200">
-                  {/* Header Image */}
-                  <div className="h-[450px] w-full relative">
+              <div 
+                  ref={flyerRef} 
+                  className="w-[1080px] h-[1920px] bg-white font-sans relative flex flex-col overflow-hidden"
+              >
+                  {/* 1. Header Section (Agent Branding) */}
+                  <div className="bg-white px-10 py-12 flex flex-col items-center justify-center border-b border-slate-100 relative">
+                       {/* Color Accent Top */}
+                       <div className="absolute top-0 left-0 w-full h-4" style={{ backgroundColor: brandColor }}></div>
+                       
+                       {user?.agentBranding?.logoUrl ? (
+                           <img src={user.agentBranding.logoUrl} className="h-32 object-contain mb-4" alt="Agency Logo" crossOrigin="anonymous" />
+                       ) : (
+                           <div className="text-5xl font-extrabold text-slate-800 mb-2 uppercase tracking-wide">
+                               {user?.companyName || user?.name || 'Travel Partner'}
+                           </div>
+                       )}
+                       {user?.agentBranding?.website && (
+                           <div className="text-xl text-slate-500 font-medium tracking-wide flex items-center gap-2">
+                               <Globe size={24} className="text-slate-400" /> {user.agentBranding.website}
+                           </div>
+                       )}
+                  </div>
+
+                  {/* 2. Hero Image Section (Large Impact) */}
+                  <div className="relative h-[700px] w-full overflow-hidden">
                       {flyerData.imageUrl ? (
                           <img 
-                              src={flyerData.imageUrl} 
-                              className="w-full h-full object-cover" 
-                              alt="" 
-                              crossOrigin="anonymous" 
+                            src={flyerData.imageUrl} 
+                            className="w-full h-full object-cover" 
+                            alt="" 
+                            crossOrigin="anonymous"
                           />
                       ) : (
-                          <div className="w-full h-full bg-brand-600 flex items-center justify-center">
-                              <Package size={80} className="text-white opacity-50" />
+                          <div className="w-full h-full bg-slate-200 flex items-center justify-center">
+                              <ImageIcon size={120} className="text-slate-400" />
                           </div>
                       )}
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-8 pt-24 text-white">
-                          <h1 className="text-4xl font-extrabold mb-2 text-white drop-shadow-md">{flyerData.packageName}</h1>
-                          <div className="flex gap-4 text-lg font-medium opacity-95">
-                              <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-lg">{flyerData.nights} Nights / {flyerData.nights + 1} Days</span>
-                              <span className="flex items-center gap-1"><MapPin size={20}/> {getDestinationName(flyerData.destinationId)}</span>
-                          </div>
-                      </div>
                       
-                      {/* Agency Logo Placeholder */}
-                      <div className="absolute top-6 right-6 bg-white p-3 rounded-xl shadow-lg max-w-[200px]">
-                           {user?.agentBranding?.logoUrl ? (
-                               <img src={user.agentBranding.logoUrl} className="h-16 w-auto object-contain" alt="Logo" crossOrigin="anonymous" />
-                           ) : (
-                               <span className="font-bold text-brand-600 text-lg px-2">{user?.companyName || user?.name}</span>
-                           )}
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+
+                      {/* Package Title Overlay */}
+                      <div className="absolute bottom-0 left-0 w-full p-12 text-white">
+                           <span className="inline-block px-4 py-2 bg-white/20 backdrop-blur-md rounded-lg text-lg font-bold mb-4 border border-white/30 uppercase tracking-widest">
+                               {flyerData.category || 'Special Offer'}
+                           </span>
+                           <h1 className="text-7xl font-extrabold leading-tight mb-4 drop-shadow-md">
+                               {flyerData.packageName}
+                           </h1>
+                           <div className="flex items-center gap-6 text-2xl font-medium">
+                               <span className="flex items-center gap-2"><MapPin size={28} /> {getDestinationName(flyerData.destinationId)}</span>
+                               <span className="flex items-center gap-2"><Calendar size={28} /> {flyerData.nights} Nights / {flyerData.nights + 1} Days</span>
+                           </div>
                       </div>
                   </div>
 
-                  {/* Body */}
-                  <div className="px-10 py-8">
-                      {/* Highlights */}
-                      <div className="flex justify-between items-center mb-8 bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
-                           <div>
-                               <p className="text-sm text-slate-500 uppercase font-bold tracking-wider mb-1">Accommodation</p>
-                               <p className="font-bold text-slate-800 text-xl">{flyerData.hotelDetails || 'Standard Hotel'}</p>
-                           </div>
-                           <div className="text-right">
-                               <p className="text-sm text-slate-500 uppercase font-bold tracking-wider mb-1">Starting From</p>
-                               <p className="font-bold text-brand-600 text-4xl">₹ {flyerData.fixedPrice.toLocaleString()}</p>
-                               <p className="text-xs text-slate-400 font-medium">per person</p>
-                           </div>
-                      </div>
+                  {/* 3. Main Content & Pricing */}
+                  <div className="flex-1 px-12 py-10 bg-slate-50 flex flex-col justify-start relative">
+                       {/* Price Badge - Floating */}
+                       <div className="absolute top-[-50px] right-12 bg-white px-10 py-6 rounded-2xl shadow-2xl text-center border-b-8" style={{ borderColor: brandColor }}>
+                           <p className="text-slate-400 text-lg uppercase font-bold tracking-widest mb-1">Starting From</p>
+                           <p className="text-6xl font-extrabold text-slate-900">₹ {flyerData.fixedPrice.toLocaleString()}</p>
+                           <p className="text-slate-400 text-sm mt-1">Per Person</p>
+                       </div>
 
-                      <div className="grid grid-cols-2 gap-10">
-                          <div>
-                              <h3 className="text-green-700 font-bold mb-4 flex items-center gap-2 uppercase text-base tracking-wider border-b border-green-100 pb-2">
-                                  <CheckCircle size={20} /> Inclusions
-                              </h3>
-                              <ul className="space-y-3">
-                                  {flyerData.inclusions.slice(0, 8).map((inc, i) => (
-                                      <li key={i} className="text-base text-slate-700 flex items-start gap-3">
-                                          <span className="mt-2 w-1.5 h-1.5 bg-green-500 rounded-full shrink-0"></span>
-                                          {inc}
-                                      </li>
-                                  ))}
-                              </ul>
-                          </div>
-                          <div>
-                              <h3 className="text-red-700 font-bold mb-4 flex items-center gap-2 uppercase text-base tracking-wider border-b border-red-100 pb-2">
-                                  <X size={20} /> Exclusions
-                              </h3>
-                              <ul className="space-y-3">
-                                  {flyerData.exclusions.slice(0, 8).map((exc, i) => (
-                                      <li key={i} className="text-base text-slate-700 flex items-start gap-3">
-                                          <span className="mt-2 w-1.5 h-1.5 bg-red-400 rounded-full shrink-0"></span>
-                                          {exc}
-                                      </li>
-                                  ))}
-                              </ul>
-                          </div>
-                      </div>
+                       <div className="mt-16 space-y-8">
+                            {/* Inclusions Grid */}
+                            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                                <h3 className="text-3xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+                                    <Star size={32} fill={brandColor} stroke={brandColor} /> Highlights
+                                </h3>
+                                <div className="space-y-4">
+                                     <div className="flex items-start gap-4">
+                                          <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><Hotel size={32}/></div>
+                                          <div>
+                                              <p className="text-lg font-bold text-slate-700">Accommodation</p>
+                                              <p className="text-xl text-slate-900">{flyerData.hotelDetails || 'Standard Hotel'}</p>
+                                          </div>
+                                     </div>
+                                     {flyerData.inclusions.slice(0, 4).map((inc, i) => (
+                                         <div key={i} className="flex items-center gap-4 text-xl text-slate-700">
+                                              <CheckCircle size={28} className="text-green-500 shrink-0" />
+                                              <span>{inc}</span>
+                                         </div>
+                                     ))}
+                                </div>
+                            </div>
+
+                            {/* Description Snippet */}
+                            <div className="px-2">
+                                <p className="text-2xl text-slate-600 leading-relaxed italic">
+                                    "{flyerData.description ? flyerData.description.replace(/<[^>]*>?/gm, '').substring(0, 180) + '...' : 'Experience an unforgettable journey with us.'}"
+                                </p>
+                            </div>
+                       </div>
                   </div>
 
-                  {/* Footer */}
-                  <div className="mx-10 bg-slate-900 text-white p-6 rounded-2xl flex justify-between items-center shadow-xl">
-                      <div>
-                          <p className="font-bold text-xl mb-1">Book Your Spot!</p>
-                          <p className="text-sm opacity-80">Limited seats available for upcoming dates.</p>
-                      </div>
-                      <div className="text-right">
-                          <p className="font-bold text-lg">{user?.agentBranding?.contactPhone || user?.phone}</p>
-                          <p className="text-sm opacity-80">{user?.agentBranding?.email || user?.email}</p>
-                      </div>
+                  {/* 4. Footer CTA (High Visibility) */}
+                  <div className="px-12 py-10" style={{ backgroundColor: secondaryColor }}>
+                       <div className="flex items-center justify-between">
+                            <div className="text-white">
+                                <p className="text-lg opacity-80 uppercase tracking-widest mb-2 font-bold">Book Your Trip Now</p>
+                                <div className="flex items-center gap-4 text-4xl font-bold">
+                                    <Phone size={36} /> {user?.agentBranding?.contactPhone || user?.phone}
+                                </div>
+                                <div className="flex items-center gap-4 text-2xl font-medium mt-3 opacity-90">
+                                    <Mail size={24} /> {user?.agentBranding?.email || user?.email}
+                                </div>
+                            </div>
+                            
+                            {/* QR Placeholder or Logo mark */}
+                            <div className="h-32 w-32 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
+                                <Globe size={64} className="text-white/50" />
+                            </div>
+                       </div>
                   </div>
               </div>
           </div>
       )}
 
       {isGeneratingImg && (
-          <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center backdrop-blur-sm">
-              <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center">
-                  <Loader2 className="animate-spin text-brand-600 mb-3" size={40} />
-                  <p className="font-bold text-slate-800">Generating Flyer Image...</p>
-                  <p className="text-xs text-slate-500">Please wait while we render high-quality graphics.</p>
+          <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center backdrop-blur-sm">
+              <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center animate-in zoom-in-95">
+                  <div className="relative mb-4">
+                      <div className="w-12 h-12 rounded-full border-4 border-slate-100 border-t-brand-600 animate-spin"></div>
+                      <ImageIcon className="absolute inset-0 m-auto text-brand-600" size={20} />
+                  </div>
+                  <p className="font-bold text-lg text-slate-800">Creating Flyer...</p>
+                  <p className="text-sm text-slate-500 mt-1">Generating HD Story Image (1080x1920)...</p>
               </div>
           </div>
       )}
@@ -359,88 +420,106 @@ export const AgentPackages: React.FC = () => {
                  return (
                     <div key={pkg.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-lg transition group">
                         {/* Image Header */}
-                        <div className="h-44 bg-slate-200 relative overflow-hidden">
+                        <div className="h-48 bg-slate-200 relative overflow-hidden group">
                             {pkg.imageUrl ? (
-                                <img src={pkg.imageUrl} alt={pkg.packageName} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                <img src={pkg.imageUrl} alt={pkg.packageName} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                    <Package size={40} opacity={0.5} />
+                                <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100">
+                                    <Package size={48} opacity={0.3} />
                                 </div>
                             )}
-                            <div className="absolute top-3 left-3 bg-black/50 backdrop-blur text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
-                                <MapPin size={10} /> {getDestinationName(pkg.destinationId)}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
+                            
+                            <div className="absolute top-3 left-3 bg-white/90 backdrop-blur text-slate-800 px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
+                                <MapPin size={12} className="text-brand-600" /> {getDestinationName(pkg.destinationId)}
                             </div>
-                            <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur px-3 py-1.5 rounded-lg text-xs font-bold text-slate-900 shadow-sm flex items-center gap-1">
-                                <Calendar size={12} className="text-brand-600"/> {pkg.nights} Nights
+                            
+                            <div className="absolute bottom-3 left-3 text-white">
+                                <p className="text-xs font-medium opacity-90">{pkg.nights} Nights / {pkg.nights + 1} Days</p>
+                                <h3 className="font-bold text-lg leading-tight shadow-sm">{pkg.packageName}</h3>
                             </div>
                         </div>
 
                         <div className="p-5 flex-1 flex flex-col">
-                            <h3 className="font-bold text-lg text-slate-900 mb-1 group-hover:text-brand-600 transition">{pkg.packageName}</h3>
-                            <div className="flex items-center gap-1.5 text-xs text-slate-600 mb-3">
-                                <Hotel size={14} className="text-slate-400"/> 
-                                <span className="font-medium truncate">{pkg.hotelDetails || 'Hotel: NA'}</span>
+                            {/* Hotel Info */}
+                            <div className="flex items-start gap-2 mb-4 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                <Hotel size={16} className="text-slate-400 mt-0.5 shrink-0"/> 
+                                <div>
+                                    <p className="text-xs font-bold text-slate-500 uppercase">Accommodation</p>
+                                    <p className="text-sm font-medium text-slate-800 line-clamp-1">{pkg.hotelDetails || 'Standard Hotel'}</p>
+                                </div>
                             </div>
                             
                             {/* Tags */}
-                            <div className="flex flex-wrap gap-1 mb-4">
+                            <div className="flex flex-wrap gap-1.5 mb-4">
                                 <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200">{pkg.category || 'Group Tour'}</span>
-                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-100">{pkg.dateType === 'DAILY' ? 'Daily' : 'Fixed Dates'}</span>
+                                {pkg.dateType === 'DAILY' ? (
+                                    <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-100 flex items-center gap-1"><CheckCircle size={10}/> Daily</span>
+                                ) : (
+                                    <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-100">Fixed Dates</span>
+                                )}
                             </div>
 
-                            <div className="bg-slate-50 p-3 rounded-lg text-xs space-y-2 mb-4 border border-slate-100">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-slate-500">Departure:</span>
-                                    <span className="font-bold text-slate-800">
-                                        {pkg.dateType === 'DAILY' 
-                                            ? <span className="text-green-600 flex items-center gap-1"><CheckCircle size={10}/> Daily</span> 
-                                            : (nextDate ? nextDate.toLocaleDateString() : <span className="text-red-500">Sold Out</span>)
-                                        }
-                                    </span>
+                            <div className="mt-auto pt-4 border-t border-slate-100 flex items-end justify-between mb-4">
+                                <div>
+                                    <p className="text-xs text-slate-400">Starting From</p>
+                                    <p className="font-mono font-bold text-slate-900 text-lg">₹ {pkg.fixedPrice.toLocaleString()}</p>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-slate-500">Starting Price:</span>
-                                    <span className="font-mono font-bold text-slate-900 text-sm">₹ {pkg.fixedPrice.toLocaleString()}</span>
-                                </div>
+                                {nextDate && pkg.dateType !== 'DAILY' && (
+                                    <div className="text-right">
+                                        <p className="text-[10px] text-slate-400">Next Departure</p>
+                                        <p className="text-xs font-bold text-brand-600">{nextDate.toLocaleDateString(undefined, {month:'short', day:'numeric'})}</p>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="mt-auto flex gap-2">
-                                {/* Flyer Dropdown Button */}
+                            <div className="flex gap-2">
+                                {/* Flyer Dropdown */}
                                 <div className="relative flex-1" ref={dropdownRef}>
                                     <button 
                                         onClick={(e) => toggleDropdown(e, pkg.id)}
-                                        className="w-full bg-white border border-slate-200 text-slate-600 px-3 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-50 hover:text-slate-900 transition flex items-center justify-center gap-2"
+                                        className={`w-full border px-3 py-2.5 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
+                                            openDropdownId === pkg.id 
+                                            ? 'bg-slate-100 border-slate-300 text-slate-900' 
+                                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                        }`}
                                     >
-                                        <Download size={16} /> Flyer <ChevronDown size={14} className={`transition ${openDropdownId === pkg.id ? 'rotate-180' : ''}`} />
+                                        <Download size={16} /> Flyer <ChevronDown size={14} className={`transition-transform duration-200 ${openDropdownId === pkg.id ? 'rotate-180' : ''}`} />
                                     </button>
                                     
                                     {openDropdownId === pkg.id && (
-                                        <div className="absolute bottom-full left-0 w-full mb-1 bg-white border border-slate-200 rounded-xl shadow-xl z-20 overflow-hidden animate-in fade-in zoom-in-95">
-                                            <button 
-                                                onClick={() => handleDownloadImage(pkg)}
-                                                className="w-full px-4 py-3 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50"
-                                            >
-                                                <ImageIcon size={14} className="text-blue-500" />
-                                                Download Image
-                                                <span className="text-[9px] text-slate-400 font-normal ml-auto">Summary</span>
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDownloadPDF(pkg)}
-                                                className="w-full px-4 py-3 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                            >
-                                                <FileText size={14} className="text-red-500" />
-                                                Download PDF
-                                                <span className="text-[9px] text-slate-400 font-normal ml-auto">Full Details</span>
-                                            </button>
+                                        <div className="absolute bottom-full left-0 w-full mb-2 bg-white border border-slate-200 rounded-xl shadow-xl z-20 overflow-hidden animate-in fade-in zoom-in-95 origin-bottom">
+                                            <div className="p-2 space-y-1">
+                                                <button 
+                                                    onClick={(e) => handleDownloadImage(e, pkg)}
+                                                    className="w-full px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-3 transition"
+                                                >
+                                                    <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md"><ImageIcon size={14} /></div>
+                                                    <div>
+                                                        <span className="block">Download Image</span>
+                                                        <span className="text-[9px] text-slate-400 font-normal">Story Format (1080x1920)</span>
+                                                    </div>
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => handleDownloadPDF(e, pkg)}
+                                                    className="w-full px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-3 transition"
+                                                >
+                                                     <div className="p-1.5 bg-red-50 text-red-600 rounded-md"><FileText size={14} /></div>
+                                                     <div>
+                                                        <span className="block">Download PDF</span>
+                                                        <span className="text-[9px] text-slate-400 font-normal">Full Details Itinerary</span>
+                                                    </div>
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
 
                                 <button 
                                     onClick={() => openBookingModal(pkg)}
-                                    className="flex-[2] bg-brand-600 text-white px-3 py-2.5 rounded-lg text-sm font-bold hover:bg-brand-700 transition flex items-center justify-center gap-2 shadow-sm"
+                                    className="flex-[2] bg-brand-600 text-white px-3 py-2.5 rounded-lg text-sm font-bold hover:bg-brand-700 transition flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform active:scale-95 duration-200"
                                 >
-                                    <ArrowRight size={16} /> Book Quote
+                                    Book Now <ArrowRight size={16} />
                                 </button>
                             </div>
                         </div>
@@ -448,9 +527,10 @@ export const AgentPackages: React.FC = () => {
                  );
             })}
             {packages.length === 0 && (
-                <div className="col-span-3 text-center py-16 bg-white rounded-xl border border-slate-200 text-slate-400">
-                    <Info size={40} className="mx-auto mb-3 opacity-50" />
-                    <p>No fixed packages available at the moment. Please check back later.</p>
+                <div className="col-span-3 text-center py-20 bg-white rounded-xl border border-slate-200 text-slate-400">
+                    <Info size={48} className="mx-auto mb-4 opacity-30" />
+                    <p className="text-lg font-medium text-slate-600">No fixed packages found</p>
+                    <p className="text-sm">Check back later for new group departures.</p>
                 </div>
             )}
         </div>
@@ -458,95 +538,106 @@ export const AgentPackages: React.FC = () => {
 
       {/* CONFIG MODAL */}
       {isModalOpen && selectedPkg && (
-          <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
-                  <div className="flex justify-between items-center mb-6">
-                      <h3 className="font-bold text-lg text-slate-900">Configure Trip</h3>
-                      <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+          <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-0 overflow-hidden transform scale-100 transition-all">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 backdrop-blur">
+                      <div>
+                          <h3 className="font-bold text-lg text-slate-900">Configure Trip</h3>
+                          <p className="text-xs text-slate-500">{selectedPkg.packageName}</p>
+                      </div>
+                      <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-200 rounded-full transition"><X size={20}/></button>
                   </div>
 
-                  <form onSubmit={handleCreateQuote} className="space-y-4">
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Select Departure Date</label>
-                          
-                          {selectedPkg.dateType === 'DAILY' ? (
+                  <div className="p-6">
+                      <form onSubmit={handleCreateQuote} className="space-y-5">
+                          {/* Form inputs remain same */}
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Select Departure Date</label>
+                              
+                              {selectedPkg.dateType === 'DAILY' ? (
+                                  <div className="relative">
+                                      <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
+                                      <input 
+                                        required
+                                        type="date"
+                                        min={todayStr}
+                                        className="w-full pl-10 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                                        value={bookingForm.date}
+                                        onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
+                                      />
+                                      <p className="text-[10px] text-green-600 mt-1.5 flex items-center gap-1 font-bold">
+                                          <CheckCircle size={10} /> Daily departures available.
+                                      </p>
+                                  </div>
+                              ) : (
+                                  <div className="relative">
+                                      <select 
+                                        required
+                                        className="w-full border border-slate-300 rounded-xl p-3 pl-4 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white font-medium appearance-none"
+                                        value={bookingForm.date}
+                                        onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
+                                      >
+                                          <option value="">-- Choose Date --</option>
+                                          {selectedPkg.validDates.map(d => (
+                                              <option key={d} value={d}>{new Date(d).toLocaleDateString(undefined, {weekday:'short', year:'numeric', month:'short', day:'numeric'})}</option>
+                                          ))}
+                                      </select>
+                                      <ChevronDown size={16} className="absolute right-4 top-4 text-slate-400 pointer-events-none" />
+                                  </div>
+                              )}
+                          </div>
+
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Lead Traveler Name</label>
                               <div className="relative">
-                                  <Calendar className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                                  <User size={18} className="absolute left-3 top-3 text-slate-400" />
                                   <input 
                                     required
-                                    type="date"
-                                    min={todayStr}
-                                    className="w-full pl-10 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
-                                    value={bookingForm.date}
-                                    onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
+                                    type="text"
+                                    className="w-full pl-10 border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                                    placeholder="Mr. John Doe"
+                                    value={bookingForm.guestName}
+                                    onChange={e => setBookingForm({...bookingForm, guestName: e.target.value})}
                                   />
-                                  <p className="text-[10px] text-green-600 mt-1">Daily departures available.</p>
                               </div>
-                          ) : (
-                              <select 
-                                required
-                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white"
-                                value={bookingForm.date}
-                                onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Adults</label>
+                                  <input 
+                                    type="number" 
+                                    min="1" 
+                                    className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium" 
+                                    value={bookingForm.adults}
+                                    onChange={e => setBookingForm({...bookingForm, adults: Number(e.target.value)})}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Children</label>
+                                  <input 
+                                    type="number" 
+                                    min="0" 
+                                    className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium" 
+                                    value={bookingForm.children}
+                                    onChange={e => setBookingForm({...bookingForm, children: Number(e.target.value)})}
+                                  />
+                              </div>
+                          </div>
+
+                          <div className="pt-2 flex gap-3">
+                              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-bold transition">Cancel</button>
+                              <button 
+                                type="submit" 
+                                disabled={isCreating}
+                                className="flex-[2] bg-brand-600 text-white py-3 rounded-xl text-sm font-bold hover:bg-brand-700 transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-70"
                               >
-                                  <option value="">-- Choose Date --</option>
-                                  {selectedPkg.validDates.map(d => (
-                                      <option key={d} value={d}>{new Date(d).toLocaleDateString()}</option>
-                                  ))}
-                              </select>
-                          )}
-                      </div>
-
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lead Traveler Name</label>
-                          <div className="relative">
-                              <User size={16} className="absolute left-3 top-3 text-slate-400" />
-                              <input 
-                                required
-                                type="text"
-                                className="w-full pl-9 border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
-                                placeholder="Mr. John Doe"
-                                value={bookingForm.guestName}
-                                onChange={e => setBookingForm({...bookingForm, guestName: e.target.value})}
-                              />
+                                  {isCreating ? <Loader2 size={18} className="animate-spin"/> : <ArrowRight size={18} />}
+                                  Generate Quote
+                              </button>
                           </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Adults</label>
-                              <input 
-                                type="number" 
-                                min="1" 
-                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" 
-                                value={bookingForm.adults}
-                                onChange={e => setBookingForm({...bookingForm, adults: Number(e.target.value)})}
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Children</label>
-                              <input 
-                                type="number" 
-                                min="0" 
-                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" 
-                                value={bookingForm.children}
-                                onChange={e => setBookingForm({...bookingForm, children: Number(e.target.value)})}
-                              />
-                          </div>
-                      </div>
-
-                      <div className="pt-4 flex justify-end gap-3">
-                          <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium">Cancel</button>
-                          <button 
-                            type="submit" 
-                            disabled={isCreating}
-                            className="bg-brand-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-brand-700 transition flex items-center gap-2 disabled:opacity-70"
-                          >
-                              {isCreating ? <Loader2 size={16} className="animate-spin"/> : <ArrowRight size={16} />}
-                              Generate Quote
-                          </button>
-                      </div>
-                  </form>
+                      </form>
+                  </div>
               </div>
           </div>
       )}

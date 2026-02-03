@@ -238,7 +238,9 @@ export const InventoryManager: React.FC = () => {
       setIsSaving(true);
       try {
           // Process in parallel chunks could be better, but loop is fine for now
-          for (const id of Array.from(selectedIds)) {
+          // Explicitly cast to string to avoid 'unknown' type error in strict mode
+          for (const rawId of Array.from(selectedIds)) {
+              const id = String(rawId);
               const item = items.find(i => i.id === id);
               if (item) {
                   // For Activity, update costAdult. For others, costPrice.
@@ -274,8 +276,8 @@ export const InventoryManager: React.FC = () => {
           return matchSearch && matchType && matchStatus;
       });
 
-      return filtered.sort((a, b) => {
-          const key = sortConfig.key as keyof OperatorInventoryItem;
+      return filtered.sort((a: OperatorInventoryItem, b: OperatorInventoryItem) => {
+          const key = sortConfig.key;
           
           const multiplier = sortConfig.direction === 'asc' ? 1 : -1;
 
@@ -286,8 +288,9 @@ export const InventoryManager: React.FC = () => {
               return (dateA - dateB) * multiplier;
           }
 
-          const aVal = a[key];
-          const bVal = b[key];
+          const k = key as keyof OperatorInventoryItem;
+          const aVal = a[k];
+          const bVal = b[k];
 
           if (aVal === bVal) return 0;
           
