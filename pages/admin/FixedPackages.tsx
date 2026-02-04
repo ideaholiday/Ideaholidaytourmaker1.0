@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
@@ -160,7 +159,8 @@ export const FixedPackages: React.FC = () => {
           name: '',
           cost: 0,
           price: 0,
-          currency: 'INR'
+          currency: 'INR',
+          quantity: 1
       });
       current[dayIdx].services = services;
       setFormData({...formData, itinerary: current});
@@ -594,7 +594,7 @@ export const FixedPackages: React.FC = () => {
             </div>
             
             <div className="p-6 border-t border-slate-200 bg-white rounded-b-xl flex justify-end gap-3">
-                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium border border-slate-200">Cancel</button>
+                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 font-medium">Cancel</button>
                  <button type="submit" form="pkgForm" className="px-6 py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-bold shadow-sm">Save Package</button>
             </div>
           </div>
