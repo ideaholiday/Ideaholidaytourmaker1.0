@@ -7,7 +7,8 @@ import { agentService } from '../../services/agentService';
 import { useAuth } from '../../context/AuthContext';
 import { useClientBranding } from '../../hooks/useClientBranding';
 import { FixedPackage, Quote, ItineraryItem } from '../../types';
-import { Package, Calendar, MapPin, ArrowRight, Loader2, Info, X, User, Image as ImageIcon, Hotel, ChevronDown, CheckCircle, Download, Coffee, Car, Phone, Mail, Globe, Clock, Star, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Package, Calendar, MapPin, ArrowRight, Loader2, Info, X, User, Image as ImageIcon, Hotel, ChevronDown, CheckCircle, Download, Coffee, Car, Phone, Mail, Globe, Clock, Star, TrendingUp, AlertTriangle, XCircle, FileText, Eye } from 'lucide-react';
+import { generateFixedPackagePDF } from '../../utils/pdfGenerator';
 
 export const AgentPackages: React.FC = () => {
   const { user } = useAuth();
@@ -28,6 +29,10 @@ export const AgentPackages: React.FC = () => {
   // Booking Modal State
   const [selectedPkg, setSelectedPkg] = useState<FixedPackage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Detail Modal State
+  const [viewingPkg, setViewingPkg] = useState<FixedPackage | null>(null);
+
   const [bookingForm, setBookingForm] = useState({
       date: '',
       guestName: '',
@@ -132,6 +137,18 @@ export const AgentPackages: React.FC = () => {
         const totalPax = Number(bookingForm.adults) + Number(bookingForm.children);
         const totalPrice = pkg.fixedPrice * totalPax;
 
+        // Prepare Public Note with Policy & Inclusions for the Quote
+        const compiledNotes = `
+INCLUSIONS:
+• ${pkg.inclusions.join('\n• ')}
+
+EXCLUSIONS:
+• ${pkg.exclusions.join('\n• ')}
+
+POLICY / IMPORTANT NOTES:
+${pkg.notes || 'As per standard booking terms.'}
+`.trim();
+
         const updatedQuote: Quote = {
             ...newQuote,
             serviceDetails: `Fixed Package: ${pkg.packageName} (${pkg.nights} Nights). Hotel: ${pkg.hotelDetails || 'Standard'}`,
@@ -141,7 +158,8 @@ export const AgentPackages: React.FC = () => {
             currency: 'INR',
             status: 'DRAFT',
             isLocked: false,
-            childCount: Number(bookingForm.children)
+            childCount: Number(bookingForm.children),
+            publicNote: compiledNotes // Carry over details to Quote
         };
 
         await agentService.updateQuote(updatedQuote);
@@ -189,6 +207,12 @@ export const AgentPackages: React.FC = () => {
               setGeneratingPdfId(null);
           }
       }, 3000); // Increased delay for heavy assets
+  };
+
+  const handleDownloadPDF = (e: React.MouseEvent, pkg: FixedPackage) => {
+      e.stopPropagation();
+      if (!user) return;
+      generateFixedPackagePDF(pkg, user.role, user);
   };
 
   const getDestinationName = (id: string) => {
@@ -281,19 +305,35 @@ export const AgentPackages: React.FC = () => {
 
                             <div className="flex gap-2">
                                 <button 
+                                    onClick={() => setViewingPkg(pkg)}
+                                    className="p-2.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition"
+                                    title="View Full Details"
+                                >
+                                    <Eye size={18} />
+                                </button>
+
+                                <button 
                                     onClick={(e) => handleDownloadFlyer(e, pkg)}
                                     disabled={generatingPdfId === pkg.id}
-                                    className="flex-1 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 px-3 py-2.5 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-70"
+                                    className="p-2.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition disabled:opacity-70"
+                                    title="Generate Flyer Image"
                                 >
-                                    {generatingPdfId === pkg.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} className="text-brand-600" />} 
-                                    Flyer
+                                    {generatingPdfId === pkg.id ? <Loader2 size={18} className="animate-spin" /> : <ImageIcon size={18} />} 
+                                </button>
+                                
+                                <button 
+                                    onClick={(e) => handleDownloadPDF(e, pkg)}
+                                    className="p-2.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition"
+                                    title="Download Detailed PDF"
+                                >
+                                    <FileText size={18} />
                                 </button>
 
                                 <button 
                                     onClick={() => openBookingModal(pkg)}
-                                    className="flex-[2] bg-brand-600 text-white px-3 py-2.5 rounded-lg text-sm font-bold hover:bg-brand-700 transition flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform active:scale-95 duration-200"
+                                    className="flex-1 bg-brand-600 text-white px-3 py-2.5 rounded-lg text-sm font-bold hover:bg-brand-700 transition flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform active:scale-95 duration-200"
                                 >
-                                    Book Now <ArrowRight size={16} />
+                                    Book <ArrowRight size={16} />
                                 </button>
                             </div>
                         </div>
@@ -310,7 +350,101 @@ export const AgentPackages: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL */}
+      {/* DETAIL MODAL */}
+      {viewingPkg && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+                  
+                  {/* Header Image */}
+                  <div className="h-48 bg-slate-200 relative shrink-0">
+                      {viewingPkg.imageUrl ? (
+                          <img src={viewingPkg.imageUrl} alt={viewingPkg.packageName} className="w-full h-full object-cover" />
+                      ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                              <ImageIcon size={48} />
+                          </div>
+                      )}
+                      <button 
+                          onClick={() => setViewingPkg(null)} 
+                          className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition backdrop-blur-md"
+                      >
+                          <X size={20} />
+                      </button>
+                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                          <h2 className="text-xl font-bold text-white">{viewingPkg.packageName}</h2>
+                          <p className="text-sm text-white/90">{viewingPkg.nights} Nights / {viewingPkg.nights+1} Days</p>
+                      </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                      
+                      {/* Description */}
+                      <div className="prose prose-sm max-w-none text-slate-600">
+                          <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-2 flex items-center gap-2">
+                              <Info size={16} className="text-brand-600"/> Overview
+                          </h4>
+                          <div dangerouslySetInnerHTML={{ __html: viewingPkg.description || 'No description available.' }} />
+                      </div>
+
+                      {/* Inc/Exc Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                              <h4 className="text-sm font-bold text-green-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                  <CheckCircle size={16}/> Inclusions
+                              </h4>
+                              <ul className="space-y-2">
+                                  {viewingPkg.inclusions.map((inc, i) => (
+                                      <li key={i} className="flex items-start gap-2 text-sm text-green-900">
+                                          <CheckCircle size={14} className="mt-0.5 shrink-0 opacity-50" />
+                                          {inc}
+                                      </li>
+                                  ))}
+                              </ul>
+                          </div>
+
+                          <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                              <h4 className="text-sm font-bold text-red-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                  <XCircle size={16}/> Exclusions
+                              </h4>
+                              <ul className="space-y-2">
+                                  {viewingPkg.exclusions.map((exc, i) => (
+                                      <li key={i} className="flex items-start gap-2 text-sm text-red-900">
+                                          <XCircle size={14} className="mt-0.5 shrink-0 opacity-50" />
+                                          {exc}
+                                      </li>
+                                  ))}
+                              </ul>
+                          </div>
+                      </div>
+
+                      {/* Policy */}
+                      {viewingPkg.notes && (
+                          <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                              <h4 className="text-sm font-bold text-amber-800 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                  <AlertTriangle size={16}/> Policy & Notes
+                              </h4>
+                              <div 
+                                className="text-sm text-amber-900 whitespace-pre-line leading-relaxed"
+                                dangerouslySetInnerHTML={{ __html: viewingPkg.notes }}
+                              />
+                          </div>
+                      )}
+                  </div>
+
+                  {/* Footer Action */}
+                  <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+                      <button 
+                          onClick={() => { setViewingPkg(null); openBookingModal(viewingPkg); }}
+                          className="bg-brand-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-brand-700 transition flex items-center gap-2 shadow-sm"
+                      >
+                          Book Now <ArrowRight size={16} />
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* BOOKING MODAL */}
       {isModalOpen && selectedPkg && (
           <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-0 overflow-hidden transform scale-100 transition-all">
@@ -389,8 +523,8 @@ export const AgentPackages: React.FC = () => {
                            </div>
                       )}
                       
-                      {/* Artistic Gradient Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent opacity-80"></div>
+                      {/* Artistic Gradient Overlay - Neutral Dark */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90"></div>
 
                       {/* Header Branding */}
                       <div className="absolute top-16 left-12 flex items-center gap-6 bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl">
@@ -432,7 +566,7 @@ export const AgentPackages: React.FC = () => {
                           </h1>
                           
                           <div className="flex items-center gap-4 text-white/90 text-4xl font-medium tracking-tight">
-                              <MapPin size={40} className="text-brand-400" style={{color: primaryColor}} /> 
+                              <MapPin size={40} style={{color: primaryColor}} /> 
                               {getDestinationName(flyerPackage.destinationId)}
                           </div>
                       </div>
@@ -462,7 +596,7 @@ export const AgentPackages: React.FC = () => {
                       </div>
 
                       {/* Icons Grid (Centered) */}
-                      <div className="grid grid-cols-4 gap-10 mb-16 border-b border-slate-100 pb-12">
+                      <div className="grid grid-cols-4 gap-10 mb-10">
                            <div className="flex flex-col items-center text-center gap-4">
                                <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
                                    <Hotel size={40} strokeWidth={2} style={{color: primaryColor}} />
@@ -489,44 +623,80 @@ export const AgentPackages: React.FC = () => {
                            </div>
                       </div>
 
+                      {/* PROMINENT HOTEL BANNER (Added for visibility) */}
+                      <div className="mb-10 bg-slate-50 border border-slate-100 rounded-[30px] p-6 flex items-center gap-6 shadow-sm mx-4">
+                          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-sm text-indigo-600 shrink-0 border border-slate-100">
+                              <Hotel size={40} style={{color: primaryColor}} />
+                          </div>
+                          <div>
+                              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Premium Accommodation</p>
+                              <h3 className="text-4xl font-black text-slate-900 leading-tight" style={{color: primaryColor}}>
+                                  {(flyerPackage.hotelDetails && flyerPackage.hotelDetails !== 'NA') ? flyerPackage.hotelDetails : 'Premium Accommodation'}
+                              </h3>
+                          </div>
+                      </div>
+
                       {/* Content Columns */}
-                      <div className="grid grid-cols-2 gap-16 flex-1">
+                      <div className="grid grid-cols-2 gap-16 flex-1 pt-6 border-t border-slate-100">
                           
-                          {/* Highlights (Left) */}
+                          {/* Left: Highlights & Exclusions */}
                           <div>
                               <h3 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3 uppercase tracking-wide">
                                   <Info size={28} className="text-slate-400"/> Experience
                               </h3>
-                              <p className="text-slate-600 text-lg leading-relaxed text-justify font-medium">
-                                  <span className="text-5xl float-left mr-3 mt-[-10px] font-black text-slate-900">“</span>
-                                  {flyerPackage.description?.replace(/<[^>]+>/g, ' ').substring(0, 450) || 'Enjoy a wonderful trip with our curated package designed for the best experience.'}...
+                              <p className="text-slate-600 text-xl leading-relaxed text-justify font-medium mb-8">
+                                  <span className="text-6xl float-left mr-4 mt-[-15px] font-black text-slate-900">“</span>
+                                  {flyerPackage.description?.replace(/<[^>]+>/g, ' ').substring(0, 380) || 'Enjoy a wonderful trip with our curated package designed for the best experience.'}...
                               </p>
-                              
-                              <div className="mt-10 bg-slate-50 p-8 rounded-3xl border border-slate-200">
-                                  <p className="text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Accommodation</p>
-                                  <p className="font-bold text-slate-900 text-2xl">{flyerPackage.hotelDetails || 'Premium Hotel'}</p>
-                              </div>
+
+                              {/* NEW: Exclusions */}
+                              {flyerPackage.exclusions.length > 0 && (
+                                  <div className="mt-8 bg-red-50/50 p-6 rounded-3xl border border-red-100">
+                                       <h3 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-2 uppercase tracking-wide">
+                                            <XCircle size={24} className="text-red-500" /> Exclusions
+                                       </h3>
+                                       <ul className="space-y-3">
+                                           {flyerPackage.exclusions.slice(0, 4).map((exc, i) => (
+                                               <li key={i} className="flex items-start gap-3 text-slate-700 text-lg font-bold">
+                                                   <X size={20} className="text-red-400 mt-1 shrink-0" strokeWidth={3} /> {exc}
+                                               </li>
+                                           ))}
+                                       </ul>
+                                  </div>
+                              )}
                           </div>
 
-                          {/* Inclusions (Right) - Styled List */}
+                          {/* Right: Inclusions */}
                           <div>
                               <h3 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3 uppercase tracking-wide">
                                   <CheckCircle size={28} className="text-green-600" style={{color: primaryColor}}/> Inclusions
                               </h3>
                               <div className="space-y-4">
-                                  {flyerPackage.inclusions.slice(0, 6).map((inc, i) => (
+                                  {flyerPackage.inclusions.slice(0, 8).map((inc, i) => (
                                       <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
                                           <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                                               <CheckCircle size={18} className="text-green-600" strokeWidth={3} style={{color: primaryColor}} />
                                           </div>
-                                          <span className="text-lg font-bold text-slate-700">{inc}</span>
+                                          <span className="text-xl font-bold text-slate-700">{inc}</span>
                                       </div>
                                   ))}
                               </div>
                           </div>
                       </div>
 
-                      {/* 3. PREMIUM FOOTER CARD HERO */}
+                      {/* NEW: Notes / Policy (Full Width) */}
+                      {flyerPackage.notes && (
+                          <div className="mt-8 mb-8 p-6 bg-amber-50 rounded-3xl border border-amber-100/50">
+                              <h3 className="text-xl font-black text-amber-900 mb-3 uppercase tracking-wide flex items-center gap-2">
+                                  <AlertTriangle size={24} className="text-amber-600" /> Important Policy
+                              </h3>
+                              <p className="text-amber-800 text-lg leading-relaxed font-medium">
+                                  {flyerPackage.notes.replace(/<[^>]+>/g, ' ').substring(0, 250)}...
+                              </p>
+                          </div>
+                      )}
+
+                      {/* 3. PREMIUM FOOTER CARD HERO (Dark Background, Brand Accents) */}
                       <div className="mt-auto bg-[#1a1a1a] text-white p-12 -mx-12 -mb-20 pt-16 pb-20 relative overflow-hidden rounded-t-[50px]">
                           {/* Background Texture */}
                           <div className="absolute top-0 right-0 p-8 opacity-5 transform scale-150 rotate-12 pointer-events-none">
@@ -538,17 +708,17 @@ export const AgentPackages: React.FC = () => {
                               <div className="flex justify-between items-end mb-8">
                                   {/* Call to Action Section */}
                                   <div>
-                                     <p className="text-2xl text-slate-400 mb-2 font-medium">For Booking & Queries</p>
+                                     <p className="text-2xl text-white/80 mb-2 font-medium">For Booking & Queries</p>
                                      <div className="flex items-center gap-4 mb-2">
-                                        <div className="bg-brand-600 p-3 rounded-full" style={{backgroundColor: primaryColor}}>
-                                            <Phone size={32} className="text-white" />
+                                        <div className="bg-white/10 p-3 rounded-full border border-white/10" style={{borderColor: primaryColor}}>
+                                            <Phone size={32} style={{color: primaryColor}} />
                                         </div>
-                                        <span className="text-6xl font-black tracking-tight">{displayPhone}</span>
+                                        <span className="text-6xl font-black tracking-tight text-white">{displayPhone}</span>
                                      </div>
                                      {displayEmail && (
                                          <div className="flex items-center gap-3 mt-4 ml-2">
                                              <Mail size={24} className="text-slate-400" />
-                                             <span className="text-2xl font-medium text-slate-300">{displayEmail}</span>
+                                             <span className="text-2xl font-medium text-white/90">{displayEmail}</span>
                                          </div>
                                      )}
                                   </div>
@@ -557,18 +727,18 @@ export const AgentPackages: React.FC = () => {
                                   <div className="text-right">
                                       {website && (
                                           <div className="flex items-center justify-end gap-2 mb-6">
-                                              <Globe size={24} className="text-brand-400" style={{color: primaryColor}} />
+                                              <Globe size={24} style={{color: primaryColor}} />
                                               <span className="text-2xl font-bold">{website}</span>
                                           </div>
                                       )}
                                       <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl inline-block border border-white/10">
-                                         <span className="text-xl font-bold uppercase tracking-widest text-white/80">{displayAgencyName}</span>
+                                         <span className="text-xl font-bold uppercase tracking-widest text-white/90">{displayAgencyName}</span>
                                       </div>
                                   </div>
                               </div>
                               
-                              <div className="w-full h-1 bg-white/10 rounded-full mb-6"></div>
-                              <p className="text-center text-slate-500 text-lg">Terms & Conditions Apply. Prices subject to availability.</p>
+                              <div className="w-full h-1 bg-white/20 rounded-full mb-6"></div>
+                              <p className="text-center text-white/60 text-lg">Terms & Conditions Apply. Prices subject to availability.</p>
                           </div>
                       </div>
 

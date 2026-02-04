@@ -201,7 +201,18 @@ export const generateQuotePDF = (
           if (svc.type === 'HOTEL') hotels.add(svc.name);
       });
   });
-  const hotelStr = hotels.size > 0 ? Array.from(hotels).join(', ') : 'NA';
+  
+  // Hotel fallback logic for PDF
+  let hotelStr = hotels.size > 0 ? Array.from(hotels).join(', ') : '';
+  if (!hotelStr) {
+      if (quote.serviceDetails) {
+          hotelStr = "As per Itinerary";
+      } else {
+          hotelStr = "Premium Accommodation";
+      }
+  } else if (hotelStr === 'NA') {
+      hotelStr = "Premium Accommodation";
+  }
   
   // Hotel Display (Wrapped)
   const splitHotel = doc.splitTextToSize(`Hotel: ${hotelStr}`, 65);
@@ -298,6 +309,45 @@ export const generateQuotePDF = (
     });
     
     yPos = (doc as any).lastAutoTable.finalY + 15;
+  }
+  
+  // --- TERMS, INCLUSIONS & POLICY (Enhanced) ---
+  // If we came from a Fixed Package, these details are likely in publicNote
+  if (quote.publicNote) {
+      if (yPos > 240) {
+          doc.addPage();
+          yPos = 30;
+      }
+      
+      doc.setFontSize(12);
+      doc.setTextColor(SECONDARY[0], SECONDARY[1], SECONDARY[2]);
+      doc.setFont("times", "bold");
+      doc.text("Terms, Inclusions & Policy", 15, yPos);
+      yPos += 6;
+      
+      doc.setFontSize(9);
+      doc.setFont("times", "normal");
+      doc.setTextColor(60, 60, 60);
+
+      const cleanNote = cleanText(quote.publicNote);
+      const noteLines = doc.splitTextToSize(cleanNote, 180);
+      
+      // Draw background box for emphasis
+      const noteHeight = (noteLines.length * 4) + 10;
+      
+      // Ensure we don't break page weirdly with the box
+      if (yPos + noteHeight > 280) {
+          doc.addPage();
+          yPos = 30;
+          doc.text("Terms & Policy (Continued)", 15, yPos);
+          yPos += 10;
+      }
+
+      doc.setFillColor(245, 245, 245);
+      doc.rect(15, yPos, 180, noteHeight, 'F');
+      
+      doc.text(noteLines, 20, yPos + 8);
+      yPos += noteHeight + 15;
   }
 
   // --- PRICE BOX ---
@@ -399,9 +449,13 @@ export const createFixedPackagePDF = (
     doc.setFont("times", "bold");
     doc.text("Accommodation:", 80, yPos + 10);
     doc.setFont("times", "normal");
-    // Explicit Hotel Name Logic
-    const hotelName = cleanText(pkg.hotelDetails) || "NA";
-    doc.text(hotelName, 80, yPos + 18);
+    // Explicit Hotel Name Logic (Do not show NA)
+    let hotelName = cleanText(pkg.hotelDetails) || "Premium Accommodation";
+    if (hotelName === 'NA') hotelName = "Premium Accommodation";
+    
+    // Wrap hotel name if too long
+    const splitHotelName = doc.splitTextToSize(hotelName, 55);
+    doc.text(splitHotelName, 80, yPos + 18);
 
     // Validity/Type
     doc.setFont("times", "bold");
@@ -431,7 +485,7 @@ export const createFixedPackagePDF = (
     // 4. Inclusions & Exclusions
     const incExcY = yPos;
     const boxWidth = 85;
-    const boxHeight = 60; // Fixed height for alignment
+    const boxHeight = 70; // Increased height to fit more content
 
     // Inclusions
     doc.setFillColor(240, 253, 244); // Light Green bg
@@ -515,8 +569,51 @@ export const createFixedPackagePDF = (
 
         yPos = (doc as any).lastAutoTable.finalY + 15;
     }
+    
+    // 6. Internal Notes / Policy
+    if (pkg.notes) {
+        // Check page break
+        if (yPos > 250) {
+            doc.addPage();
+            yPos = 30;
+        }
 
-    // 6. Contact / Booking Footer
+        doc.setFontSize(14);
+        doc.setTextColor(SECONDARY[0], SECONDARY[1], SECONDARY[2]);
+        doc.setFont("times", "bold");
+        doc.text("Terms & Policy / Important Notes", 15, yPos);
+        yPos += 7;
+
+        doc.setFontSize(10);
+        doc.setFont("times", "normal");
+        doc.setTextColor(80, 80, 80);
+        
+        // Clean and split text
+        const cleanNotes = cleanText(pkg.notes);
+        const splitNotes = doc.splitTextToSize(cleanNotes, 180);
+        
+        // Background box for emphasis
+        const notesHeight = (splitNotes.length * 5) + 10;
+        
+        // Ensure box doesn't run off page, if so, just text, or page break
+        if (yPos + notesHeight > 280) {
+             doc.addPage();
+             yPos = 30;
+             doc.text("Terms & Policy (Continued)", 15, yPos);
+             yPos += 10;
+        }
+
+        doc.setFillColor(255, 251, 235); // Amber 50
+        doc.setDrawColor(252, 211, 77); // Amber 300
+        doc.rect(15, yPos, 180, notesHeight, 'FD'); // Fill and Draw
+        
+        doc.setTextColor(60, 60, 60);
+        doc.text(splitNotes, 20, yPos + 8);
+        
+        yPos += notesHeight + 10;
+    }
+
+    // 7. Contact / Booking Footer
     addFooter(doc, branding, primaryRGB);
 
     return doc;
