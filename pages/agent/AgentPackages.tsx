@@ -194,7 +194,7 @@ ${pkg.notes || 'As per standard booking terms.'}
                   const image = canvas.toDataURL('image/jpeg', 0.90);
                   const link = document.createElement('a');
                   link.href = image;
-                  link.download = `${pkg.packageName.replace(/\s+/g, '_')}_Flyer.jpg`;
+                  link.download = `${pkg.packageName.replace(/\s+/g, '_')}_Post.jpg`;
                   link.click();
               } catch (error) {
                   console.error("Flyer generation failed", error);
@@ -316,7 +316,7 @@ ${pkg.notes || 'As per standard booking terms.'}
                                     onClick={(e) => handleDownloadFlyer(e, pkg)}
                                     disabled={generatingPdfId === pkg.id}
                                     className="p-2.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition disabled:opacity-70"
-                                    title="Generate Flyer Image"
+                                    title="Generate Post Image"
                                 >
                                     {generatingPdfId === pkg.id ? <Loader2 size={18} className="animate-spin" /> : <ImageIcon size={18} />} 
                                 </button>
@@ -504,16 +504,16 @@ ${pkg.notes || 'As per standard booking terms.'}
           </div>
       )}
 
-      {/* --- HIDDEN FLYER TEMPLATE FOR HTML2CANVAS (1080x1920) --- */}
+      {/* --- HIDDEN FLYER TEMPLATE FOR HTML2CANVAS (1080x1350) --- */}
       {flyerPackage && (
           <div style={{ position: 'fixed', top: -9999, left: -9999 }}>
               <div 
                   ref={flyerRef} 
-                  className="w-[1080px] h-[1920px] bg-white relative overflow-hidden flex flex-col font-sans"
+                  className="w-[1080px] h-[1350px] bg-white relative flex flex-col font-sans"
                   style={{ fontFamily: "'Inter', sans-serif" }}
               >
-                  {/* 1. HERO SECTION (Larger for Mobile Story format) */}
-                  <div className="h-[900px] relative shrink-0">
+                  {/* 1. HERO SECTION (Adjusted for 4:5 ratio) */}
+                  <div className="h-[750px] relative shrink-0">
                       {/* Background Image */}
                       {flyerPackage.imageUrl ? (
                            <img src={flyerPackage.imageUrl} className="w-full h-full object-cover" crossOrigin="anonymous" alt="Hero" />
@@ -551,7 +551,7 @@ ${pkg.notes || 'As per standard booking terms.'}
                       </div>
 
                       {/* Huge Typographic Hero Title */}
-                      <div className="absolute bottom-56 left-12 right-12 z-10">
+                      <div className="absolute bottom-48 left-12 right-12 z-10">
                           <div className="flex gap-4 mb-6">
                               <span className="bg-white/20 backdrop-blur-md text-white px-6 py-2 rounded-full font-bold text-lg uppercase tracking-widest border border-white/20 shadow-lg">
                                   {flyerPackage.category || 'Exclusive'}
@@ -561,7 +561,7 @@ ${pkg.notes || 'As per standard booking terms.'}
                               </span>
                           </div>
                           
-                          <h1 className="text-[110px] font-black text-white leading-[0.9] mb-6 drop-shadow-2xl tracking-tight">
+                          <h1 className="text-[90px] font-black text-white leading-[0.9] mb-6 drop-shadow-2xl tracking-tight">
                               {flyerPackage.packageName}
                           </h1>
                           
@@ -573,175 +573,136 @@ ${pkg.notes || 'As per standard booking terms.'}
                   </div>
 
                   {/* 2. BODY CONTENT (Overlapping Magazine Layout) */}
-                  {/* Changed pt-20 to pt-36 to push content down and clear floating price card */}
-                  <div className="flex-1 bg-white relative -mt-40 rounded-t-[60px] px-12 pt-36 pb-16 flex flex-col shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.4)]">
+                  <div className="flex-1 px-12 pt-8 pb-8 flex flex-col bg-white rounded-t-[60px] -mt-16 relative z-10 shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.3)]">
                       
                       {/* Floating Price Card (Right Side) */}
-                      <div className="absolute -top-32 right-12 bg-white p-8 rounded-[40px] shadow-2xl text-center border-t-[12px] min-w-[320px] flex flex-col items-center justify-center z-20" style={{borderColor: primaryColor}}>
+                      <div className="absolute -top-24 right-12 bg-white p-6 rounded-[40px] shadow-2xl text-center border-t-[12px] min-w-[280px] flex flex-col items-center justify-center z-20" style={{borderColor: primaryColor}}>
                           <p className="text-slate-400 uppercase text-sm font-bold tracking-[0.2em] mb-2">Deal Price</p>
                           {/* Use Brand Color for Price */}
-                          <h2 className="text-7xl font-black tracking-tighter" style={{color: primaryColor}}>
+                          <h2 className="text-6xl font-black tracking-tighter" style={{color: primaryColor}}>
                               ₹ {(flyerPackage.fixedPrice / 1000).toFixed(1)}k
                           </h2>
                           <p className="text-slate-400 text-lg mt-2 font-medium">per person</p>
                           
-                          <div className="mt-6 w-full bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-100 rounded-2xl p-4 flex flex-col items-center justify-center shadow-sm">
+                          <div className="mt-4 w-full bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-100 rounded-2xl p-3 flex flex-col items-center justify-center shadow-sm">
                               <p className="text-rose-600 font-bold uppercase text-[10px] tracking-widest mb-1 flex items-center gap-2">
                                   <TrendingUp size={14} /> Limited Time
                               </p>
-                              <p className="text-slate-900 font-black text-sm leading-tight text-center">
+                              <p className="text-slate-900 font-black text-xs leading-tight text-center">
                                   Book Before Price Increase
                               </p>
                           </div>
                       </div>
 
                       {/* Icons Grid (Centered) */}
-                      <div className="grid grid-cols-4 gap-10 mb-10">
-                           <div className="flex flex-col items-center text-center gap-4">
-                               <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
-                                   <Hotel size={40} strokeWidth={2} style={{color: primaryColor}} />
+                      <div className="grid grid-cols-4 gap-6 mb-6 pt-20">
+                           <div className="flex flex-col items-center text-center gap-2">
+                               <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
+                                   <Hotel size={32} strokeWidth={2} style={{color: primaryColor}} />
                                </div>
-                               <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Stay</span>
+                               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stay</span>
                            </div>
-                           <div className="flex flex-col items-center text-center gap-4">
-                               <div className="w-20 h-20 rounded-full bg-orange-50 flex items-center justify-center text-orange-600 shadow-sm border border-orange-100">
-                                   <Coffee size={40} strokeWidth={2} style={{color: primaryColor}} />
+                           <div className="flex flex-col items-center text-center gap-2">
+                               <div className="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center text-orange-600 shadow-sm border border-orange-100">
+                                   <Coffee size={32} strokeWidth={2} style={{color: primaryColor}} />
                                </div>
-                               <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Meals</span>
+                               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Meals</span>
                            </div>
-                           <div className="flex flex-col items-center text-center gap-4">
-                               <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-sm border border-blue-100">
-                                   <Car size={40} strokeWidth={2} style={{color: primaryColor}} />
+                           <div className="flex flex-col items-center text-center gap-2">
+                               <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-sm border border-blue-100">
+                                   <Car size={32} strokeWidth={2} style={{color: primaryColor}} />
                                </div>
-                               <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Transfer</span>
+                               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Transfer</span>
                            </div>
-                           <div className="flex flex-col items-center text-center gap-4">
-                               <div className="w-20 h-20 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 shadow-sm border border-pink-100">
-                                   <Star size={40} strokeWidth={2} style={{color: primaryColor}} />
+                           <div className="flex flex-col items-center text-center gap-2">
+                               <div className="w-16 h-16 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 shadow-sm border border-pink-100">
+                                   <Star size={32} strokeWidth={2} style={{color: primaryColor}} />
                                </div>
-                               <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Tours</span>
+                               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tours</span>
                            </div>
                       </div>
 
-                      {/* PROMINENT HOTEL BANNER (Added for visibility) */}
-                      <div className="mb-10 bg-slate-50 border border-slate-100 rounded-[30px] p-6 flex items-center gap-6 shadow-sm mx-4">
-                          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-sm text-indigo-600 shrink-0 border border-slate-100">
-                              <Hotel size={40} style={{color: primaryColor}} />
+                      {/* PROMINENT HOTEL BANNER */}
+                      <div className="mb-6 bg-slate-50 border border-slate-100 rounded-[30px] p-4 flex items-center gap-4 shadow-sm mx-2">
+                          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-indigo-600 shrink-0 border border-slate-100">
+                              <Hotel size={32} style={{color: primaryColor}} />
                           </div>
                           <div>
-                              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Premium Accommodation</p>
-                              <h3 className="text-4xl font-black text-slate-900 leading-tight" style={{color: primaryColor}}>
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Premium Accommodation</p>
+                              <h3 className="text-3xl font-black text-slate-900 leading-tight" style={{color: primaryColor}}>
                                   {(flyerPackage.hotelDetails && flyerPackage.hotelDetails !== 'NA') ? flyerPackage.hotelDetails : 'Premium Accommodation'}
                               </h3>
                           </div>
                       </div>
 
                       {/* Content Columns */}
-                      <div className="grid grid-cols-2 gap-16 flex-1 pt-6 border-t border-slate-100">
+                      <div className="grid grid-cols-2 gap-10 flex-1 pt-4 border-t border-slate-100">
                           
                           {/* Left: Highlights & Exclusions */}
                           <div>
-                              <h3 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3 uppercase tracking-wide">
-                                  <Info size={28} className="text-slate-400"/> Experience
+                              <h3 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-3 uppercase tracking-wide">
+                                  <Info size={24} className="text-slate-400"/> Experience
                               </h3>
-                              <p className="text-slate-600 text-xl leading-relaxed text-justify font-medium mb-8">
-                                  <span className="text-6xl float-left mr-4 mt-[-15px] font-black text-slate-900">“</span>
-                                  {flyerPackage.description?.replace(/<[^>]+>/g, ' ').substring(0, 380) || 'Enjoy a wonderful trip with our curated package designed for the best experience.'}...
+                              <p className="text-slate-600 text-lg leading-relaxed text-justify font-medium mb-6">
+                                  <span className="text-5xl float-left mr-3 mt-[-10px] font-black text-slate-900">“</span>
+                                  {flyerPackage.description?.replace(/<[^>]+>/g, ' ').substring(0, 320) || 'Enjoy a wonderful trip with our curated package designed for the best experience.'}...
                               </p>
-
-                              {/* NEW: Exclusions */}
-                              {flyerPackage.exclusions.length > 0 && (
-                                  <div className="mt-8 bg-red-50/50 p-6 rounded-3xl border border-red-100">
-                                       <h3 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-2 uppercase tracking-wide">
-                                            <XCircle size={24} className="text-red-500" /> Exclusions
-                                       </h3>
-                                       <ul className="space-y-3">
-                                           {flyerPackage.exclusions.slice(0, 4).map((exc, i) => (
-                                               <li key={i} className="flex items-start gap-3 text-slate-700 text-lg font-bold">
-                                                   <X size={20} className="text-red-400 mt-1 shrink-0" strokeWidth={3} /> {exc}
-                                               </li>
-                                           ))}
-                                       </ul>
-                                  </div>
-                              )}
                           </div>
 
                           {/* Right: Inclusions */}
                           <div>
-                              <h3 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3 uppercase tracking-wide">
-                                  <CheckCircle size={28} className="text-green-600" style={{color: primaryColor}}/> Inclusions
+                              <h3 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-3 uppercase tracking-wide">
+                                  <CheckCircle size={24} className="text-green-600" style={{color: primaryColor}}/> Inclusions
                               </h3>
-                              <div className="space-y-4">
-                                  {flyerPackage.inclusions.slice(0, 8).map((inc, i) => (
-                                      <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
-                                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                                              <CheckCircle size={18} className="text-green-600" strokeWidth={3} style={{color: primaryColor}} />
+                              <div className="space-y-3">
+                                  {flyerPackage.inclusions.slice(0, 6).map((inc, i) => (
+                                      <div key={i} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                                          <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                                              <CheckCircle size={14} className="text-green-600" strokeWidth={3} style={{color: primaryColor}} />
                                           </div>
-                                          <span className="text-xl font-bold text-slate-700">{inc}</span>
+                                          <span className="text-lg font-bold text-slate-700">{inc}</span>
                                       </div>
                                   ))}
                               </div>
                           </div>
                       </div>
+                  </div>
 
-                      {/* NEW: Notes / Policy (Full Width) */}
-                      {flyerPackage.notes && (
-                          <div className="mt-8 mb-8 p-6 bg-amber-50 rounded-3xl border border-amber-100/50">
-                              <h3 className="text-xl font-black text-amber-900 mb-3 uppercase tracking-wide flex items-center gap-2">
-                                  <AlertTriangle size={24} className="text-amber-600" /> Important Policy
-                              </h3>
-                              <p className="text-amber-800 text-lg leading-relaxed font-medium">
-                                  {flyerPackage.notes.replace(/<[^>]+>/g, ' ').substring(0, 250)}...
-                              </p>
-                          </div>
-                      )}
-
-                      {/* 3. PREMIUM FOOTER CARD HERO (Dark Background, Brand Accents) */}
-                      <div className="mt-auto bg-[#1a1a1a] text-white p-12 -mx-12 -mb-20 pt-16 pb-20 relative overflow-hidden rounded-t-[50px]">
-                          {/* Background Texture */}
-                          <div className="absolute top-0 right-0 p-8 opacity-5 transform scale-150 rotate-12 pointer-events-none">
-                             <Globe size={400} />
-                          </div>
+                  {/* 3. PREMIUM FOOTER - COMPACT FOR PORTRAIT (Clean Contact Info Only) */}
+                  <div className="bg-[#1a1a1a] text-white pt-12 pb-12 px-12 rounded-t-[50px] relative z-20 mt-auto">
+                      <div className="flex items-end justify-between">
                           
-                          <div className="relative z-10 flex flex-col justify-between h-full">
-                              
-                              <div className="flex justify-between items-end mb-8">
-                                  {/* Call to Action Section */}
-                                  <div>
-                                     <p className="text-2xl text-white/80 mb-2 font-medium">For Booking & Queries</p>
-                                     <div className="flex items-center gap-4 mb-2">
-                                        <div className="bg-white/10 p-3 rounded-full border border-white/10" style={{borderColor: primaryColor}}>
-                                            <Phone size={32} style={{color: primaryColor}} />
-                                        </div>
-                                        <span className="text-6xl font-black tracking-tight text-white">{displayPhone}</span>
-                                     </div>
-                                     {displayEmail && (
-                                         <div className="flex items-center gap-3 mt-4 ml-2">
-                                             <Mail size={24} className="text-slate-400" />
-                                             <span className="text-2xl font-medium text-white/90">{displayEmail}</span>
-                                         </div>
-                                     )}
+                          {/* Contact Info (Left) */}
+                          <div className="flex flex-col gap-6">
+                              {/* Mobile */}
+                              <div className="flex items-center gap-5">
+                                  <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shrink-0 text-[#1a1a1a]">
+                                      <Phone size={36} strokeWidth={3} />
                                   </div>
-
-                                  {/* Website & Brand */}
-                                  <div className="text-right">
-                                      {website && (
-                                          <div className="flex items-center justify-end gap-2 mb-6">
-                                              <Globe size={24} style={{color: primaryColor}} />
-                                              <span className="text-2xl font-bold">{website}</span>
-                                          </div>
-                                      )}
-                                      <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl inline-block border border-white/10">
-                                         <span className="text-xl font-bold uppercase tracking-widest text-white/90">{displayAgencyName}</span>
-                                      </div>
-                                  </div>
+                                  <h2 className="text-[70px] font-black tracking-tighter leading-none">{displayPhone}</h2>
                               </div>
-                              
-                              <div className="w-full h-1 bg-white/20 rounded-full mb-6"></div>
-                              <p className="text-center text-white/60 text-lg">Terms & Conditions Apply. Prices subject to availability.</p>
-                          </div>
-                      </div>
 
+                              {/* Email */}
+                              {displayEmail && (
+                                  <div className="flex items-center gap-4 ml-2">
+                                      <Mail size={32} className="text-gray-400" />
+                                      <span className="text-4xl font-medium text-gray-200">{displayEmail}</span>
+                                  </div>
+                              )}
+                          </div>
+
+                          {/* Website (Right) */}
+                          {website && (
+                              <div className="text-right">
+                                  <div className="flex items-center justify-end gap-3 mb-2">
+                                      <Globe size={36} style={{color: primaryColor}} />
+                                  </div>
+                                  <h3 className="text-4xl font-bold tracking-tight text-white border-b-4 pb-2" style={{borderColor: primaryColor}}>
+                                      {website}
+                                  </h3>
+                              </div>
+                          )}
+                      </div>
                   </div>
               </div>
           </div>
