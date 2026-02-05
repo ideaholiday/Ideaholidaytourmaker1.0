@@ -10,7 +10,7 @@ import { Quote, ItineraryItem, UserRole, PricingBreakdown, Message } from '../..
 import { ItineraryView } from '../components/ItineraryView';
 import { PriceSummary } from '../components/PriceSummary';
 import { ChatPanel } from '../components/ChatPanel'; // Restored Import
-import { ArrowLeft, Edit2, Download, Share2, GitBranch, Link as LinkIcon, CheckCircle, Trash2, UserPlus, Truck, Phone, MessageCircle, CreditCard, Save, Eye, EyeOff, FileText } from 'lucide-react';
+import { ArrowLeft, Edit2, Download, Share2, GitBranch, Link as LinkIcon, CheckCircle, Trash2, UserPlus, Truck, Phone, MessageCircle, CreditCard, Save, Eye, EyeOff, FileText, AlertTriangle } from 'lucide-react';
 import { usePricingEngine } from '../hooks/usePricingEngine';
 import { ItineraryBuilder } from '../components/ItineraryBuilder';
 import { generateQuotePDF } from '../utils/pdfGenerator';
@@ -341,6 +341,20 @@ export const QuoteDetail: React.FC = () => {
             <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-xl mb-6 flex items-center gap-2 text-sm">
                 <EyeOff size={18} />
                 <strong>Client Preview Mode:</strong> Viewing as your customer sees it. Internal costs and chats are hidden.
+            </div>
+        )}
+        
+        {/* WARNING FOR ZERO PRICE */}
+        {showInternal && !hasValidPrice && !isBooked && (
+             <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-4 rounded-xl mb-6 flex items-start gap-3 shadow-sm">
+                <AlertTriangle size={24} className="shrink-0 mt-0.5 text-amber-600" />
+                <div>
+                    <h4 className="font-bold text-sm">Pricing Incomplete / Pending</h4>
+                    <p className="text-xs mt-1">
+                        The itinerary currently has no cost associated or is just a route skeleton. 
+                        Please click <strong>Edit Itinerary</strong> below to add services and calculate the final price before sending to your client.
+                    </p>
+                </div>
             </div>
         )}
 

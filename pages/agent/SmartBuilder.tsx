@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -109,33 +110,32 @@ export const SmartBuilder: React.FC = () => {
     setStep(2);
   };
 
-  const calculateFinancials = () => {
-      let totalRawCost = 0;
-      const currency = 'INR'; 
-      const pricingRules = adminService.getPricingRuleSync();
-
-      itinerary.forEach(day => {
-          day.services?.forEach(svc => {
-              if (!svc.isRef) {
-                  totalRawCost += currencyService.convert(svc.cost, svc.currency || 'USD', currency);
-              }
-          });
-      });
-
-      return calculatePriceFromNet(
-          totalRawCost,
-          pricingRules,
-          basics.adults + basics.children,
-          undefined,
-          currency
-      );
-  };
-
-  const handleSaveQuote = async (finalItinerary: ItineraryItem[]) => {
+  const handleSaveQuote = async (finalItinerary: ItineraryItem[], financialsInput?: { net: number, selling: number, currency: string }) => {
       setItinerary(finalItinerary); // Update state with final edits
       
-      const financials = calculateFinancials();
-      const currency = 'INR'; 
+      let price = 0;
+      let sellingPrice = 0;
+      const currency = financialsInput?.currency || 'INR'; 
+
+      if (financialsInput) {
+          price = financialsInput.net;
+          sellingPrice = financialsInput.selling;
+      } else {
+          // Fallback calculation if not provided (rare)
+          const pricingRules = adminService.getPricingRuleSync();
+          let totalRawCost = 0;
+          finalItinerary.forEach(day => {
+            day.services?.forEach(svc => {
+                if (!svc.isRef) {
+                    totalRawCost += currencyService.convert(svc.cost, svc.currency || 'USD', currency);
+                }
+            });
+          });
+          const calc = calculatePriceFromNet(totalRawCost, pricingRules, basics.adults + basics.children, undefined, currency);
+          price = calc.platformNetCost;
+          sellingPrice = calc.finalPrice;
+      }
+
       const fullGuestName = `${basics.guestSalutation}. ${basics.guestName}`;
       const destinationName = selectedCities.map(c => c.cityName).join(', ');
       const totalNights = selectedCities.reduce((sum, c) => sum + c.nights, 0);
@@ -154,9 +154,9 @@ export const SmartBuilder: React.FC = () => {
           childAges: basics.childAges,
           itinerary: finalItinerary,
           
-          cost: financials.supplierCost, 
-          price: financials.platformNetCost,
-          sellingPrice: financials.finalPrice,
+          cost: 0, // Raw supplier cost not tracked in this context easily without breakdown
+          price: price, // B2B Net
+          sellingPrice: sellingPrice, // Client Price
           
           currency: currency,
           serviceDetails: `${totalNights} Nights Trip: ${destinationName}`,
