@@ -20,50 +20,47 @@ interface BrandingOptions {
 }
 
 // --- TEXT SANITIZATION HELPER ---
-const cleanText = (text: string | undefined | null): string => {
-    if (!text) return '';
-    
-    let clean = text;
+const cleanText = (html: string | undefined | null): string => {
+    if (!html) return '';
+    let text = html;
 
-    // 0. Decode HTML entities FIRST (Crucial for handling escaped HTML)
-    // This ensures tags are restored to <p> before we try to strip them
-    const domParser = new DOMParser();
-    try {
-        const decoded = domParser.parseFromString(clean, 'text/html').body.textContent;
-        if (decoded) clean = decoded;
-    } catch (e) {
-        // Fallback for environments without DOMParser or simple strings
-        clean = clean.replace(/&nbsp;/g, ' ')
-                     .replace(/&amp;/g, '&')
-                     .replace(/&lt;/g, '<')
-                     .replace(/&gt;/g, '>')
-                     .replace(/&quot;/g, '"')
-                     .replace(/&#39;/g, "'");
+    // 1. Replace block elements with line breaks to preserve structure
+    text = text.replace(/<br\s*\/?>/gi, "\n");
+    text = text.replace(/<\/p>/gi, "\n\n");
+    text = text.replace(/<\/div>/gi, "\n");
+    text = text.replace(/<\/h[1-6]>/gi, "\n\n");
+    text = text.replace(/<\/li>/gi, "\n");
+    text = text.replace(/<li>/gi, "• ");
+    text = text.replace(/<ul>/gi, "\n");
+    text = text.replace(/<\/ul>/gi, "\n");
+    text = text.replace(/<ol>/gi, "\n");
+    text = text.replace(/<\/ol>/gi, "\n");
+
+    // 2. Strip remaining tags
+    text = text.replace(/<[^>]+>/g, '');
+    
+    // 3. Decode HTML entities (e.g. &amp; -> &)
+    // Create a dummy textarea to use browser's native decoder if available
+    if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = text;
+        text = textarea.value;
+    } else {
+        // Fallback for non-browser environments (if any)
+        text = text.replace(/&nbsp;/g, ' ')
+                   .replace(/&amp;/g, '&')
+                   .replace(/&lt;/g, '<')
+                   .replace(/&gt;/g, '>')
+                   .replace(/&quot;/g, '"')
+                   .replace(/&#39;/g, "'");
     }
 
-    // 1. Convert block tags to newlines for formatting
-    clean = clean.replace(/<\/p>/gi, '\n')
-                 .replace(/<br\s*\/?>/gi, '\n')
-                 .replace(/<\/div>/gi, '\n')
-                 .replace(/<\/h[1-6]>/gi, '\n')
-                 .replace(/<\/li>/gi, '\n')
-                 .replace(/<li>/gi, '• ')
-                 .replace(/<ul>/gi, '\n')
-                 .replace(/<\/ul>/gi, '\n')
-                 .replace(/<ol>/gi, '\n')
-                 .replace(/<\/ol>/gi, '\n');
-
-    // 2. Strip remaining HTML Tags
-    clean = clean.replace(/<[^>]*>/g, '');
-
-    // 3. Decode entities again (Safe measure for any residuals like &nbsp;)
-    clean = clean.replace(/&nbsp;/g, ' ');
-
     // 4. Cleanup Whitespace
-    clean = clean.replace(/\n\s*\n/g, '\n'); // Remove multiple empty lines
-    clean = clean.trim();
+    // Collapse multiple newlines into max 2
+    text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); 
+    text = text.trim();
 
-    return clean;
+    return text;
 };
 
 // Helper: Resolve Branding

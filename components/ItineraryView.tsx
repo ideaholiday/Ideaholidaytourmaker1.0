@@ -72,11 +72,12 @@ export const ItineraryView: React.FC<Props> = ({ itinerary, startDate }) => {
                     </div>
 
                     <div className="p-6">
-                        {/* Day Description */}
+                        {/* Day Description - Rich Text Support */}
                         {item.description && (
-                            <div className="mb-6 text-slate-600 text-sm leading-relaxed whitespace-pre-line border-l-2 border-slate-200 pl-4">
-                                {item.description}
-                            </div>
+                            <div 
+                                className="mb-6 text-slate-600 text-sm leading-relaxed prose prose-sm max-w-none border-l-2 border-slate-200 pl-4 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-2"
+                                dangerouslySetInnerHTML={{ __html: item.description }}
+                            />
                         )}
 
                         {/* Services List */}

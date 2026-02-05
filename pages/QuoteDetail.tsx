@@ -10,7 +10,7 @@ import { Quote, ItineraryItem, UserRole, PricingBreakdown, Message } from '../..
 import { ItineraryView } from '../components/ItineraryView';
 import { PriceSummary } from '../components/PriceSummary';
 import { ChatPanel } from '../components/ChatPanel'; // Restored Import
-import { ArrowLeft, Edit2, Download, Share2, GitBranch, Link as LinkIcon, CheckCircle, Trash2, UserPlus, Truck, Phone, MessageCircle, CreditCard, Save, Eye, EyeOff, FileText, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Edit2, Download, Share2, GitBranch, Link as LinkIcon, CheckCircle, Trash2, UserPlus, Truck, Phone, MessageCircle, CreditCard, Save, Eye, EyeOff, FileText, AlertTriangle, BadgeCheck } from 'lucide-react';
 import { usePricingEngine } from '../hooks/usePricingEngine';
 import { ItineraryBuilder } from '../components/ItineraryBuilder';
 import { generateQuotePDF } from '../utils/pdfGenerator';
@@ -378,8 +378,9 @@ export const QuoteDetail: React.FC = () => {
                         <span>•</span>
                         <span>{new Date(quote.travelDate).toLocaleDateString()}</span>
                         {showInternal && quote.operatorName && (
-                            <span className="text-purple-600 font-medium ml-2 border-l border-slate-300 pl-3">
-                                Op: {quote.operatorName} ({quote.operatorStatus || 'Assigned'})
+                            <span className="text-purple-600 font-medium ml-2 border-l border-slate-300 pl-3 flex items-center gap-1">
+                                <BadgeCheck size={12} /> 
+                                {isAdminOrStaff ? `Op: ${quote.operatorName} (${quote.operatorStatus || 'Assigned'})` : 'DMC Verified'}
                             </span>
                         )}
                     </div>
