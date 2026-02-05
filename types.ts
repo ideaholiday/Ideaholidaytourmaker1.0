@@ -656,6 +656,15 @@ export interface AuditLog {
 // Inventory Workflow Types
 export type InventoryStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 
+export interface PackagePricingTiers {
+    solo: number;
+    twin: number; // 2 pax (Base)
+    quad: number; // 4 pax
+    six: number;  // 6 pax
+    childWithBed?: number;
+    childNoBed?: number;
+}
+
 export interface OperatorInventoryItem {
     id: string;
     productId: string; // Grouping revisions
@@ -663,14 +672,14 @@ export interface OperatorInventoryItem {
     isCurrent: boolean;
     operatorId: string;
     operatorName: string;
-    type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER';
+    type: 'HOTEL' | 'ACTIVITY' | 'TRANSFER' | 'PACKAGE';
     name: string;
     destinationId: string;
     description: string;
     currency: string;
     
     // Union fields for simplicity
-    costPrice: number; // Base cost
+    costPrice: number; // Base cost (Usually Twin Sharing or Lowest)
     costAdult?: number;
     costChild?: number;
     
@@ -687,6 +696,16 @@ export interface OperatorInventoryItem {
     // Activity
     activityType?: string;
     transferOptions?: ActivityTransferOptions;
+
+    // Package Extended
+    hotelName?: string;
+    pricingTiers?: PackagePricingTiers;
+    nights?: number;
+    validDates?: string[];
+    dateType?: 'SPECIFIC' | 'RANGE';
+    inclusions?: string[];
+    exclusions?: string[];
+    itinerary?: ItineraryItem[];
 
     imageUrl?: string;
     validFrom?: string;

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { inventoryService } from '../../services/inventoryService';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
-import { OperatorInventoryItem, ActivityTransferOptions, Destination, ItineraryItem } from '../../types';
+import { OperatorInventoryItem, ActivityTransferOptions, Destination, ItineraryItem, PackagePricingTiers } from '../../types';
 import { InventoryStatusBadge } from '../../components/inventory/InventoryStatusBadge';
 import { 
     Plus, Save, X, Box, GitBranch, DollarSign, Bus, Car, Ticket, 
@@ -12,12 +12,21 @@ import {
     AlignLeft, AlignCenter, AlignRight, AlignJustify, 
     List as ListIcon, ListOrdered, Link as LinkIcon, 
     Heading1, Heading2, Eraser, Undo, Redo, Type, Check,
-    ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, Square, RefreshCcw, Package, Layers, CalendarRange
+    ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, Square, RefreshCcw, Package, Layers, CalendarRange, Hotel, Users
 } from 'lucide-react';
 
 const DEFAULT_TRANSFER_OPTS: ActivityTransferOptions = {
     sic: { enabled: false, costPerPerson: 0 },
     pvt: { enabled: false, costPerVehicle: 0, vehicleCapacity: 4 }
+};
+
+const DEFAULT_PRICING_TIERS: PackagePricingTiers = {
+    solo: 0,
+    twin: 0,
+    quad: 0,
+    six: 0,
+    childWithBed: 0,
+    childNoBed: 0
 };
 
 type ModalTab = 'GENERAL' | 'ITINERARY' | 'PRICING' | 'MEDIA';
@@ -181,6 +190,7 @@ export const InventoryManager: React.FC = () => {
   }>({});
   
   const [transferOpts, setTransferOpts] = useState<ActivityTransferOptions>(DEFAULT_TRANSFER_OPTS);
+  const [pricingTiers, setPricingTiers] = useState<PackagePricingTiers>(DEFAULT_PRICING_TIERS);
   const [isSaving, setIsSaving] = useState(false);
 
   // Filter & Sort State
@@ -324,6 +334,7 @@ export const InventoryManager: React.FC = () => {
               dateType: (item as any).dateType || (item.validFrom ? 'RANGE' : 'SPECIFIC') // Determine date type
           });
           setTransferOpts(item.transferOptions || DEFAULT_TRANSFER_OPTS);
+          setPricingTiers(item.pricingTiers || DEFAULT_PRICING_TIERS);
       } else {
           setEditingItem(null);
           setFormData({
@@ -338,6 +349,7 @@ export const InventoryManager: React.FC = () => {
               dateType: 'SPECIFIC'
           });
           setTransferOpts(DEFAULT_TRANSFER_OPTS);
+          setPricingTiers(DEFAULT_PRICING_TIERS);
       }
       setIsModalOpen(true);
   };
@@ -356,6 +368,7 @@ export const InventoryManager: React.FC = () => {
               // Parse Text Areas
               payload.inclusions = formData.inclusionsText?.split('\n').map(s => s.trim()).filter(s => s) || [];
               payload.exclusions = formData.exclusionsText?.split('\n').map(s => s.trim()).filter(s => s) || [];
+              payload.pricingTiers = pricingTiers;
               
               // Date Logic
               payload.dateType = formData.dateType || 'SPECIFIC';
@@ -371,8 +384,10 @@ export const InventoryManager: React.FC = () => {
                   }
               }
 
-              // Use costPrice for package fixed price
-              payload.fixedPrice = payload.costPrice;
+              // Use costPrice for package fixed price (Base 2pax usually)
+              payload.fixedPrice = pricingTiers.twin || payload.costPrice;
+              payload.costPrice = pricingTiers.twin || payload.costPrice;
+              
               payload.itinerary = formData.itinerary || [];
           }
           
@@ -407,6 +422,11 @@ export const InventoryManager: React.FC = () => {
   const updateSic = (field: string, value: any) => setTransferOpts(prev => ({ ...prev, sic: { ...prev.sic, [field]: value } }));
   const updatePvt = (field: string, value: any) => setTransferOpts(prev => ({ ...prev, pvt: { ...prev.pvt, [field]: value } }));
   
+  // Update Tiers Logic
+  const updateTier = (field: keyof PackagePricingTiers, value: number) => {
+      setPricingTiers(prev => ({ ...prev, [field]: value }));
+  };
+
   // --- ITINERARY BUILDER LOGIC ---
   const handleAddDay = () => {
       const current = formData.itinerary || [];
@@ -599,6 +619,7 @@ export const InventoryManager: React.FC = () => {
                 <td className="px-6 py-4 font-mono text-slate-700">
                     {item.currency} {item.type === 'ACTIVITY' ? item.costAdult : item.costPrice}
                     {item.type === 'ACTIVITY' && <span className="text-[10px] text-slate-400 block">Base Adult</span>}
+                    {item.type === 'PACKAGE' && <span className="text-[10px] text-slate-400 block">Twin Share</span>}
                 </td>
                 <td className="px-6 py-4">
                     <InventoryStatusBadge status={item.status} reason={item.rejectionReason} />
@@ -820,6 +841,37 @@ export const InventoryManager: React.FC = () => {
                             {/* D. PACKAGE FORM */}
                             {formData.type === 'PACKAGE' && (
                                 <div className="space-y-6">
+                                    {/* NEW: Accommodation Section */}
+                                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+                                        <h4 className="text-xs font-bold text-indigo-800 uppercase mb-3 flex items-center gap-2"><Hotel size={14}/> Accommodation Details</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Hotel Name</label>
+                                                <input 
+                                                    type="text" 
+                                                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                                    value={formData.hotelName || ''}
+                                                    onChange={e => setFormData({...formData, hotelName: e.target.value})}
+                                                    placeholder="e.g. Citymax Hotel"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Category</label>
+                                                <select 
+                                                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white"
+                                                    value={formData.category || ''}
+                                                    onChange={e => setFormData({...formData, category: e.target.value})}
+                                                >
+                                                    <option value="">Select Rating...</option>
+                                                    <option>3 Star</option>
+                                                    <option>4 Star</option>
+                                                    <option>5 Star</option>
+                                                    <option>Luxury</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
                                         <h4 className="text-xs font-bold text-orange-800 uppercase mb-3 flex items-center gap-2"><Package size={14}/> Package Specifics</h4>
                                         
@@ -884,19 +936,43 @@ export const InventoryManager: React.FC = () => {
                                                 <p className="text-[10px] text-slate-500 mt-1">Enter dates in YYYY-MM-DD format, separated by commas.</p>
                                             </div>
                                         )}
-
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Net Cost Per Person (INR)</label>
-                                            <input 
-                                                required
-                                                type="number" 
-                                                min="0"
-                                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold font-mono"
-                                                placeholder="0.00"
-                                                value={formData.costPrice || ''}
-                                                onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})}
-                                            />
+                                        
+                                        {/* NEW: Tiered Pricing Grid */}
+                                        <div className="mt-6 border-t border-orange-200 pt-4">
+                                            <label className="block text-xs font-bold text-slate-700 uppercase mb-2 flex items-center gap-2">
+                                                <Users size={14}/> Tiered Pricing (Net Per Person in INR)
+                                            </label>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-3 rounded-lg border border-slate-200">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 mb-1">Solo Pax</label>
+                                                    <input type="number" min="0" className="w-full border p-2 rounded text-sm font-mono" placeholder="0" value={pricingTiers.solo} onChange={e => updateTier('solo', Number(e.target.value))} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 mb-1">2 Pax Base</label>
+                                                    <input type="number" min="0" className="w-full border p-2 rounded text-sm font-mono font-bold bg-brand-50" placeholder="0" value={pricingTiers.twin} onChange={e => updateTier('twin', Number(e.target.value))} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 mb-1">4 Pax Base</label>
+                                                    <input type="number" min="0" className="w-full border p-2 rounded text-sm font-mono" placeholder="0" value={pricingTiers.quad} onChange={e => updateTier('quad', Number(e.target.value))} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 mb-1">6 Pax Base</label>
+                                                    <input type="number" min="0" className="w-full border p-2 rounded text-sm font-mono" placeholder="0" value={pricingTiers.six} onChange={e => updateTier('six', Number(e.target.value))} />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4 mt-3 bg-white p-3 rounded-lg border border-slate-200">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 mb-1">Child With Bed</label>
+                                                    <input type="number" min="0" className="w-full border p-2 rounded text-sm font-mono" placeholder="0" value={pricingTiers.childWithBed} onChange={e => updateTier('childWithBed', Number(e.target.value))} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 mb-1">Child No Bed</label>
+                                                    <input type="number" min="0" className="w-full border p-2 rounded text-sm font-mono" placeholder="0" value={pricingTiers.childNoBed} onChange={e => updateTier('childNoBed', Number(e.target.value))} />
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 mt-2">Enter the Net Cost per person based on the group size sharing the vehicle/services.</p>
                                         </div>
+
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
