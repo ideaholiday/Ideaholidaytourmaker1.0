@@ -63,17 +63,25 @@ export const AgentPackages: React.FC = () => {
   const openBookingModal = (pkg: FixedPackage) => {
       setSelectedPkg(pkg);
       let defaultDate = '';
+      
+      // Smart Default Date Logic
       if (pkg.dateType === 'DAILY') {
+          // Default to tomorrow
           const tmrw = new Date();
           tmrw.setDate(tmrw.getDate() + 1);
           defaultDate = tmrw.toISOString().split('T')[0];
       } else {
-          const nextDate = pkg.validDates
+          // Default to first valid future date
+          const sortedDates = pkg.validDates
             .map(d => new Date(d))
             .sort((a,b) => a.getTime() - b.getTime())
-            .find(d => d.getTime() >= new Date().setHours(0,0,0,0));
-          if (nextDate) defaultDate = nextDate.toISOString().split('T')[0];
+            .filter(d => d.getTime() >= new Date().setHours(0,0,0,0));
+            
+          if (sortedDates.length > 0) {
+              defaultDate = sortedDates[0].toISOString().split('T')[0];
+          }
       }
+
       setBookingForm({
           date: defaultDate,
           guestName: '',
@@ -298,19 +306,118 @@ ${pkg.notes || 'As per standard booking terms.'}
         </div>
       )}
 
-      {/* BOOKING MODAL */}
+      {/* BOOKING MODAL (ENHANCED) */}
       {isModalOpen && selectedPkg && (
           <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-                   <div className="flex justify-between items-center mb-6">
-                      <h3 className="font-bold text-lg">Book {selectedPkg.packageName}</h3>
-                      <button onClick={() => setIsModalOpen(false)}><X size={20}/></button>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                   <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                      <div>
+                          <h3 className="font-bold text-lg text-slate-900">Book Package</h3>
+                          <p className="text-xs text-slate-500">{selectedPkg.packageName}</p>
+                      </div>
+                      <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
                    </div>
-                   <form onSubmit={handleCreateQuote} className="space-y-4">
-                       <input type="date" required className="w-full border p-2 rounded" value={bookingForm.date} onChange={e => setBookingForm({...bookingForm, date: e.target.value})} />
-                       <input type="text" required placeholder="Guest Name" className="w-full border p-2 rounded" value={bookingForm.guestName} onChange={e => setBookingForm({...bookingForm, guestName: e.target.value})} />
-                       <button type="submit" disabled={isCreating} className="w-full bg-brand-600 text-white py-3 rounded font-bold">
-                           {isCreating ? 'Processing...' : 'Create Quote'}
+                   
+                   <form onSubmit={handleCreateQuote} className="p-6 space-y-5">
+                       
+                       {/* Date Selection */}
+                       <div>
+                           <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Travel Date</label>
+                           {selectedPkg.dateType === 'SPECIFIC' ? (
+                               <div className="relative">
+                                   <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
+                                   <select 
+                                       required
+                                       className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none appearance-none bg-white font-medium"
+                                       value={bookingForm.date}
+                                       onChange={e => setBookingForm({...bookingForm, date: e.target.value})}
+                                   >
+                                       <option value="">Select Departure Date...</option>
+                                       {selectedPkg.validDates.map(date => (
+                                           <option key={date} value={date}>
+                                               {new Date(date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+                                           </option>
+                                       ))}
+                                   </select>
+                               </div>
+                           ) : (
+                               <div className="relative">
+                                   <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
+                                   <input 
+                                       type="date" 
+                                       required 
+                                       className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                                       value={bookingForm.date} 
+                                       onChange={e => setBookingForm({...bookingForm, date: e.target.value})} 
+                                   />
+                               </div>
+                           )}
+                       </div>
+
+                       {/* Pax Selection */}
+                       <div className="grid grid-cols-2 gap-4">
+                           <div>
+                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Adults</label>
+                               <div className="relative">
+                                   <User className="absolute left-3 top-3 text-slate-400" size={18} />
+                                   <input 
+                                       type="number" 
+                                       min="1"
+                                       required 
+                                       className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                                       value={bookingForm.adults} 
+                                       onChange={e => setBookingForm({...bookingForm, adults: Number(e.target.value)})} 
+                                   />
+                               </div>
+                           </div>
+                           <div>
+                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Children</label>
+                               <div className="relative">
+                                   <User className="absolute left-3 top-3 text-slate-400" size={18} />
+                                   <input 
+                                       type="number" 
+                                       min="0"
+                                       required 
+                                       className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                                       value={bookingForm.children} 
+                                       onChange={e => setBookingForm({...bookingForm, children: Number(e.target.value)})} 
+                                   />
+                               </div>
+                           </div>
+                       </div>
+
+                       {/* Guest Name */}
+                       <div>
+                           <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Lead Guest Name</label>
+                           <input 
+                               type="text" 
+                               required 
+                               placeholder="e.g. John Doe" 
+                               className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                               value={bookingForm.guestName} 
+                               onChange={e => setBookingForm({...bookingForm, guestName: e.target.value})} 
+                           />
+                       </div>
+
+                       {/* Total Estimate */}
+                       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center">
+                           <div>
+                               <p className="text-xs font-bold text-blue-600 uppercase">Total Estimate</p>
+                               <p className="text-xs text-blue-400">
+                                   {bookingForm.adults + bookingForm.children} Pax × ₹ {selectedPkg.fixedPrice.toLocaleString()}
+                               </p>
+                           </div>
+                           <div className="text-xl font-bold text-slate-900">
+                               ₹ {((bookingForm.adults + bookingForm.children) * selectedPkg.fixedPrice).toLocaleString()}
+                           </div>
+                       </div>
+
+                       <button type="submit" disabled={isCreating} className="w-full bg-brand-600 text-white py-4 rounded-xl font-bold hover:bg-brand-700 transition shadow-lg shadow-brand-200">
+                           {isCreating ? (
+                               <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={20}/> Processing...</span>
+                           ) : (
+                               'Create Booking Quote'
+                           )}
                        </button>
                    </form>
               </div>
