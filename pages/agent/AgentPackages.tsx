@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
@@ -9,7 +8,7 @@ import { inventoryService } from '../../services/inventoryService'; // Import In
 import { useAuth } from '../../context/AuthContext';
 import { useClientBranding } from '../../hooks/useClientBranding';
 import { FixedPackage, Quote, ItineraryItem, OperatorInventoryItem } from '../../types';
-import { Package, Calendar, MapPin, ArrowRight, Loader2, Info, X, User, Image as ImageIcon, Hotel, ChevronDown, CheckCircle, FileText, Eye, Check, Clock, Mail, Globe, AlertTriangle, XCircle, Phone, LayoutTemplate, Star, Zap, Plane, Utensils, Car, Camera, QrCode, BadgeCheck } from 'lucide-react';
+import { Package, Calendar, MapPin, ArrowRight, Loader2, Info, X, User, Image as ImageIcon, Hotel, ChevronDown, CheckCircle, FileText, Eye, Check, Clock, Mail, Globe, AlertTriangle, XCircle, Phone, LayoutTemplate, Star, Zap, Plane, Utensils, Car, Camera, QrCode, BadgeCheck, Sparkles } from 'lucide-react';
 import { generateFixedPackagePDF } from '../../utils/pdfGenerator';
 
 type FlyerDesign = 'MINIMAL' | 'LUXURY' | 'BOLD';
@@ -241,23 +240,36 @@ ${pkg.notes || 'As per standard booking terms.'}
       setShowDesignModal(true);
   };
 
-  // ... [Flyer Generation Logic - No Changes Needed] ... 
   const handleGenerateFlyer = async () => {
       if (!targetFlyerPkg) return;
       setIsGenerating(true);
       
+      // Delay to ensure DOM is rendered
       setTimeout(async () => {
           const node = document.getElementById('flyer-generator-target');
           if (node) {
               try {
                   await document.fonts.ready;
-                  const bgColor = selectedDesign === 'LUXURY' ? '#0f172a' : selectedDesign === 'BOLD' ? '#ffffff' : '#ffffff';
-                  const canvas = await html2canvas(node, { useCORS: true, allowTaint: true, backgroundColor: bgColor, width: 1080, height: 1080, scale: 1, logging: false });
+                  
+                  // Use specific background color to avoid transparency issues
+                  const bgColor = '#ffffff'; 
+
+                  const canvas = await html2canvas(node, { 
+                      useCORS: true, 
+                      allowTaint: true, 
+                      backgroundColor: bgColor, 
+                      width: 1080, 
+                      height: 1080, 
+                      scale: 1, // Exact scale
+                      logging: false 
+                  });
+                  
                   const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
                   const link = document.createElement('a');
-                  link.download = `${targetFlyerPkg.packageName.replace(/\s+/g, '_')}_Post.jpg`;
+                  link.download = `${targetFlyerPkg.packageName.replace(/\s+/g, '_')}_Flyer.jpg`;
                   link.href = dataUrl;
                   link.click();
+                  
                   setShowDesignModal(false);
                   setTargetFlyerPkg(null);
               } catch (error) {
@@ -269,7 +281,7 @@ ${pkg.notes || 'As per standard booking terms.'}
           } else {
               setIsGenerating(false);
           }
-      }, 2000); 
+      }, 1000); 
   };
 
   const handleDownloadPDF = (e: React.MouseEvent, pkg: FixedPackage) => {
@@ -383,7 +395,6 @@ ${pkg.notes || 'As per standard booking terms.'}
                    </div>
                    
                    <form onSubmit={handleCreateQuote} className="p-6 space-y-5">
-                       {/* Form Content Identical to before */}
                        {/* Date Selection */}
                        <div>
                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Travel Date</label>
@@ -488,14 +499,14 @@ ${pkg.notes || 'As per standard booking terms.'}
           </div>
       )}
 
-      {/* DESIGN SELECTION MODAL & HIDDEN GENERATOR - Keeping existing logic */}
+      {/* DESIGN SELECTION MODAL */}
       {showDesignModal && targetFlyerPkg && (
            <div className="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
                     <div className="flex justify-between items-center mb-6">
                         <div>
                             <h3 className="font-bold text-xl text-slate-900">Select Flyer Style</h3>
-                            <p className="text-sm text-slate-500">Creates a high-quality social media post.</p>
+                            <p className="text-sm text-slate-500">Creates a high-quality square post.</p>
                         </div>
                         <button onClick={() => { setShowDesignModal(false); setTargetFlyerPkg(null); }}><X size={24}/></button>
                     </div>
@@ -542,86 +553,210 @@ ${pkg.notes || 'As per standard booking terms.'}
                   id="flyer-generator-target"
                   className="w-[1080px] h-[1080px] relative flex flex-col font-sans overflow-hidden bg-white"
               >
-                  {/* ... Existing Template Code ... */}
-                  {/* Only update to use displayAgencyName logic in templates */}
+                  {/* DESIGN 1: MODERN / MINIMAL (Magazine + Brochure Hybrid) */}
                   {selectedDesign === 'MINIMAL' && targetFlyerPkg && (
-                    <div className="w-full h-full relative flex flex-col bg-slate-50">
-                        {/* Background */}
-                        <div className="absolute inset-0 z-0">
-                             {targetFlyerPkg.imageUrl ? (
-                                <img src={`${targetFlyerPkg.imageUrl}?t=${Date.now()}`} className="w-full h-full object-cover blur-sm opacity-50 scale-105" crossOrigin="anonymous" alt="BG" />
-                            ) : (
-                                <div className="w-full h-full bg-slate-200"></div>
-                            )}
-                        </div>
+                      <div className="w-full h-full flex flex-col bg-white">
+                          {/* Top: Logo */}
+                          <div className="h-24 flex items-center justify-center pt-6 pb-2">
+                              {logoUrl ? (
+                                  <img src={logoUrl} className="h-20 object-contain" crossOrigin="anonymous" />
+                              ) : (
+                                  <h2 className="text-3xl font-bold text-slate-800 uppercase tracking-widest">{displayAgencyName}</h2>
+                              )}
+                          </div>
 
-                        {/* Central Card */}
-                        <div className="relative z-10 m-auto w-[920px] h-[920px] bg-white rounded-[60px] shadow-2xl overflow-hidden flex flex-col">
-                            
-                            {/* Image (Top 55%) */}
-                            <div className="h-[55%] w-full relative">
-                                {targetFlyerPkg.imageUrl ? (
-                                    <img src={`${targetFlyerPkg.imageUrl}?t=${Date.now()}`} className="w-full h-full object-cover" crossOrigin="anonymous" alt="Hero" />
-                                ) : null}
-                                <div className="absolute top-10 left-10 bg-white/90 backdrop-blur px-8 py-3 rounded-full">
-                                    <h3 className="text-3xl font-bold text-slate-900 uppercase tracking-wide flex items-center gap-3">
-                                        <MapPin size={28} className="text-brand-600"/> 
-                                        {getDestinationName(targetFlyerPkg.destinationId)}
-                                    </h3>
-                                </div>
-                            </div>
+                          {/* Hero: Image + Title Overlay */}
+                          <div className="relative h-[450px] w-full m-4 mx-auto w-[95%] rounded-3xl overflow-hidden shadow-xl">
+                              {targetFlyerPkg.imageUrl ? (
+                                  <img src={targetFlyerPkg.imageUrl} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                              ) : (
+                                  <div className="w-full h-full bg-slate-200" />
+                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                              <div className="absolute bottom-8 left-8 text-white">
+                                  <span className="bg-brand-600 text-white px-3 py-1 rounded text-lg font-bold uppercase tracking-wider mb-2 inline-block">
+                                      {targetFlyerPkg.nights} Nights Package
+                                  </span>
+                                  <h1 className="text-5xl font-black leading-tight mb-2">{targetFlyerPkg.packageName}</h1>
+                                  <p className="text-2xl font-medium opacity-90 flex items-center gap-2">
+                                      <Calendar size={28} /> {targetFlyerPkg.dateType === 'SPECIFIC' ? targetFlyerPkg.validDates[0] : 'Daily Departures'}
+                                  </p>
+                              </div>
+                          </div>
 
-                            {/* Content (Bottom 45%) */}
-                            <div className="flex-1 p-12 flex flex-col relative">
-                                {/* Agency Badge */}
-                                <div className="absolute top-[-40px] right-12 bg-white p-2 rounded-2xl shadow-lg">
-                                    {logoUrl ? (
-                                        <img src={logoUrl} className="h-24 w-24 object-contain rounded-xl" crossOrigin="anonymous" />
-                                    ) : (
-                                        <div className="h-24 w-24 bg-brand-600 rounded-xl flex items-center justify-center font-bold text-4xl text-white">{displayAgencyName?.charAt(0)}</div>
-                                    )}
-                                </div>
+                          {/* Middle: 2 Columns Inclusions/Exclusions */}
+                          <div className="flex-1 px-12 py-6 grid grid-cols-2 gap-12">
+                              <div className="border-r border-slate-200 pr-8">
+                                  <h3 className="text-2xl font-bold text-brand-700 uppercase mb-4 border-b-2 border-brand-200 pb-2 inline-block">Inclusions</h3>
+                                  <ul className="space-y-3">
+                                      {targetFlyerPkg.inclusions.slice(0, 6).map((item, idx) => (
+                                          <li key={idx} className="flex gap-3 text-xl text-slate-700">
+                                              <span className="font-bold text-brand-500">{idx + 1}.</span>
+                                              <span className="font-medium">{item}</span>
+                                          </li>
+                                      ))}
+                                  </ul>
+                              </div>
+                              <div>
+                                  <h3 className="text-2xl font-bold text-slate-500 uppercase mb-4 border-b-2 border-slate-200 pb-2 inline-block">Exclusions</h3>
+                                  <ul className="space-y-3">
+                                      {targetFlyerPkg.exclusions.slice(0, 6).map((item, idx) => (
+                                          <li key={idx} className="flex gap-3 text-xl text-slate-500">
+                                              <span className="font-bold text-slate-400">{idx + 1}.</span>
+                                              <span>{item}</span>
+                                          </li>
+                                      ))}
+                                  </ul>
+                              </div>
+                          </div>
 
-                                <h1 className="text-6xl font-black text-slate-900 leading-tight mb-4 pr-32">
-                                    {targetFlyerPkg.packageName}
-                                </h1>
+                          {/* Bottom: Price Ribbon & CTA */}
+                          <div className="mt-auto h-40 relative">
+                              {/* Price Ribbon */}
+                              <div className="absolute -top-6 right-0 bg-red-600 text-white py-4 px-12 rounded-l-full shadow-lg z-10">
+                                  <p className="text-xl uppercase font-bold opacity-80">Deal Price</p>
+                                  <p className="text-5xl font-black">₹ {targetFlyerPkg.fixedPrice.toLocaleString()}</p>
+                              </div>
 
-                                <div className="flex gap-4 mb-8">
-                                    <span className="bg-slate-100 text-slate-600 px-5 py-2 rounded-lg text-2xl font-bold flex items-center gap-2">
-                                        <Clock size={24}/> {targetFlyerPkg.nights} Nights
-                                    </span>
-                                    <span className="bg-slate-100 text-slate-600 px-5 py-2 rounded-lg text-2xl font-bold flex items-center gap-2">
-                                        <Hotel size={24}/> Premium Stay
-                                    </span>
-                                </div>
-
-                                <div className="flex justify-between items-end mt-auto">
-                                    <div>
-                                        <h3 className="text-2xl font-bold text-slate-400 uppercase mb-2">Includes</h3>
-                                        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                                            {targetFlyerPkg.inclusions.slice(0, 4).map((inc, i) => (
-                                                <div key={i} className="flex items-center gap-2 text-2xl font-medium text-slate-800">
-                                                    <CheckCircle size={24} className="text-green-500" /> {inc}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="text-right">
-                                        <p className="text-2xl text-slate-500 font-medium mb-1">Offer Price</p>
-                                        <h2 className="text-7xl font-black text-brand-600 leading-none">
-                                            ₹ {targetFlyerPkg.fixedPrice.toLocaleString()}
-                                        </h2>
-                                        <p className="text-xl text-slate-400 font-medium mt-2">Call: {displayPhone}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                              <div className="h-full bg-slate-900 text-white flex items-center justify-between px-12">
+                                  <div>
+                                      <p className="text-slate-400 text-lg uppercase tracking-widest font-bold mb-1">Book Your Trip</p>
+                                      <p className="text-4xl font-bold">{displayPhone}</p>
+                                      <p className="text-xl text-brand-400">{website}</p>
+                                  </div>
+                                  <div className="text-right opacity-50">
+                                      <p className="text-lg">{displayAgencyName}</p>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
                   )}
 
-                   {/* Other designs (Luxury, Bold) reuse same logic, omitted for brevity but conceptually identical */}
-                   {/* ... */}
+                  {/* DESIGN 2: LUXURY (Card-Based) */}
+                  {selectedDesign === 'LUXURY' && targetFlyerPkg && (
+                     <div className="w-full h-full bg-slate-100 p-8 flex flex-col gap-6 font-serif">
+                        {/* Background Image Layer */}
+                        <div className="absolute inset-0 z-0">
+                            <img src={targetFlyerPkg.imageUrl} className="w-full h-full object-cover opacity-20 filter blur-sm" crossOrigin="anonymous" />
+                        </div>
+
+                        {/* Card 1: Header */}
+                        <div className="relative z-10 bg-white rounded-3xl shadow-xl overflow-hidden h-[45%] flex">
+                            <div className="w-1/2 p-12 flex flex-col justify-center">
+                                <p className="text-amber-600 text-xl uppercase tracking-[0.3em] font-bold mb-4">Premium Escape</p>
+                                <h1 className="text-6xl font-bold text-slate-900 leading-tight mb-6">{targetFlyerPkg.packageName}</h1>
+                                <div className="flex items-center gap-4 text-slate-500 text-2xl">
+                                     <MapPin size={32} className="text-amber-500" />
+                                     <span>{getDestinationName(targetFlyerPkg.destinationId)}</span>
+                                </div>
+                            </div>
+                            <div className="w-1/2 h-full relative">
+                                <img src={targetFlyerPkg.imageUrl} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-white via-transparent to-transparent"></div>
+                            </div>
+                        </div>
+
+                        {/* Card 2: Details Grid */}
+                        <div className="relative z-10 grid grid-cols-3 gap-6 h-[30%]">
+                            <div className="col-span-2 bg-white/90 backdrop-blur-md rounded-3xl shadow-lg p-10 border border-white/50">
+                                 <h3 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+                                     <Star className="text-amber-500 fill-amber-500" /> Package Highlights
+                                 </h3>
+                                 <div className="grid grid-cols-2 gap-y-4 gap-x-8">
+                                     {targetFlyerPkg.inclusions.slice(0, 6).map((inc, i) => (
+                                         <div key={i} className="flex items-center gap-3 text-xl text-slate-700">
+                                             <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                                             {inc}
+                                         </div>
+                                     ))}
+                                 </div>
+                            </div>
+                            <div className="bg-slate-900 text-white rounded-3xl shadow-lg p-10 flex flex-col justify-center text-center relative overflow-hidden">
+                                <div className="absolute inset-0 bg-amber-500/10 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
+                                <p className="text-slate-400 text-xl uppercase tracking-widest mb-2 relative z-10">Starting At</p>
+                                <p className="text-6xl font-bold text-amber-400 relative z-10">₹ {targetFlyerPkg.fixedPrice.toLocaleString()}</p>
+                                <p className="text-sm text-slate-400 mt-2 relative z-10">Per Person</p>
+                            </div>
+                        </div>
+
+                        {/* Card 3: Footer */}
+                        <div className="relative z-10 flex-1 bg-white rounded-3xl shadow-xl p-8 flex justify-between items-center">
+                            <div className="flex items-center gap-6">
+                                {logoUrl && <img src={logoUrl} className="h-24 w-auto object-contain" crossOrigin="anonymous" />}
+                                <div>
+                                     <p className="text-3xl font-bold text-slate-900">{displayAgencyName}</p>
+                                     <p className="text-xl text-slate-500">{website}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xl font-bold text-slate-400 uppercase">Reservations</p>
+                                <p className="text-5xl font-bold text-slate-900">{displayPhone}</p>
+                            </div>
+                        </div>
+                     </div>
+                  )}
+
+                  {/* DESIGN 3: BOLD (Split-Panel Magazine) */}
+                  {selectedDesign === 'BOLD' && targetFlyerPkg && (
+                      <div className="w-full h-full flex bg-white">
+                          {/* Left Panel: Content (40%) */}
+                          <div className="w-[40%] bg-brand-600 text-white p-12 flex flex-col relative overflow-hidden">
+                              {/* Pattern */}
+                              <div className="absolute top-0 left-0 w-full h-full opacity-10" style={{ backgroundImage: 'radial-gradient(#fff 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
+
+                              <div className="relative z-10">
+                                  {/* Logo Area */}
+                                  <div className="mb-12">
+                                      {logoUrl ? (
+                                          <img src={logoUrl} className="h-20 object-contain brightness-0 invert" crossOrigin="anonymous" />
+                                      ) : (
+                                          <h2 className="text-4xl font-black uppercase">{displayAgencyName}</h2>
+                                      )}
+                                  </div>
+
+                                  <p className="text-2xl font-bold opacity-80 uppercase tracking-widest mb-2">Special Offer</p>
+                                  <h1 className="text-7xl font-black leading-none mb-6">{targetFlyerPkg.packageName}</h1>
+                                  
+                                  <div className="bg-white/10 p-6 rounded-xl border border-white/20 mb-8 backdrop-blur-sm">
+                                      <p className="text-xl font-bold mb-4 uppercase tracking-wider border-b border-white/20 pb-2">Includes</p>
+                                      <ul className="space-y-3">
+                                          {targetFlyerPkg.inclusions.slice(0, 5).map((inc, i) => (
+                                              <li key={i} className="flex items-start gap-3 text-xl font-medium">
+                                                  <Check size={28} className="shrink-0" /> {inc}
+                                              </li>
+                                          ))}
+                                      </ul>
+                                  </div>
+
+                                  <div className="mt-auto">
+                                      <p className="text-xl font-bold opacity-70 mb-1">Book Now</p>
+                                      <p className="text-5xl font-black">{displayPhone}</p>
+                                      <p className="text-xl mt-2 underline opacity-80">{website}</p>
+                                  </div>
+                              </div>
+                          </div>
+
+                          {/* Right Panel: Image (60%) */}
+                          <div className="w-[60%] relative">
+                              <img src={targetFlyerPkg.imageUrl} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                              
+                              {/* Price Overlay */}
+                              <div className="absolute top-12 right-0 bg-white text-slate-900 py-8 px-12 shadow-2xl">
+                                  <p className="text-2xl font-bold text-slate-400 uppercase">Only</p>
+                                  <p className="text-7xl font-black text-brand-600">₹ {targetFlyerPkg.fixedPrice.toLocaleString()}</p>
+                                  <p className="text-right text-lg font-bold text-slate-500">/ Person</p>
+                              </div>
+
+                              {/* Destination Name Vertical */}
+                              <div className="absolute bottom-12 left-12">
+                                  <h2 className="text-[120px] font-black text-white leading-none opacity-90 drop-shadow-lg uppercase writing-mode-vertical" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+                                      {getDestinationName(targetFlyerPkg.destinationId)}
+                                  </h2>
+                              </div>
+                          </div>
+                      </div>
+                  )}
+
               </div>
           </div>
       )}
