@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { inventoryService } from '../../services/inventoryService';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
-import { OperatorInventoryItem, ActivityTransferOptions, Destination } from '../../types';
+import { OperatorInventoryItem, ActivityTransferOptions, Destination, ItineraryItem } from '../../types';
 import { InventoryStatusBadge } from '../../components/inventory/InventoryStatusBadge';
 import { 
     Plus, Save, X, Box, GitBranch, DollarSign, Bus, Car, Ticket, 
@@ -11,7 +12,7 @@ import {
     AlignLeft, AlignCenter, AlignRight, AlignJustify, 
     List as ListIcon, ListOrdered, Link as LinkIcon, 
     Heading1, Heading2, Eraser, Undo, Redo, Type, Check,
-    ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, Square, RefreshCcw
+    ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, Square, RefreshCcw, Package, Layers, CalendarRange
 } from 'lucide-react';
 
 const DEFAULT_TRANSFER_OPTS: ActivityTransferOptions = {
@@ -19,7 +20,7 @@ const DEFAULT_TRANSFER_OPTS: ActivityTransferOptions = {
     pvt: { enabled: false, costPerVehicle: 0, vehicleCapacity: 4 }
 };
 
-type ModalTab = 'GENERAL' | 'PRICING' | 'MEDIA';
+type ModalTab = 'GENERAL' | 'ITINERARY' | 'PRICING' | 'MEDIA';
 type SortKey = 'name' | 'costPrice' | 'createdAt' | 'status';
 
 // --- PROFESSIONAL WYSIWYG EDITOR ---
@@ -168,13 +169,23 @@ export const InventoryManager: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ModalTab>('GENERAL');
   const [editingItem, setEditingItem] = useState<OperatorInventoryItem | null>(null);
-  const [formData, setFormData] = useState<Partial<OperatorInventoryItem>>({});
+  
+  // Extended Form Data
+  const [formData, setFormData] = useState<Partial<OperatorInventoryItem> & { 
+      inclusionsText?: string; 
+      exclusionsText?: string;
+      datesText?: string;
+      nights?: number;
+      itinerary?: ItineraryItem[];
+      dateType?: 'SPECIFIC' | 'RANGE'; // Added dateType
+  }>({});
+  
   const [transferOpts, setTransferOpts] = useState<ActivityTransferOptions>(DEFAULT_TRANSFER_OPTS);
   const [isSaving, setIsSaving] = useState(false);
 
   // Filter & Sort State
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'HOTEL' | 'ACTIVITY' | 'TRANSFER'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'HOTEL' | 'ACTIVITY' | 'TRANSFER' | 'PACKAGE'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'APPROVED' | 'PENDING' | 'REJECTED'>('ALL');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
 
@@ -237,13 +248,10 @@ export const InventoryManager: React.FC = () => {
 
       setIsSaving(true);
       try {
-          // Process in parallel chunks could be better, but loop is fine for now
-          // Explicitly cast to string to avoid 'unknown' type error in strict mode
           for (const rawId of Array.from(selectedIds)) {
               const id = String(rawId);
               const item = items.find(i => i.id === id);
               if (item) {
-                  // For Activity, update costAdult. For others, costPrice.
                   const updates: any = {};
                   if (item.type === 'ACTIVITY') {
                       updates.costAdult = Number(bulkRate);
@@ -281,7 +289,6 @@ export const InventoryManager: React.FC = () => {
           
           const multiplier = sortConfig.direction === 'asc' ? 1 : -1;
 
-          // Handle dates string comparison
           if (key === 'createdAt') {
               const dateA = new Date(a.createdAt).getTime();
               const dateB = new Date(b.createdAt).getTime();
@@ -294,7 +301,6 @@ export const InventoryManager: React.FC = () => {
 
           if (aVal === bVal) return 0;
           
-          // Handle numbers
           if (key === 'costPrice') {
              const costA = a.type === 'ACTIVITY' ? (a.costAdult || 0) : (a.costPrice || 0);
              const costB = b.type === 'ACTIVITY' ? (b.costAdult || 0) : (b.costPrice || 0);
@@ -305,21 +311,31 @@ export const InventoryManager: React.FC = () => {
       });
   }, [items, searchTerm, typeFilter, statusFilter, sortConfig]);
 
-  const handleOpenModal = (item?: OperatorInventoryItem) => {
+  const handleOpenModal = (item?: any) => {
       setActiveTab('GENERAL');
       if (item) {
-          // EDIT MODE
           setEditingItem(item);
-          setFormData({ ...item });
+          setFormData({ 
+              ...item,
+              inclusionsText: item.inclusions ? item.inclusions.join('\n') : '',
+              exclusionsText: item.exclusions ? item.exclusions.join('\n') : '',
+              datesText: item.validDates ? item.validDates.join(', ') : '',
+              itinerary: item.itinerary || [],
+              dateType: (item as any).dateType || (item.validFrom ? 'RANGE' : 'SPECIFIC') // Determine date type
+          });
           setTransferOpts(item.transferOptions || DEFAULT_TRANSFER_OPTS);
       } else {
-          // CREATE MODE
           setEditingItem(null);
           setFormData({
               type: 'HOTEL',
               currency: 'INR',
               status: 'PENDING_APPROVAL',
-              destinationId: destinations[0]?.id || ''
+              destinationId: destinations[0]?.id || '',
+              inclusionsText: '',
+              exclusionsText: '',
+              datesText: '',
+              itinerary: [],
+              dateType: 'SPECIFIC'
           });
           setTransferOpts(DEFAULT_TRANSFER_OPTS);
       }
@@ -332,11 +348,40 @@ export const InventoryManager: React.FC = () => {
       
       setIsSaving(true);
       try {
-          const payload = { ...formData };
+          const payload: any = { ...formData };
           if (payload.type === 'ACTIVITY') {
               payload.transferOptions = transferOpts;
           }
+          if (payload.type === 'PACKAGE') {
+              // Parse Text Areas
+              payload.inclusions = formData.inclusionsText?.split('\n').map(s => s.trim()).filter(s => s) || [];
+              payload.exclusions = formData.exclusionsText?.split('\n').map(s => s.trim()).filter(s => s) || [];
+              
+              // Date Logic
+              payload.dateType = formData.dateType || 'SPECIFIC';
+              if (payload.dateType === 'SPECIFIC') {
+                  payload.validDates = formData.datesText?.split(',').map(s => s.trim()).filter(s => s) || [];
+                  payload.validFrom = null; 
+                  payload.validTo = null;
+              } else {
+                  // RANGE: Use validFrom/validTo already in payload, clear array
+                  payload.validDates = [];
+                  if (!payload.validFrom || !payload.validTo) {
+                      throw new Error("Valid From and To dates are required for Date Range.");
+                  }
+              }
+
+              // Use costPrice for package fixed price
+              payload.fixedPrice = payload.costPrice;
+              payload.itinerary = formData.itinerary || [];
+          }
+          
           payload.currency = 'INR';
+
+          // Clean up temp UI fields
+          delete payload.inclusionsText;
+          delete payload.exclusionsText;
+          delete payload.datesText;
 
           if (editingItem) {
               await inventoryService.updateItem(editingItem.id, payload, user);
@@ -359,10 +404,35 @@ export const InventoryManager: React.FC = () => {
       }
   };
 
-  // ... (Helper updateSic/updatePvt functions remain same) ...
   const updateSic = (field: string, value: any) => setTransferOpts(prev => ({ ...prev, sic: { ...prev.sic, [field]: value } }));
   const updatePvt = (field: string, value: any) => setTransferOpts(prev => ({ ...prev, pvt: { ...prev.pvt, [field]: value } }));
+  
+  // --- ITINERARY BUILDER LOGIC ---
+  const handleAddDay = () => {
+      const current = formData.itinerary || [];
+      const dayNum = current.length + 1;
+      const newDay: ItineraryItem = {
+          day: dayNum,
+          title: `Day ${dayNum}`,
+          description: '',
+          services: [] // For fixed packages, we might stick to text descriptions mainly, but structure is there
+      };
+      setFormData({...formData, itinerary: [...current, newDay]});
+  };
 
+  const handleUpdateDay = (idx: number, field: keyof ItineraryItem, val: any) => {
+      const current = [...(formData.itinerary || [])];
+      current[idx] = { ...current[idx], [field]: val };
+      setFormData({...formData, itinerary: current});
+  };
+
+  const handleRemoveDay = (idx: number) => {
+      const current = [...(formData.itinerary || [])];
+      current.splice(idx, 1);
+      // Re-index days
+      const updated = current.map((day, i) => ({ ...day, day: i + 1 }));
+      setFormData({...formData, itinerary: updated});
+  };
 
   const SortIcon = ({ col }: { col: SortKey }) => {
       if (sortConfig.key !== col) return <ArrowUpDown size={14} className="text-slate-300 ml-1" />;
@@ -423,13 +493,13 @@ export const InventoryManager: React.FC = () => {
               
               {/* Type Filter */}
               <div className="flex bg-slate-100 p-1 rounded-lg">
-                  {(['ALL', 'HOTEL', 'ACTIVITY', 'TRANSFER'] as const).map(type => (
+                  {(['ALL', 'HOTEL', 'ACTIVITY', 'TRANSFER', 'PACKAGE'] as const).map(type => (
                       <button
                         key={type}
                         onClick={() => setTypeFilter(type)}
                         className={`px-4 py-1.5 text-xs font-bold rounded-md transition ${typeFilter === type ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                       >
-                          {type === 'ALL' ? 'All Types' : type}
+                          {type === 'ALL' ? 'All Types' : type === 'PACKAGE' ? 'Fixed Pkg' : type}
                       </button>
                   ))}
               </div>
@@ -516,11 +586,13 @@ export const InventoryManager: React.FC = () => {
                     <span className={`px-2 py-1 rounded text-[10px] font-bold border flex items-center w-fit gap-1 ${
                         item.type === 'HOTEL' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
                         item.type === 'ACTIVITY' ? 'bg-pink-50 text-pink-700 border-pink-100' :
+                        item.type === 'PACKAGE' ? 'bg-orange-50 text-orange-700 border-orange-100' :
                         'bg-blue-50 text-blue-700 border-blue-100'
                     }`}>
                         {item.type === 'HOTEL' && <Box size={10}/>}
                         {item.type === 'ACTIVITY' && <Ticket size={10}/>}
                         {item.type === 'TRANSFER' && <Car size={10}/>}
+                        {item.type === 'PACKAGE' && <Package size={10}/>}
                         {item.type}
                     </span>
                 </td>
@@ -592,6 +664,14 @@ export const InventoryManager: React.FC = () => {
                 >
                     <FileText size={16} /> General Info
                 </button>
+                {formData.type === 'PACKAGE' && (
+                     <button 
+                        onClick={() => setActiveTab('ITINERARY')}
+                        className={`px-4 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'ITINERARY' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <Layers size={16} /> Itinerary
+                    </button>
+                )}
                 <button 
                     onClick={() => setActiveTab('PRICING')}
                     className={`px-4 py-3 text-sm font-bold border-b-2 transition flex items-center gap-2 ${activeTab === 'PRICING' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
@@ -624,6 +704,7 @@ export const InventoryManager: React.FC = () => {
                                         <option value="HOTEL">Hotel</option>
                                         <option value="ACTIVITY">Activity / Tour</option>
                                         <option value="TRANSFER">Transfer</option>
+                                        <option value="PACKAGE">Fixed Departure Package</option>
                                     </select>
                                 </div>
                                 <div>
@@ -640,32 +721,209 @@ export const InventoryManager: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Service Name</label>
-                                <input 
-                                    required
-                                    type="text" 
-                                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium"
-                                    placeholder={formData.type === 'HOTEL' ? 'e.g. Marina Byblos Hotel' : 'e.g. Desert Safari'}
-                                    value={formData.name || ''}
-                                    onChange={e => setFormData({...formData, name: e.target.value})}
-                                />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{formData.type === 'PACKAGE' ? 'Package Title' : 'Service Name'}</label>
+                                    <input 
+                                        required
+                                        type="text" 
+                                        className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                                        placeholder={formData.type === 'HOTEL' ? 'e.g. Marina Byblos Hotel' : 'e.g. Desert Safari'}
+                                        value={formData.name || ''}
+                                        onChange={e => setFormData({...formData, name: e.target.value})}
+                                    />
+                                </div>
+                                {formData.type === 'PACKAGE' && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Duration (Nights)</label>
+                                        <input 
+                                            required
+                                            type="number" 
+                                            min="1"
+                                            className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                                            value={formData.nights || ''}
+                                            onChange={e => setFormData({...formData, nights: Number(e.target.value)})}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <RichTextEditor 
-                                label="Description & Inclusions"
+                                label={formData.type === 'PACKAGE' ? "Detailed Itinerary & Overview" : "Description & Inclusions"}
                                 value={formData.description || ''}
                                 onChange={val => setFormData({...formData, description: val})}
-                                placeholder="Provide detailed description of amenities, timings, and inclusions..."
+                                placeholder="Provide detailed description..."
                                 height="h-64"
                             />
                         </div>
+                    )}
+                    
+                    {/* TAB: ITINERARY (PACKAGE ONLY) */}
+                    {activeTab === 'ITINERARY' && formData.type === 'PACKAGE' && (
+                         <div className="space-y-6 animate-in fade-in">
+                             <div className="flex justify-between items-center mb-4">
+                                 <h3 className="font-bold text-slate-800">Day-wise Plan</h3>
+                                 <button 
+                                    type="button" 
+                                    onClick={handleAddDay} 
+                                    className="text-xs bg-brand-50 text-brand-700 px-3 py-1.5 rounded-lg border border-brand-200 font-bold hover:bg-brand-100 flex items-center gap-1"
+                                 >
+                                     <Plus size={12}/> Add Day
+                                 </button>
+                             </div>
+
+                             <div className="space-y-4">
+                                 {(!formData.itinerary || formData.itinerary.length === 0) && (
+                                     <div className="text-center p-8 border-2 border-dashed border-slate-300 rounded-xl text-slate-400 italic">
+                                         No itinerary days defined. Click "Add Day" to start.
+                                     </div>
+                                 )}
+                                 
+                                 {formData.itinerary?.map((day, idx) => (
+                                     <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm relative group">
+                                         <button 
+                                            type="button" 
+                                            onClick={() => handleRemoveDay(idx)} 
+                                            className="absolute top-4 right-4 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
+                                         >
+                                             <Trash2 size={16}/>
+                                         </button>
+                                         
+                                         <div className="flex items-center gap-3 mb-3">
+                                             <span className="bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded text-xs font-bold shadow-sm">Day {day.day}</span>
+                                             <input 
+                                                 type="text" 
+                                                 placeholder="Day Title (e.g. Arrival)" 
+                                                 value={day.title}
+                                                 onChange={e => handleUpdateDay(idx, 'title', e.target.value)}
+                                                 className="flex-1 border-b border-transparent hover:border-slate-300 focus:border-brand-500 bg-transparent px-2 py-1 text-sm font-bold text-slate-800 outline-none transition"
+                                             />
+                                         </div>
+                                         
+                                         <RichTextEditor 
+                                             label=""
+                                             value={day.description || ''}
+                                             onChange={(val) => handleUpdateDay(idx, 'description', val)}
+                                             placeholder="Detailed activities for this day..."
+                                             height="h-32"
+                                         />
+                                     </div>
+                                 ))}
+                             </div>
+                         </div>
                     )}
 
                     {/* TAB: PRICING */}
                     {activeTab === 'PRICING' && (
                         <div className="space-y-6 animate-in fade-in">
                             
+                            {/* D. PACKAGE FORM */}
+                            {formData.type === 'PACKAGE' && (
+                                <div className="space-y-6">
+                                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                                        <h4 className="text-xs font-bold text-orange-800 uppercase mb-3 flex items-center gap-2"><Package size={14}/> Package Specifics</h4>
+                                        
+                                        {/* Date Type Selector */}
+                                        <div className="flex gap-4 mb-4">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input 
+                                                    type="radio" 
+                                                    name="dateType"
+                                                    checked={formData.dateType === 'SPECIFIC' || !formData.dateType} // Default
+                                                    onChange={() => setFormData({...formData, dateType: 'SPECIFIC'})}
+                                                    className="text-orange-600 focus:ring-orange-500"
+                                                />
+                                                <span className="text-sm font-medium text-slate-700">Specific Dates</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input 
+                                                    type="radio" 
+                                                    name="dateType"
+                                                    checked={formData.dateType === 'RANGE'}
+                                                    onChange={() => setFormData({...formData, dateType: 'RANGE'})}
+                                                    className="text-orange-600 focus:ring-orange-500"
+                                                />
+                                                <span className="text-sm font-medium text-slate-700">Daily / Date Range</span>
+                                            </label>
+                                        </div>
+
+                                        {/* Inputs based on type */}
+                                        {formData.dateType === 'RANGE' ? (
+                                            <div className="grid grid-cols-2 gap-4 mb-4 animate-in fade-in">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valid From</label>
+                                                    <input 
+                                                        type="date" 
+                                                        className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                                        value={formData.validFrom || ''}
+                                                        onChange={e => setFormData({...formData, validFrom: e.target.value})}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valid To</label>
+                                                    <input 
+                                                        type="date" 
+                                                        className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                                        value={formData.validTo || ''}
+                                                        onChange={e => setFormData({...formData, validTo: e.target.value})}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 col-span-2 flex items-center gap-1">
+                                                    <CalendarRange size={12} /> Package is available for daily departure between these dates.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="mb-4 animate-in fade-in">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Specific Departure Dates</label>
+                                                <textarea 
+                                                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono h-24 resize-none"
+                                                    placeholder="2024-10-15, 2024-11-20, 2024-12-05"
+                                                    value={formData.datesText || ''}
+                                                    onChange={e => setFormData({...formData, datesText: e.target.value})}
+                                                />
+                                                <p className="text-[10px] text-slate-500 mt-1">Enter dates in YYYY-MM-DD format, separated by commas.</p>
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Net Cost Per Person (INR)</label>
+                                            <input 
+                                                required
+                                                type="number" 
+                                                min="0"
+                                                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold font-mono"
+                                                placeholder="0.00"
+                                                value={formData.costPrice || ''}
+                                                onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inclusions (One per line)</label>
+                                            <textarea 
+                                                rows={5}
+                                                className="w-full border border-slate-300 rounded-lg p-2 text-sm resize-none focus:ring-2 focus:ring-brand-500 outline-none"
+                                                placeholder="Accommodation&#10;Breakfast&#10;Transfers"
+                                                value={formData.inclusionsText || ''}
+                                                onChange={e => setFormData({...formData, inclusionsText: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Exclusions (One per line)</label>
+                                            <textarea 
+                                                rows={5}
+                                                className="w-full border border-slate-300 rounded-lg p-2 text-sm resize-none focus:ring-2 focus:ring-brand-500 outline-none"
+                                                placeholder="Flights&#10;Visa Cost"
+                                                value={formData.exclusionsText || ''}
+                                                onChange={e => setFormData({...formData, exclusionsText: e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* A. ACTIVITY FORM */}
                             {formData.type === 'ACTIVITY' && (
                                 <div className="space-y-4">
@@ -781,17 +1039,19 @@ export const InventoryManager: React.FC = () => {
                                 </div>
                             )}
 
-                             {/* Date Validity */}
-                             <div className="grid grid-cols-2 gap-4 mt-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valid From</label>
-                                    <input type="date" className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={formData.validFrom || ''} onChange={e => setFormData({...formData, validFrom: e.target.value})} />
+                             {/* Date Validity (Common for all except Package which uses specific dates/range logic above) */}
+                             {formData.type !== 'PACKAGE' && (
+                                <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valid From</label>
+                                        <input type="date" className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={formData.validFrom || ''} onChange={e => setFormData({...formData, validFrom: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valid To</label>
+                                        <input type="date" className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={formData.validTo || ''} onChange={e => setFormData({...formData, validTo: e.target.value})} />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valid To</label>
-                                    <input type="date" className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={formData.validTo || ''} onChange={e => setFormData({...formData, validTo: e.target.value})} />
-                                </div>
-                            </div>
+                             )}
                         </div>
                     )}
 
