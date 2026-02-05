@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService'; 
 import { inventoryService } from '../../services/inventoryService';
-import { X, Search, Hotel, Camera, Car, Plus, ShieldCheck, User, MapPin, Globe, PenTool, CheckCircle, Image as ImageIcon, Loader2, Moon, Calendar, Bus, Ticket, Info, Briefcase, Users } from 'lucide-react';
+import { X, Search, Hotel, Camera, Car, Plus, ShieldCheck, User, MapPin, Globe, PenTool, CheckCircle, Image as ImageIcon, Loader2, Moon, Calendar, Bus, Ticket, Info, Briefcase, Users, BadgeCheck } from 'lucide-react';
 import { BuilderService } from './ItineraryBuilderContext';
-import { ItineraryService, ActivityTransferOptions } from '../../types';
+import { ItineraryService, ActivityTransferOptions, OperatorInventoryItem } from '../../types';
 
 interface Props {
   isOpen: boolean;
@@ -49,7 +49,7 @@ const InventoryItemRow: React.FC<{
     }, [defaultNights]);
 
     const name = item.name || item.activityName || item.transferName;
-    const isPartner = !!item.operatorId;
+    const isPartner = !!item.operatorId || !!item.supplier_id; // Check if sourced from operator
     const locationName = getCityName(item.destinationId || item.location_id);
     const image = item.imageUrl;
 
@@ -74,7 +74,10 @@ const InventoryItemRow: React.FC<{
         // --- ACTIVITY LOGIC ---
         if (type === 'ACTIVITY') {
             // Base Ticket Cost
-            const baseTicketCost = (item.costAdult * pax.adult) + (item.costChild * pax.child);
+            const costAdult = item.costAdult || item.cost || 0; // Handle operator mapped items
+            const costChild = item.costChild || item.cost || 0;
+
+            const baseTicketCost = (costAdult * pax.adult) + (costChild * pax.child);
 
             if (transferMode === 'TICKET_ONLY') {
                 return baseTicketCost;
@@ -149,6 +152,11 @@ const InventoryItemRow: React.FC<{
                         <span className="text-white font-bold text-xs flex items-center gap-1"><CheckCircle size={14} /> Added</span>
                     </div>
                 )}
+                {isPartner && (
+                    <div className="absolute top-2 left-2 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1">
+                        <BadgeCheck size={10} /> DMC
+                    </div>
+                )}
             </div>
 
             {/* Details Section */}
@@ -158,8 +166,8 @@ const InventoryItemRow: React.FC<{
                         <h4 className="font-bold text-slate-800 text-base">{name}</h4>
                         <div className="flex gap-1 shrink-0 ml-2">
                             {isPartner && (
-                                <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 font-bold flex items-center gap-1">
-                                    <User size={10} /> Partner
+                                <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 font-bold flex items-center gap-1" title="Direct Operator Rate">
+                                    <User size={10} /> Partner Rate
                                 </span>
                             )}
                         </div>
@@ -182,6 +190,12 @@ const InventoryItemRow: React.FC<{
                                 <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">{item.vehicleType}</span>
                                 <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1" title="Max Capacity"><User size={10}/> {item.maxPassengers}</span>
                                 {item.luggageCapacity && <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1"><Briefcase size={10}/> {item.luggageCapacity}</span>}
+                            </>
+                        )}
+                        {type === 'ACTIVITY' && (
+                            <>
+                                <span className="text-slate-300">•</span>
+                                <span className="bg-pink-50 text-pink-700 px-1.5 py-0.5 rounded border border-pink-100">{item.activityType || 'Activity'}</span>
                             </>
                         )}
                     </div>
@@ -254,13 +268,19 @@ const InventoryItemRow: React.FC<{
                     <div className="space-y-2 mt-2">
                         {item.description && (
                             <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
-                                {item.description}
+                                {item.description.replace(/<[^>]*>?/gm, '')}
                             </p>
                         )}
                         {item.notes && (
                             <div className="flex gap-2 items-start text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-100">
                                 <Info size={14} className="shrink-0 mt-0.5" /> 
                                 <span className="font-medium">{item.notes}</span>
+                            </div>
+                        )}
+                        {isPartner && item.operatorName && (
+                             <div className="flex gap-2 items-start text-xs text-purple-700 bg-purple-50 p-2 rounded border border-purple-100 mt-1">
+                                <User size={12} className="shrink-0 mt-0.5" /> 
+                                <span className="font-medium">Provided by: {item.operatorName}</span>
                             </div>
                         )}
                     </div>
@@ -327,6 +347,7 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
         const dests = await adminService.getDestinations();
         setAllDestinations(dests);
 
+        // 1. Load System Inventory (Standard Admin)
         let mergedItems: any[] = [];
         let systemItems: any[] = [];
         if (type === 'HOTEL') systemItems = await adminService.getHotels();
@@ -335,13 +356,42 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
         
         mergedItems = [...systemItems];
 
-        const allItems = await inventoryService.getAllItems();
-        if (allItems.length === 0) {
-            await inventoryService.syncFromCloud();
-        }
-
+        // 2. Load Partner/Operator Inventory
+        // Fetch approved items from inventory service
+        // MAP OPERATOR ITEMS TO ADMIN STRUCTURE FOR UNIFORMITY
         const partnerItems = (await inventoryService.getApprovedItems()).filter(i => i.type === type);
-        mergedItems = [...mergedItems, ...partnerItems];
+        
+        const mappedPartnerItems = partnerItems.map((i: OperatorInventoryItem) => {
+            // Base Object
+            const mapped: any = { ...i };
+            
+            // Map common fields based on Type to match InventoryItemRow expectations
+            if (i.type === 'ACTIVITY') {
+                mapped.activityName = i.name;
+                mapped.activityType = i.activityType || 'Activity';
+                // Cost Mapping if Operator used generic costPrice
+                mapped.costAdult = i.costAdult || i.costPrice || 0;
+                mapped.costChild = i.costChild || i.costPrice || 0;
+            }
+            
+            if (i.type === 'TRANSFER') {
+                mapped.transferName = i.name;
+                mapped.transferType = 'PVT'; // Default for operator transfers usually
+                mapped.vehicleType = i.vehicleType || 'Vehicle';
+                mapped.maxPassengers = i.maxPassengers || 4;
+                mapped.cost = i.costPrice; // Transfer row uses 'cost'
+            }
+
+            if (i.type === 'HOTEL') {
+                mapped.cost = i.costPrice;
+                mapped.roomType = i.roomType || 'Standard';
+                mapped.mealPlan = i.mealPlan || 'RO';
+            }
+
+            return mapped;
+        });
+
+        mergedItems = [...mergedItems, ...mappedPartnerItems];
 
         setItems(mergedItems);
     } catch (e) {
@@ -376,7 +426,9 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
               mealPlan: type === 'HOTEL' ? item.mealPlan : undefined,
               imageUrl: item.imageUrl,
               vehicle: type === 'TRANSFER' ? item.vehicleType : undefined,
-              capacity: type === 'TRANSFER' ? item.maxPassengers : undefined
+              capacity: type === 'TRANSFER' ? item.maxPassengers : undefined,
+              // Operator Linkage
+              operatorId: item.operatorId
           }
       };
       onSelect(service);
@@ -410,7 +462,8 @@ export const InventoryModal: React.FC<Props> = ({ isOpen, onClose, onSelect, typ
   };
 
   const filteredItems = items.filter(i => {
-    const matchesSearch = (i.name || i.activityName || i.transferName || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const nameMatch = (i.name || i.activityName || i.transferName || '').toLowerCase();
+    const matchesSearch = nameMatch.includes(searchTerm.toLowerCase());
     
     let matchesCity = true;
     if (filterCityId && filterCityId !== 'ALL') {

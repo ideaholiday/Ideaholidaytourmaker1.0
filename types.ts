@@ -1,4 +1,5 @@
 
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   STAFF = 'STAFF',
@@ -328,7 +329,9 @@ export interface FixedPackage {
   inclusions: string[];
   exclusions: string[];
   validDates: string[]; // ISO Date strings
-  dateType?: 'SPECIFIC' | 'DAILY';
+  dateType?: 'SPECIFIC' | 'DAILY' | 'RANGE'; // Updated to support RANGE
+  validFrom?: string; // Added for RANGE
+  validTo?: string;   // Added for RANGE
   description?: string;
   imageUrl?: string;
   category?: string;

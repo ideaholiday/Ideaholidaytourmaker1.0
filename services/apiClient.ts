@@ -2,6 +2,7 @@
 import { BRANDING } from '../constants';
 import { adminService } from './adminService';
 import { currencyService } from './currencyService';
+import { inventoryService } from './inventoryService'; // Import Inventory Service
 
 const MOCK_COOKIE_NAME = 'iht_secure_session';
 
@@ -52,13 +53,15 @@ class ApiClient {
                    let itemCost = 0;
 
                    if (svc.inventory_id) {
-                       // SYSTEM ITEM: Strict Lookup from "Database" (AdminService) to simulate backend truth
-                       const adminPrice = this.getAdminItemPrice(svc.inventory_id, svc.type);
-                       if (adminPrice > 0) {
-                           itemCost = adminPrice;
+                       // SYSTEM ITEM: Strict Lookup from "Database" to simulate backend truth
+                       const dbPrice = this.getItemPrice(svc.inventory_id, svc.type);
+                       
+                       if (dbPrice > 0) {
+                           itemCost = dbPrice;
                            supplierCostTotal += (itemCost * qty * nights);
                        } else {
-                           // Fallback if ID not found (e.g. newly added in session)
+                           // Fallback if ID not found (e.g. newly added in session or cache miss)
+                           // In a real app, this would be a DB query.
                            itemCost = Number(svc.cost) || 0;
                            supplierCostTotal += (itemCost * qty * nights);
                        }
@@ -73,9 +76,12 @@ class ApiClient {
 
        // --- PRICING ALGORITHM (INR) ---
        
-       // 1. Platform Margin (Admin Profit)
-       // Applied ONLY to System Inventory (Supplier Cost)
-       const platformMarginPercent = 0.10; // 10%
+       // FETCH DYNAMIC RULES FROM DB (Simulated)
+       const rules = adminService.getPricingRuleSync();
+
+       // 1. Platform Margin (Admin Profit / Global Markup)
+       // Applied ONLY to System Inventory (Supplier/Operator/Partner Cost)
+       const platformMarginPercent = (rules.companyMarkup || 0) / 100; 
        const platformMarginValue = supplierCostTotal * platformMarginPercent;
 
        // 2. Platform Net Cost (B2B Price for Agent)
@@ -84,13 +90,13 @@ class ApiClient {
 
        // 3. Agent Markup (Agent Profit)
        // Applied on top of the B2B Price
-       // Use overridden markup from request if present, else default 10%
-       const agentMarkupPercent = body.markup !== undefined ? Number(body.markup) / 100 : 0.10; 
+       // Use overridden markup from request if present, else default from rules
+       const agentMarkupPercent = body.markup !== undefined ? Number(body.markup) / 100 : ((rules.agentMarkup || 0) / 100); 
        const agentMarkupValue = platformNetCost * agentMarkupPercent;
 
        // 4. Tax (GST)
        // Applied on Subtotal (Net + Agent Markup)
-       const taxPercent = 0.05; // 5%
+       const taxPercent = (rules.gstPercentage || 0) / 100;
        const subtotal = platformNetCost + agentMarkupValue;
        const taxAmount = subtotal * taxPercent;
 
@@ -136,25 +142,35 @@ class ApiClient {
     return Promise.resolve({} as T); 
   }
 
-  // Helper to simulate DB Lookup
-  private getAdminItemPrice(id: string, type: string): number {
+  // Helper to simulate DB Lookup across both Admin and Partner/Operator tables
+  private getItemPrice(id: string, type: string): number {
+      // 1. Check Admin Inventory
       const hotels = adminService.getHotelsSync();
       const activities = adminService.getActivitiesSync();
       const transfers = adminService.getTransfersSync();
 
       if (type === 'HOTEL') {
           const h = hotels.find(x => x.id === id);
-          return h ? h.cost : 0;
+          if (h) return h.cost;
       }
       if (type === 'ACTIVITY') {
           const a = activities.find(x => x.id === id);
-          // Assuming adult cost for simplicity in calc
-          return a ? a.costAdult : 0; 
+          if (a) return a.costAdult; // Defaulting to adult for base calc
       }
       if (type === 'TRANSFER') {
           const t = transfers.find(x => x.id === id);
-          return t ? t.cost : 0;
+          if (t) return t.cost;
       }
+
+      // 2. Check Partner/Operator Inventory
+      const partnerItems = inventoryService.getAllItemsSync();
+      const item = partnerItems.find(i => i.id === id);
+      
+      if (item) {
+          if (type === 'ACTIVITY') return item.costAdult || item.costPrice || 0;
+          return item.costPrice || 0;
+      }
+
       return 0;
   }
 

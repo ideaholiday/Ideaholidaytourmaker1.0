@@ -68,7 +68,7 @@ export const PricingRules: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Company Markup (Platform Margin)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Company Markup (Global)</label>
                     <div className="relative">
                         <input 
                             type="number" 
@@ -79,8 +79,9 @@ export const PricingRules: React.FC = () => {
                         />
                         <span className="absolute right-4 top-4 text-slate-400 font-bold">%</span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                        Added to Supplier Net Cost. This creates the <strong>B2B Agent Net Rate</strong>.
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        Added to <strong>ALL</strong> inventory (Operators, Hotel Partners, & Transfers).<br/>
+                        This creates the <strong>B2B Agent Net Rate</strong>.
                     </p>
                   </div>
 
@@ -142,7 +143,7 @@ export const PricingRules: React.FC = () => {
               </div>
 
               <div className="mb-8">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Test Supplier Cost (Input)</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Partner/Supplier Net (Input)</label>
                   <div className="relative">
                       <span className="absolute left-4 top-3 text-slate-500 font-bold">₹</span>
                       <input 
@@ -161,7 +162,7 @@ export const PricingRules: React.FC = () => {
                   <div className="flex justify-between items-center group">
                       <div className="text-sm text-slate-300">
                           <span className="block font-bold text-white">1. Supplier Net</span>
-                          <span className="text-xs">Inventory Cost</span>
+                          <span className="text-xs">Raw Cost</span>
                       </div>
                       <div className="font-mono font-bold">₹ {simCost.toLocaleString()}</div>
                   </div>
@@ -172,7 +173,7 @@ export const PricingRules: React.FC = () => {
                   <div className="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg border border-slate-700">
                       <div className="text-sm text-brand-400">
                           <span className="block font-bold">+ Company Margin</span>
-                          <span className="text-xs opacity-80">{rule.companyMarkup}% of Supplier Net</span>
+                          <span className="text-xs opacity-80">{rule.companyMarkup}% of Net</span>
                       </div>
                       <div className="font-mono font-bold text-brand-400">+ {simCalc.companyMarginVal?.toLocaleString()}</div>
                   </div>
@@ -183,7 +184,7 @@ export const PricingRules: React.FC = () => {
                   <div className="flex justify-between items-center border-t border-b border-slate-600 py-3 bg-slate-800">
                       <div className="text-sm text-white">
                           <span className="block font-bold text-yellow-400">2. Agent B2B Cost</span>
-                          <span className="text-xs text-slate-400">What the Agent Pays You</span>
+                          <span className="text-xs text-slate-400">Agent Buying Price</span>
                       </div>
                       <div className="font-mono font-bold text-yellow-400">₹ {simCalc.agentNet?.toLocaleString()}</div>
                   </div>
