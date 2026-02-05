@@ -1,9 +1,10 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
 import { bookingService } from '../../services/bookingService';
-import { Search, Plus, Copy, Download, Share2, Eye, Filter, ArrowUpDown, ArrowUp, ArrowDown, Trash2, CheckCircle, Link as LinkIcon, History, FileText, Loader2 } from 'lucide-react';
+import { Search, Plus, Copy, Download, Share2, Eye, Filter, ArrowUpDown, ArrowUp, ArrowDown, Trash2, CheckCircle, Link as LinkIcon, History, FileText, Loader2, Plane, UserCheck } from 'lucide-react';
 import { formatWhatsAppQuote } from '../../utils/whatsappFormatter';
 import { generateQuotePDF } from '../../utils/pdfGenerator';
 import { Quote } from '../../types';
@@ -21,7 +22,11 @@ export const QuoteList: React.FC = () => {
 
   // Load Data
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  // Use 'any' here because history returns Quotes but we might want to check booking-specific fields
+  // In a real app, History usually comes from the Bookings table, but here we use Quote status
   const [history, setHistory] = useState<Quote[]>([]);
+  // Also fetch bookings to check operational status for history items
+  const [bookings, setBookings] = useState<any[]>([]);
 
   useEffect(() => {
       if (user) {
@@ -29,11 +34,12 @@ export const QuoteList: React.FC = () => {
           // Parallel fetch simulation
           Promise.all([
              agentService.fetchQuotes(user.id),
-             agentService.getBookedHistory(user.id)
-          ]).then(([q, h]) => {
-             // If API fails or returns undefined, fallback to local service getters
+             agentService.getBookedHistory(user.id),
+             bookingService.getBookingsForAgent(user.id) // Fetch bookings for status check
+          ]).then(([q, h, b]) => {
              setQuotes(q || agentService.getQuotes(user.id));
              setHistory(h || []);
+             setBookings(b || []);
              setLoading(false);
           });
       }
@@ -148,6 +154,31 @@ export const QuoteList: React.FC = () => {
      window.open(url, '_blank');
   };
 
+  // Helper to find booking status for a quote in history
+  const getOperationalStatus = (quoteId: string) => {
+      const booking = bookings.find(b => b.quoteId === quoteId);
+      if (!booking) return null;
+      
+      // If Operator Accepted, it's Operationally Ready
+      if (booking.operatorStatus === 'ACCEPTED') {
+          return (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                  <UserCheck size={12} /> Ground Ops Ready
+              </span>
+          );
+      }
+      
+      if (booking.status === 'CONFIRMED' || booking.paymentStatus === 'PAID_IN_FULL') {
+          return (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                  <CheckCircle size={12} /> Confirmed
+              </span>
+          );
+      }
+      
+      return null;
+  };
+
   const SortIcon = ({ columnKey }: { columnKey: string }) => {
     if (sortConfig.key !== columnKey) return <ArrowUpDown size={14} className="ml-1 text-slate-300" />;
     return sortConfig.direction === 'asc' ? <ArrowUp size={14} className="ml-1 text-brand-600" /> : <ArrowDown size={14} className="ml-1 text-brand-600" />;
@@ -209,14 +240,19 @@ export const QuoteList: React.FC = () => {
                         <th className="px-6 py-4 font-semibold cursor-pointer" onClick={() => handleSort('destination')}>Destination <SortIcon columnKey="destination"/></th>
                         <th className="px-6 py-4 font-semibold">Price</th>
                         <th className="px-6 py-4 font-semibold">Status</th>
+                        {activeTab === 'HISTORY' && <th className="px-6 py-4 font-semibold">Ops Status</th>}
                         <th className="px-6 py-4 font-semibold text-center">Actions</th>
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                     {processedData.map((quote) => {
                         const displayPrice = quote.sellingPrice || quote.price || 0;
+                        const opsBadge = activeTab === 'HISTORY' ? getOperationalStatus(quote.id) : null;
+                        const bookingLink = bookings.find(b => b.quoteId === quote.id)?.id;
+                        const targetLink = bookingLink ? `/booking/${bookingLink}` : `/quote/${quote.id}`;
+
                         return (
-                            <tr key={quote.id} className="hover:bg-slate-50 transition group cursor-pointer" onClick={() => navigate(`/quote/${quote.id}`)}>
+                            <tr key={quote.id} className="hover:bg-slate-50 transition group cursor-pointer" onClick={() => navigate(targetLink)}>
                             <td className="px-6 py-4">
                                 <span className="font-mono text-brand-600 font-medium">{quote.uniqueRefNo}</span>
                             </td>
@@ -229,11 +265,19 @@ export const QuoteList: React.FC = () => {
                             </td>
                             <td className="px-6 py-4">
                                 <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                    quote.status === 'BOOKED' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                                    quote.status === 'BOOKED' ? 'bg-indigo-100 text-indigo-700' : 
+                                    quote.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' :
+                                    quote.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                                    'bg-slate-100 text-slate-600'
                                 }`}>
                                 {quote.status}
                                 </span>
                             </td>
+                            {activeTab === 'HISTORY' && (
+                                <td className="px-6 py-4">
+                                    {opsBadge || <span className="text-xs text-slate-400">-</span>}
+                                </td>
+                            )}
                             <td className="px-6 py-4">
                                 <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                                     {activeTab === 'QUOTES' && (
@@ -246,9 +290,15 @@ export const QuoteList: React.FC = () => {
                                             </button>
                                         </>
                                     )}
-                                    <Link to={`/quote/${quote.id}`} title="View/Edit" className="p-2 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition">
-                                        <Eye size={18} />
-                                    </Link>
+                                    {activeTab === 'HISTORY' ? (
+                                        <button onClick={(e) => { e.stopPropagation(); navigate(targetLink); }} title="View Booking" className="p-2 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition">
+                                            <Eye size={18} />
+                                        </button>
+                                    ) : (
+                                        <Link to={`/quote/${quote.id}`} title="View/Edit" className="p-2 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition">
+                                            <Eye size={18} />
+                                        </Link>
+                                    )}
                                     <button onClick={(e) => handleCopyLink(e, quote.id)} title="Copy Link" className="p-2 text-slate-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition">
                                         <LinkIcon size={18} />
                                     </button>
@@ -258,16 +308,18 @@ export const QuoteList: React.FC = () => {
                                     <button onClick={(e) => handleShare(e, quote)} title="WhatsApp" className="p-2 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
                                         <Share2 size={18} />
                                     </button>
-                                    <button onClick={(e) => handleDuplicate(e, quote.id)} title="Duplicate" className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                                        <Copy size={18} />
-                                    </button>
+                                    {activeTab === 'QUOTES' && (
+                                        <button onClick={(e) => handleDuplicate(e, quote.id)} title="Duplicate" className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                                            <Copy size={18} />
+                                        </button>
+                                    )}
                                 </div>
                             </td>
                             </tr>
                         );
                     })}
                     {processedData.length === 0 && (
-                        <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500">No records found.</td></tr>
+                        <tr><td colSpan={activeTab === 'HISTORY' ? 7 : 6} className="px-6 py-12 text-center text-slate-500">No records found.</td></tr>
                     )}
                     </tbody>
                 </table>

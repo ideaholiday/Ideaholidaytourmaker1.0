@@ -78,21 +78,33 @@ class BookingOperatorService {
 
     booking.operatorStatus = 'ACCEPTED';
     
-    // Auto-move booking to IN_PROGRESS if it was CONFIRMED
-    if (booking.status === 'CONFIRMED') {
-        booking.status = 'IN_PROGRESS';
-    }
-
-    const msg: Message = {
+    // Auto-move booking to IN_PROGRESS if it was CONFIRMED (Optional, usually kept as Confirmed until travel date)
+    // We keep it as CONFIRMED but mark the operator status
+    
+    // 1. Internal Log for Operator/Admin
+    const opMsg: Message = {
         id: `sys_${Date.now()}`,
         senderId: operatorUser.id,
         senderName: 'System',
         senderRole: UserRole.ADMIN, // Appear as system
-        content: `Operator ${operatorUser.name} ACCEPTED the assignment. Booking is now IN PROGRESS.`,
+        content: `Operator ${operatorUser.name} ACCEPTED the assignment.`,
         timestamp: new Date().toISOString(),
         isSystem: true
     };
-    booking.comments.push(msg);
+    booking.comments.push(opMsg);
+
+    // 2. Friendly Notification for Agent (Privacy Wall Safe)
+    const agentMsg: Message = {
+        id: `sys_ag_${Date.now()}`,
+        senderId: 'system',
+        senderName: 'System',
+        senderRole: UserRole.ADMIN,
+        content: `✅ Ground Operation Team has confirmed receipt of this booking. All services are secured.`,
+        timestamp: new Date().toISOString(),
+        isSystem: true
+    };
+    booking.comments.push(agentMsg);
+
     booking.updatedAt = new Date().toISOString();
     
     // Persist directly

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -8,7 +9,7 @@ import { ItineraryView } from '../../components/ItineraryView';
 import { BookingStatusTimeline } from '../../components/booking/BookingStatusTimeline';
 import { PaymentPanel } from '../../components/booking/PaymentPanel';
 import { CancellationRequestModal } from '../../components/booking/CancellationRequestModal';
-import { ArrowLeft, MapPin, Calendar, Users, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText, Eye, EyeOff, Truck, Phone, Briefcase, Info, Save, Loader2, Edit2, User } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Users, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText, Eye, EyeOff, Truck, Phone, Briefcase, Info, Save, Loader2, Edit2, User, UserCheck, CheckCircle2 } from 'lucide-react';
 import { generateQuotePDF, generateInvoicePDF } from '../../utils/pdfGenerator';
 
 export const BookingDetail: React.FC = () => {
@@ -106,6 +107,7 @@ export const BookingDetail: React.FC = () => {
 
   const isCancellable = ['CONFIRMED', 'BOOKED', 'IN_PROGRESS'].includes(bookingStatus);
   const isCancelled = bookingStatus.includes('CANCEL') || bookingStatus === 'CANCELLATION_REQUESTED';
+  const isGroundOpsReady = booking.operatorStatus === 'ACCEPTED';
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -181,6 +183,14 @@ export const BookingDetail: React.FC = () => {
                 </button>
             </div>
         </div>
+
+        {/* OPS STATUS BANNER */}
+        {showInternal && !isCancelled && isGroundOpsReady && (
+             <div className="bg-green-50 border-b border-green-200 p-4 flex items-center gap-3 text-green-900 text-sm">
+                <div className="bg-green-100 p-1.5 rounded-full"><UserCheck size={18} className="text-green-700" /></div>
+                <p><strong>Operations Confirmed:</strong> The Ground Team has accepted this booking and is ready for arrival.</p>
+            </div>
+        )}
 
         {/* Cancellation Banner */}
         {bookingStatus === 'CANCELLATION_REQUESTED' && showInternal && (
