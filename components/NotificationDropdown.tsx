@@ -5,6 +5,8 @@ import { UserNotification } from '../types';
 import { Bell, CheckCircle, AlertTriangle, Info, CreditCard, Calendar, X, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { onSnapshot, query, collection, where } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 export const NotificationDropdown: React.FC = () => {
   const { user } = useAuth();
@@ -14,20 +16,29 @@ export const NotificationDropdown: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Poll for notifications
+  // Real-time Listener
   useEffect(() => {
     if (!user) return;
-    
-    const fetch = async () => {
-        const data = await notificationService.getNotifications(user.id);
+
+    // Create a query against the collection
+    const q = query(
+        collection(db, 'user_notifications'),
+        where('recipientId', '==', user.id)
+    );
+
+    // Subscribe to updates
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => doc.data() as UserNotification);
+        // Sort client-side to avoid composite index requirement issues
+        data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
         setNotifications(data);
         setUnreadCount(data.filter(n => !n.isRead).length);
-    };
-
-    fetch();
-    const interval = setInterval(fetch, 15000); // Poll every 15s
+    }, (error) => {
+        console.error("Notification listener error:", error);
+    });
     
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, [user]);
 
   // Click outside to close
@@ -44,8 +55,7 @@ export const NotificationDropdown: React.FC = () => {
   const handleNotificationClick = async (notif: UserNotification) => {
       if (!notif.isRead) {
           await notificationService.markAsRead(notif.id);
-          setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
-          setUnreadCount(prev => Math.max(0, prev - 1));
+          // Local state updates automatically via snapshot listener
       }
       setIsOpen(false);
       if (notif.link) navigate(notif.link);
@@ -54,8 +64,6 @@ export const NotificationDropdown: React.FC = () => {
   const handleMarkAllRead = async () => {
       if (!user) return;
       await notificationService.markAllAsRead(user.id);
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      setUnreadCount(0);
   };
 
   const handleViewAll = () => {

@@ -40,6 +40,82 @@ Navigate to your Dashboard sidebar. You will see sections for:
         `
     },
     {
+        id: 'g-op-3',
+        title: 'How to Add Transfers, Activities & Packages',
+        category: 'Inventory Management',
+        lastUpdated: '2024-03-10',
+        targetRoles: [UserRole.OPERATOR],
+        content: `
+### Step-by-Step Guide to Adding Services
+
+Go to **My Inventory** > **Add New Item** to get started.
+
+---
+
+### 1. Adding a Transfer (Fleet)
+Used for Airport pickups, Intercity transfers, or Disposal usage.
+
+1.  **Service Type:** Select **Transfer**.
+2.  **Vehicle Type:** Be specific (e.g., "Toyota Innova", "Tempo Traveller").
+3.  **Capacity:** Enter max passengers (Pax) and Luggage capacity. The system uses this to calculate how many vehicles are needed for a group.
+4.  **Pricing:**
+    *   Enter the **Net Cost per Vehicle**.
+    *   *Example:* If a Sedan costs ₹1500 and holds 3 pax, enter 1500. If a group has 5 pax, the system charges for 2 vehicles (₹3000).
+
+---
+
+### 2. Adding an Activity (Sightseeing)
+Used for attractions, show tickets, and day tours.
+
+1.  **Service Type:** Select **Activity**.
+2.  **Base Pricing:**
+    *   **Adult Cost:** Net rate for the ticket.
+    *   **Child Cost:** Net rate for children (usually 3-11 years).
+3.  **Transfer Options (Crucial):**
+    *   **Ticket Only:** If you only provide the entry pass.
+    *   **Enable SIC (Shared):** Check this if you offer Seat-in-Coach pickups. Enter the **Cost Per Person** for the transfer add-on.
+    *   **Enable PVT (Private):** Check this for private car pickups. Enter **Cost Per Vehicle** and **Capacity**.
+    
+> **Note:** Agents can choose between Ticket Only, SIC, or PVT when building a quote. Ensure your add-on rates are accurate.
+
+---
+
+### 3. Adding a Fixed Tour Package
+Used for Group Departures or Ready-made Itineraries.
+
+**Tab 1: General Info**
+*   **Package Name:** Make it catchy (e.g., "Vietnam Super Saver").
+*   **Duration:** Total Nights.
+*   **Hotel Details:** Mention the hotel star category or specific hotel name.
+
+**Tab 2: Itinerary (The Plan)**
+*   Click **+ Add Day** to create the schedule.
+*   **Day 1:** Typically "Arrival & Transfer".
+*   **Middle Days:** Add descriptions like "City Tour & Shopping".
+*   *Tip:* Use the Rich Text editor to make descriptions look professional. This content goes directly onto the Agent's flyer.
+
+**Tab 3: Pricing & Dates**
+*   **Departure Type:**
+    *   *Specific Dates:* Enter exact dates (e.g., 2024-12-25) for fixed groups.
+    *   *Daily/Range:* Select a date range if the package is available every day.
+*   **Tiered Pricing (Net per Person):**
+    *   **Twin Base:** Cost per person when sharing a double room.
+    *   **Solo:** Cost for a single traveler (Single Supplement included).
+    *   **Child w/ Bed:** Cost for child needing extra bed.
+    *   **Child No Bed:** Cost for child sharing parent's bed.
+
+**Tab 4: Media**
+*   Add a high-quality Image URL. This image is used to generate the promotional flyer for Agents.
+
+---
+
+### Approval Process
+*   Once saved, items go to **Pending Approval**.
+*   The Admin team reviews the rates and descriptions.
+*   Once **Approved**, the item becomes visible to all Agents for booking.
+        `
+    },
+    {
         id: 'g-op-2',
         title: 'Service Execution Standards',
         category: 'Policy',

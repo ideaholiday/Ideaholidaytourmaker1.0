@@ -151,6 +151,16 @@ class BookingService {
         'ALERT',
         `/booking/${booking.id}`
     );
+
+    // Notify Admins for Critical Status Changes
+    if (['IN_PROGRESS', 'COMPLETED', 'CANCELLED_NO_REFUND', 'CANCELLED_WITH_REFUND'].includes(status)) {
+         await notificationService.notifyAdmins(
+            `Booking Status: ${booking.uniqueRefNo}`,
+            `Status changed to ${status} by ${user.name}.`,
+            `/booking/${booking.id}`,
+            'INFO'
+        );
+    }
   }
 
   async updateBooking(booking: Booking) {
