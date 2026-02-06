@@ -70,11 +70,11 @@ class BookingOperatorService {
         newValue: { operator: operatorName, status: 'ASSIGNED' }
     });
 
-    // NOTIFY OPERATOR
+    // NOTIFY OPERATOR (DMC)
     await notificationService.send(
         operatorId,
-        `New Booking Assignment`,
-        `You have been assigned booking ${booking.uniqueRefNo}. Please review and accept.`,
+        `New Assignment: ${booking.uniqueRefNo}`,
+        `You have been assigned booking ${booking.uniqueRefNo}. Please review and accept to start operations.`,
         'ALERT',
         `/booking/${booking.id}`
     );
@@ -88,16 +88,13 @@ class BookingOperatorService {
 
     booking.operatorStatus = 'ACCEPTED';
     
-    // Auto-move booking to IN_PROGRESS if it was CONFIRMED (Optional, usually kept as Confirmed until travel date)
-    // We keep it as CONFIRMED but mark the operator status
-    
     // 1. Internal Log for Operator/Admin
     const opMsg: Message = {
         id: `sys_${Date.now()}`,
         senderId: operatorUser.id,
         senderName: 'System',
         senderRole: UserRole.ADMIN, // Appear as system
-        content: `Operator ${operatorUser.name} ACCEPTED the assignment.`,
+        content: `DMC ${operatorUser.name} ACCEPTED the assignment.`,
         timestamp: new Date().toISOString(),
         isSystem: true
     };
@@ -109,7 +106,7 @@ class BookingOperatorService {
         senderId: 'system',
         senderName: 'System',
         senderRole: UserRole.ADMIN,
-        content: `✅ Ground Operation Team has confirmed receipt of this booking. All services are secured.`,
+        content: `✅ DMC Team has confirmed receipt of this booking. All services are secured.`,
         timestamp: new Date().toISOString(),
         isSystem: true
     };
@@ -124,17 +121,26 @@ class BookingOperatorService {
         entityType: 'OPERATOR_ASSIGNMENT',
         entityId: bookingId,
         action: 'OPERATOR_ACCEPTED_BOOKING',
-        description: `Operator ${operatorUser.name} accepted the booking execution.`,
+        description: `DMC ${operatorUser.name} accepted the booking execution.`,
         user: operatorUser,
         newValue: { operatorStatus: 'ACCEPTED' }
     });
 
     // NOTIFY ADMIN
     await notificationService.notifyAdmins(
-        `Operator Accepted: ${booking.uniqueRefNo}`,
+        `DMC Accepted: ${booking.uniqueRefNo}`,
         `${operatorUser.name} has accepted the booking assignment.`,
         `/booking/${booking.id}`,
         'SUCCESS'
+    );
+
+    // NOTIFY AGENT (Bell Icon)
+    await notificationService.send(
+        booking.agentId,
+        `DMC Confirmed: ${booking.uniqueRefNo}`,
+        `Good news! The DMC has accepted booking ${booking.uniqueRefNo}. Operations are now active.`,
+        'SUCCESS',
+        `/booking/${booking.id}`
     );
   }
 
@@ -152,7 +158,7 @@ class BookingOperatorService {
         senderId: operatorUser.id,
         senderName: 'System',
         senderRole: UserRole.ADMIN,
-        content: `⚠️ Operator ${operatorUser.name} DECLINED the assignment. Reason: ${reason}`,
+        content: `⚠️ DMC ${operatorUser.name} DECLINED the assignment. Reason: ${reason}`,
         timestamp: new Date().toISOString(),
         isSystem: true
     };
@@ -166,17 +172,26 @@ class BookingOperatorService {
         entityType: 'OPERATOR_ASSIGNMENT',
         entityId: bookingId,
         action: 'OPERATOR_DECLINED_BOOKING',
-        description: `Operator ${operatorUser.name} declined booking. Reason: ${reason}`,
+        description: `DMC ${operatorUser.name} declined booking. Reason: ${reason}`,
         user: operatorUser,
         newValue: { operatorStatus: 'DECLINED', reason }
     });
 
-    // NOTIFY ADMIN
+    // NOTIFY ADMIN (Critical Alert)
     await notificationService.notifyAdmins(
-        `Operator Declined: ${booking.uniqueRefNo}`,
-        `${operatorUser.name} declined assignment. Reason: ${reason}`,
+        `DMC Declined: ${booking.uniqueRefNo}`,
+        `${operatorUser.name} declined assignment. Reason: ${reason}. Please Reassign.`,
         `/booking/${booking.id}`,
         'WARNING'
+    );
+
+    // NOTIFY AGENT (Operational Alert)
+    await notificationService.send(
+        booking.agentId,
+        `⚠️ Operational Alert: ${booking.uniqueRefNo}`,
+        `The assigned DMC has declined this booking (Reason: ${reason}). Admin team is reassigning immediately.`,
+        'WARNING',
+        `/booking/${booking.id}`
     );
   }
 
