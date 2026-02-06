@@ -136,7 +136,7 @@ export const OperatorDashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Briefcase className="text-brand-600" /> Operations Dashboard
+            <Briefcase className="text-brand-600" /> DMC Dashboard
           </h1>
           <p className="text-slate-500">
             Welcome, {user.name} 

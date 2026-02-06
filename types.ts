@@ -32,6 +32,17 @@ export interface BankDetails {
     swiftCode?: string;
 }
 
+export interface UserNotification {
+    id: string;
+    recipientId: string; // User ID
+    title: string;
+    message: string;
+    type: 'BOOKING' | 'PAYMENT' | 'ALERT' | 'SUCCESS' | 'WARNING' | 'INFO';
+    link?: string; // URL to navigate to
+    isRead: boolean;
+    createdAt: string;
+}
+
 export interface User {
   id: string;
   uniqueId?: string; // e.g. AG-IH-0001
@@ -819,7 +830,7 @@ export interface SupplierContract {
     rejectionReason?: string;
 }
 
-export interface TravelerInfo { // Alias for Traveler to match import error if any
+export interface TravelerInfo { 
     adults: number;
     children: number;
     infants: number;

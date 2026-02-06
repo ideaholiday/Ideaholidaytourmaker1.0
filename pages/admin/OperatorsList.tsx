@@ -19,8 +19,8 @@ export const OperatorsList: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Ground Operators</h1>
-          <p className="text-slate-500">Manage DMC partners and service providers.</p>
+          <h1 className="text-2xl font-bold text-slate-900">DMCs</h1>
+          <p className="text-slate-500">Manage DMCs and service providers.</p>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
@@ -38,7 +38,7 @@ export const OperatorsList: React.FC = () => {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
             <tr>
-              <th className="px-6 py-4 font-semibold">Operator Name</th>
+              <th className="px-6 py-4 font-semibold">DMC Name</th>
               <th className="px-6 py-4 font-semibold">Company</th>
               <th className="px-6 py-4 font-semibold">Locations</th>
               <th className="px-6 py-4 font-semibold">Status</th>

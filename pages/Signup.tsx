@@ -144,7 +144,7 @@ export const Signup: React.FC = () => {
                             <Globe size={24} />
                         </div>
                         <div>
-                            <span className={`block font-bold text-lg ${formData.role === UserRole.OPERATOR ? 'text-slate-900' : 'text-slate-600'}`}>Ground Operator</span>
+                            <span className={`block font-bold text-lg ${formData.role === UserRole.OPERATOR ? 'text-slate-900' : 'text-slate-600'}`}>DMC Partner</span>
                             <span className="text-xs text-slate-500">I provide local services</span>
                         </div>
                         {formData.role === UserRole.OPERATOR && <CheckCircle className="ml-auto text-brand-500" size={20} />}

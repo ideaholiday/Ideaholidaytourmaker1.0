@@ -3,6 +3,7 @@ import { Booking, User, UserRole, Message, DriverDetails } from '../types';
 import { bookingService } from './bookingService';
 import { auditLogService } from './auditLogService';
 import { dbHelper } from './firestoreHelper';
+import { notificationService } from './notificationService';
 
 const COLLECTION = 'bookings';
 
@@ -68,6 +69,15 @@ class BookingOperatorService {
         previousValue: { operator: previousOperator },
         newValue: { operator: operatorName, status: 'ASSIGNED' }
     });
+
+    // NOTIFY OPERATOR
+    await notificationService.send(
+        operatorId,
+        `New Booking Assignment`,
+        `You have been assigned booking ${booking.uniqueRefNo}. Please review and accept.`,
+        'ALERT',
+        `/booking/${booking.id}`
+    );
   }
 
   // Operator Accepts Booking
@@ -118,6 +128,14 @@ class BookingOperatorService {
         user: operatorUser,
         newValue: { operatorStatus: 'ACCEPTED' }
     });
+
+    // NOTIFY ADMIN
+    await notificationService.notifyAdmins(
+        `Operator Accepted: ${booking.uniqueRefNo}`,
+        `${operatorUser.name} has accepted the booking assignment.`,
+        `/booking/${booking.id}`,
+        'SUCCESS'
+    );
   }
 
   // Operator Declines Booking
@@ -152,6 +170,14 @@ class BookingOperatorService {
         user: operatorUser,
         newValue: { operatorStatus: 'DECLINED', reason }
     });
+
+    // NOTIFY ADMIN
+    await notificationService.notifyAdmins(
+        `Operator Declined: ${booking.uniqueRefNo}`,
+        `${operatorUser.name} declined assignment. Reason: ${reason}`,
+        `/booking/${booking.id}`,
+        'WARNING'
+    );
   }
 
   // Update Driver Details
@@ -185,6 +211,15 @@ class BookingOperatorService {
         user: user,
         newValue: details
     });
+
+    // NOTIFY AGENT
+    await notificationService.send(
+        booking.agentId,
+        `Driver Assigned: ${booking.uniqueRefNo}`,
+        `Driver details updated for your trip. Check booking for details.`,
+        'INFO',
+        `/booking/${booking.id}`
+    );
   }
 }
 

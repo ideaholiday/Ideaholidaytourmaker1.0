@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -12,7 +13,12 @@ import {
   Plane, 
   ArrowRight,
   Search,
-  Plus
+  Plus,
+  Filter,
+  DollarSign,
+  User,
+  MapPin,
+  Loader2
 } from 'lucide-react';
 
 export const StaffDashboard: React.FC = () => {
@@ -20,46 +26,145 @@ export const StaffDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'REQUESTS' | 'OPERATIONS' | 'ISSUES'>('REQUESTS');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load all bookings for operational view
-    bookingService.getAllBookings().then(setBookings);
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const data = await bookingService.getAllBookings();
+            if (data) {
+                // Sort by creation date descending
+                data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                setBookings(data);
+            }
+        } catch (err: any) {
+            console.error("Staff Dashboard Data Load Error:", err);
+            setError("Failed to load dashboard data. Please try refreshing.");
+        } finally {
+            setLoading(false);
+        }
+    };
+    loadData();
   }, []);
 
   if (!user) return null;
 
+  if (loading) {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+              <Loader2 className="w-10 h-10 text-brand-600 animate-spin mb-4" />
+              <p className="text-slate-500 font-medium">Loading Operations Console...</p>
+          </div>
+      );
+  }
+
+  if (error) {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+              <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+              <h3 className="text-lg font-bold text-slate-900">System Error</h3>
+              <p className="text-slate-500 mb-4">{error}</p>
+              <button 
+                  onClick={() => window.location.reload()} 
+                  className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700"
+              >
+                  Refresh Page
+              </button>
+          </div>
+      );
+  }
+
   // --- KPI CALCULATIONS ---
-  const pendingRequests = bookings.filter(b => b.status === 'REQUESTED');
-  const cancellationRequests = bookings.filter(b => b.status === 'CANCELLATION_REQUESTED');
+  const safeBookings = bookings || [];
   
-  const today = new Date().toISOString().split('T')[0];
-  const upcomingDepartures = bookings.filter(b => {
-      if (b.status === 'CANCELLED_NO_REFUND' || b.status === 'CANCELLED_WITH_REFUND') return false;
-      const travelDate = b.travelDate;
-      // Check if travel date is today or in next 3 days
-      const diff = new Date(travelDate).getTime() - new Date(today).getTime();
+  const pendingRequests = safeBookings.filter(b => b.status === 'REQUESTED');
+  const cancellationRequests = safeBookings.filter(b => b.status === 'CANCELLATION_REQUESTED');
+  
+  const today = new Date();
+  
+  const upcomingDepartures = safeBookings.filter(b => {
+      if (b.status === 'CANCELLED_NO_REFUND' || b.status === 'CANCELLED_WITH_REFUND' || b.status === 'REJECTED') return false;
+      const travelDate = new Date(b.travelDate);
+      const diff = travelDate.getTime() - today.getTime();
       const days = Math.ceil(diff / (1000 * 3600 * 24));
-      return days >= 0 && days <= 3;
+      return days >= 0 && days <= 7; // Next 7 days
   }).sort((a, b) => new Date(a.travelDate).getTime() - new Date(b.travelDate).getTime());
 
-  const activeOperations = bookings.filter(b => b.status === 'IN_PROGRESS');
+  const activeOperations = safeBookings.filter(b => b.status === 'IN_PROGRESS');
 
-  const StatCard = ({ title, count, color, icon, onClick }: any) => (
+  // Identify Payment Risks (Balance due and travel within 15 days)
+  const paymentRisks = safeBookings.filter(b => {
+      if (b.balanceAmount <= 0) return false;
+      if ((b.status || '').includes('CANCEL')) return false;
+      const travelDate = new Date(b.travelDate);
+      const diff = travelDate.getTime() - today.getTime();
+      const days = Math.ceil(diff / (1000 * 3600 * 24));
+      return days >= 0 && days <= 15; 
+  });
+
+  // --- FILTERED LIST FOR TABS ---
+  const getTabList = () => {
+      let list: Booking[] = [];
+      
+      if (activeTab === 'REQUESTS') {
+          list = pendingRequests;
+      } else if (activeTab === 'ISSUES') {
+          list = [...cancellationRequests, ...paymentRisks]; 
+          // Dedup
+          const ids = new Set();
+          list = list.filter(b => {
+              if (ids.has(b.id)) return false;
+              ids.add(b.id);
+              return true;
+          });
+      } else if (activeTab === 'OPERATIONS') {
+           list = [...activeOperations, ...upcomingDepartures];
+           const ids = new Set();
+           list = list.filter(b => {
+               if (ids.has(b.id)) return false;
+               ids.add(b.id);
+               return true;
+           });
+           list.sort((a, b) => new Date(a.travelDate).getTime() - new Date(b.travelDate).getTime());
+      }
+
+      // Apply Search
+      if (searchTerm) {
+          const lower = searchTerm.toLowerCase();
+          list = list.filter(b => 
+            (b.uniqueRefNo?.toLowerCase() || '').includes(lower) ||
+            (b.destination?.toLowerCase() || '').includes(lower) ||
+            (b.agentName?.toLowerCase() || '').includes(lower) ||
+            (b.travelers?.[0]?.firstName?.toLowerCase() || '').includes(lower) ||
+            (b.travelers?.[0]?.lastName?.toLowerCase() || '').includes(lower)
+          );
+      }
+      
+      return list;
+  };
+
+  const displayedBookings = getTabList();
+
+  const StatCard = ({ title, count, color, icon, onClick, subtext }: any) => (
     <div 
       onClick={onClick}
-      className={`p-5 rounded-xl border cursor-pointer transition-all hover:shadow-md ${
-        color === 'amber' ? 'bg-amber-50 border-amber-200 text-amber-800' :
-        color === 'red' ? 'bg-red-50 border-red-200 text-red-800' :
-        color === 'blue' ? 'bg-blue-50 border-blue-200 text-blue-800' :
-        'bg-white border-slate-200 text-slate-800'
+      className={`p-6 rounded-2xl border cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 relative overflow-hidden group ${
+        color === 'amber' ? 'bg-amber-50 border-amber-200 text-amber-900' :
+        color === 'red' ? 'bg-red-50 border-red-200 text-red-900' :
+        color === 'blue' ? 'bg-blue-50 border-blue-200 text-blue-900' :
+        'bg-green-50 border-green-200 text-green-900'
       }`}
     >
-      <div className="flex justify-between items-start">
+      <div className="relative z-10 flex justify-between items-start">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider opacity-70">{title}</p>
-          <h3 className="text-3xl font-bold mt-1">{count}</h3>
+          <p className="text-xs font-bold uppercase tracking-wider opacity-70 mb-1">{title}</p>
+          <h3 className="text-4xl font-extrabold">{count}</h3>
+          {subtext && <p className="text-xs mt-2 font-medium opacity-80">{subtext}</p>}
         </div>
-        <div className={`p-2 rounded-lg bg-white/50 shadow-sm`}>
+        <div className={`p-3 rounded-xl bg-white/60 shadow-sm group-hover:scale-110 transition-transform`}>
           {icon}
         </div>
       </div>
@@ -67,29 +172,36 @@ export const StaffDashboard: React.FC = () => {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-12">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ClipboardList className="text-brand-600" /> Staff Operations Console
-          </h1>
-          <p className="text-slate-500">Overview of pending tasks and daily operations.</p>
+      <div className="flex flex-col lg:flex-row justify-between items-center gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div className="flex items-center gap-4 w-full lg:w-auto">
+            <div className="bg-brand-100 p-3 rounded-xl text-brand-600 hidden sm:block">
+                <ClipboardList size={32} />
+            </div>
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Operations Console</h1>
+                <p className="text-slate-500 text-sm">Manage tasks, approvals, and logistics.</p>
+            </div>
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+            <div className="relative flex-1 sm:w-64">
+                <Search size={18} className="absolute left-3 top-3 text-slate-400" />
+                <input 
+                    type="text" 
+                    placeholder="Search bookings, agents..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm transition shadow-sm"
+                />
+            </div>
             <Link 
-              to="/admin/bookings" 
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium hover:bg-slate-50 transition shadow-sm"
+              to="/agent/create" 
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-lg transform hover:-translate-y-0.5"
             >
-                <Search size={18} /> Find Booking
-            </Link>
-            <Link 
-              to="/agent/create" // Staff can use agent tools to create quotes on behalf
-              className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 transition shadow-md"
-            >
-                <Plus size={18} /> Create Quote
+                <Plus size={18} /> New Quote
             </Link>
         </div>
       </div>
@@ -97,135 +209,191 @@ export const StaffDashboard: React.FC = () => {
       {/* KPI ROW */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          title="New Requests" 
+          title="Pending Requests" 
           count={pendingRequests.length} 
-          color={pendingRequests.length > 0 ? "amber" : "slate"} 
-          icon={<Clock size={24} className="text-amber-600" />}
-          onClick={() => navigate('/admin/bookings?status=REQUESTED')}
+          color="amber"
+          subtext="Requires Approval"
+          icon={<Clock size={28} className="text-amber-600" />}
+          onClick={() => setActiveTab('REQUESTS')}
         />
         <StatCard 
-          title="Cancel Requests" 
-          count={cancellationRequests.length} 
-          color={cancellationRequests.length > 0 ? "red" : "slate"} 
-          icon={<AlertTriangle size={24} className="text-red-600" />}
-          onClick={() => navigate('/admin/bookings?status=CANCELLATION_REQUESTED')}
+          title="Urgent Issues" 
+          count={cancellationRequests.length + paymentRisks.length} 
+          color="red" 
+          subtext="Cancel / Payment Risk"
+          icon={<AlertTriangle size={28} className="text-red-600" />}
+          onClick={() => setActiveTab('ISSUES')}
         />
         <StatCard 
-          title="Departing Soon" 
+          title="Departing (7 Days)" 
           count={upcomingDepartures.length} 
           color="blue" 
-          icon={<Plane size={24} className="text-blue-600" />}
-          onClick={() => {}} 
+          subtext="Operations Check"
+          icon={<Plane size={28} className="text-blue-600" />}
+          onClick={() => setActiveTab('OPERATIONS')}
         />
         <StatCard 
-          title="Active Trips" 
+          title="Active On-Trip" 
           count={activeOperations.length} 
           color="green" 
-          icon={<CheckCircle size={24} className="text-green-600" />}
-          onClick={() => navigate('/admin/bookings')}
+          subtext="Monitor Status"
+          icon={<CheckCircle size={28} className="text-green-600" />}
+          onClick={() => setActiveTab('OPERATIONS')}
         />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           
-          {/* MAIN COLUMN: PRIORITY TASKS */}
+          {/* MAIN COLUMN: TASK LIST */}
           <div className="xl:col-span-2 space-y-6">
               
-              {/* Pending Bookings List */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                      <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                          <Clock size={18} className="text-amber-500" /> Pending Approvals
-                      </h3>
-                      <span className="text-xs font-medium text-slate-500">{pendingRequests.length} pending</span>
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px] flex flex-col">
+                  {/* Tabs */}
+                  <div className="flex border-b border-slate-200 overflow-x-auto">
+                      <button 
+                        onClick={() => setActiveTab('REQUESTS')}
+                        className={`flex-1 py-4 px-4 text-sm font-bold flex items-center justify-center gap-2 transition border-b-2 whitespace-nowrap ${activeTab === 'REQUESTS' ? 'border-amber-500 text-amber-700 bg-amber-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}
+                      >
+                          <Clock size={16} /> New Requests ({pendingRequests.length})
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('OPERATIONS')}
+                        className={`flex-1 py-4 px-4 text-sm font-bold flex items-center justify-center gap-2 transition border-b-2 whitespace-nowrap ${activeTab === 'OPERATIONS' ? 'border-blue-500 text-blue-700 bg-blue-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}
+                      >
+                          <Plane size={16} /> Operations ({upcomingDepartures.length + activeOperations.length})
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('ISSUES')}
+                        className={`flex-1 py-4 px-4 text-sm font-bold flex items-center justify-center gap-2 transition border-b-2 whitespace-nowrap ${activeTab === 'ISSUES' ? 'border-red-500 text-red-700 bg-red-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}
+                      >
+                          <AlertTriangle size={16} /> Issues ({cancellationRequests.length + paymentRisks.length})
+                      </button>
                   </div>
-                  
-                  {pendingRequests.length > 0 ? (
-                      <div className="divide-y divide-slate-100">
-                          {pendingRequests.map(b => (
-                              <div key={b.id} className="p-4 hover:bg-slate-50 transition flex items-center justify-between group cursor-pointer" onClick={() => navigate(`/admin/bookings`)}>
-                                  <div className="flex items-start gap-4">
-                                      <div className="bg-amber-100 text-amber-700 p-2 rounded-lg font-bold text-xs text-center w-14">
-                                          {new Date(b.createdAt).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
-                                      </div>
-                                      <div>
-                                          <h4 className="font-bold text-slate-900 text-sm">New Booking #{b.uniqueRefNo}</h4>
-                                          <p className="text-xs text-slate-500 mt-0.5">{b.destination} • {b.agentName}</p>
-                                      </div>
-                                  </div>
-                                  <div className="flex items-center gap-4">
-                                      <div className="text-right">
-                                          <p className="font-mono text-sm font-bold text-slate-700">{b.currency} {b.sellingPrice.toLocaleString()}</p>
-                                          <p className="text-[10px] text-slate-400 uppercase">Value</p>
-                                      </div>
-                                      <ArrowRight size={16} className="text-slate-300 group-hover:text-brand-500 transition" />
-                                  </div>
-                              </div>
-                          ))}
-                      </div>
-                  ) : (
-                      <div className="p-8 text-center text-slate-400 text-sm italic">
-                          No pending booking requests. Good job!
-                      </div>
-                  )}
-              </div>
 
-              {/* Cancellation Queue */}
-              {cancellationRequests.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
-                      <div className="px-6 py-4 border-b border-red-50 bg-red-50 flex justify-between items-center">
-                          <h3 className="font-bold text-red-800 flex items-center gap-2">
-                              <AlertTriangle size={18} /> Cancellation Review Queue
-                          </h3>
-                      </div>
-                      <div className="divide-y divide-slate-100">
-                          {cancellationRequests.map(b => (
-                              <div key={b.id} className="p-4 hover:bg-red-50/50 transition flex items-center justify-between cursor-pointer" onClick={() => navigate(`/admin/bookings`)}>
+                  {/* List Content */}
+                  <div className="flex-1 overflow-y-auto max-h-[600px] p-2">
+                      {displayedBookings.length > 0 ? (
+                          <div className="space-y-3 p-2">
+                              {displayedBookings.map(b => {
+                                  const isCancel = b.status === 'CANCELLATION_REQUESTED';
+                                  const isPayRisk = b.paymentStatus !== 'PAID_IN_FULL' && new Date(b.travelDate).getTime() - Date.now() < 15 * 86400000 && !isCancel;
+                                  
+                                  return (
+                                      <div 
+                                        key={b.id} 
+                                        onClick={() => navigate(`/booking/${b.id}`)}
+                                        className={`bg-white border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer transition hover:shadow-md group ${
+                                            isCancel ? 'border-red-200 bg-red-50/30' : 
+                                            isPayRisk ? 'border-orange-200 bg-orange-50/30' : 
+                                            'border-slate-200 hover:border-brand-200'
+                                        }`}
+                                      >
+                                          <div className="flex items-start gap-4">
+                                              <div className={`w-12 h-12 rounded-lg flex flex-col items-center justify-center shrink-0 border ${
+                                                  isCancel ? 'bg-red-100 text-red-700 border-red-200' : 
+                                                  'bg-slate-100 text-slate-600 border-slate-200'
+                                              }`}>
+                                                  <span className="text-[10px] font-bold uppercase">{new Date(b.travelDate).toLocaleDateString(undefined, {month:'short'})}</span>
+                                                  <span className="text-lg font-bold leading-none">{new Date(b.travelDate).getDate()}</span>
+                                              </div>
+                                              <div>
+                                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                      <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{b.uniqueRefNo}</span>
+                                                      {isCancel && <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Cancellation Req</span>}
+                                                      {isPayRisk && <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Payment Due</span>}
+                                                      {b.status === 'REQUESTED' && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">New Request</span>}
+                                                      {b.status === 'IN_PROGRESS' && <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">On Trip</span>}
+                                                  </div>
+                                                  <h4 className="font-bold text-slate-900 text-sm">{b.destination}</h4>
+                                                  <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                                                      <span className="flex items-center gap-1"><User size={10}/> {b.paxCount} Pax</span>
+                                                      <span className="flex items-center gap-1"><DollarSign size={10}/> {b.currency} {b.sellingPrice.toLocaleString()}</span>
+                                                      <span>Agent: <strong>{b.agentName}</strong></span>
+                                                  </div>
+                                              </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-3">
+                                              <span className="text-xs font-bold text-brand-600 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block">View Details</span>
+                                              <button className="p-2 rounded-lg bg-slate-100 text-slate-500 group-hover:bg-brand-600 group-hover:text-white transition">
+                                                  <ArrowRight size={18} />
+                                              </button>
+                                          </div>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8">
+                              <ClipboardList size={48} className="mb-4 opacity-20" />
+                              <p>No items found for this category.</p>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+
+          {/* SIDEBAR: INFO & ALERTS */}
+          <div className="xl:col-span-1 space-y-6">
+              
+              {/* Payment Risk Summary */}
+              {paymentRisks.length > 0 && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 shadow-sm">
+                      <h3 className="font-bold text-orange-900 mb-3 flex items-center gap-2">
+                          <DollarSign size={18} /> Financial Alerts
+                      </h3>
+                      <div className="space-y-3">
+                          {paymentRisks.slice(0, 3).map(b => (
+                              <div key={b.id} className="bg-white p-3 rounded-lg border border-orange-100 shadow-sm flex justify-between items-center cursor-pointer hover:shadow-md transition" onClick={() => navigate(`/booking/${b.id}`)}>
                                   <div>
-                                      <h4 className="font-bold text-slate-900 text-sm">Cancel #{b.uniqueRefNo}</h4>
-                                      <p className="text-xs text-red-600 mt-0.5">Reason: {b.cancellation?.reason}</p>
+                                      <div className="text-xs font-bold text-orange-800">{b.uniqueRefNo}</div>
+                                      <div className="text-[10px] text-slate-500">Bal: {b.currency} {b.balanceAmount.toLocaleString()}</div>
                                   </div>
-                                  <button className="px-3 py-1.5 bg-white border border-red-200 text-red-700 text-xs font-bold rounded-lg hover:bg-red-50">
-                                      Review
-                                  </button>
+                                  <div className="text-right">
+                                      <div className="text-[10px] text-slate-400 uppercase font-bold">Travel In</div>
+                                      <div className="text-xs font-bold text-orange-700">
+                                          {Math.ceil((new Date(b.travelDate).getTime() - Date.now()) / (1000 * 3600 * 24))} Days
+                                      </div>
+                                  </div>
                               </div>
                           ))}
+                          {paymentRisks.length > 3 && (
+                              <button onClick={() => setActiveTab('ISSUES')} className="w-full text-center text-xs font-bold text-orange-700 hover:underline">
+                                  View all {paymentRisks.length} alerts
+                              </button>
+                          )}
                       </div>
                   </div>
               )}
 
-          </div>
-
-          {/* SIDEBAR: DEPARTURES & ACTIVITY */}
-          <div className="xl:col-span-1 space-y-6">
-              
-              {/* Upcoming Departures */}
+              {/* Upcoming Departures Mini List */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
                       <h3 className="font-bold text-slate-800 flex items-center gap-2">
                           <Calendar size={18} className="text-blue-600" /> Upcoming Departures
                       </h3>
                   </div>
-                  <div className="p-2">
+                  <div className="p-0">
                       {upcomingDepartures.length > 0 ? (
-                          upcomingDepartures.slice(0, 5).map(b => (
-                              <div key={b.id} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3">
-                                  <div className="bg-blue-50 text-blue-700 w-10 h-10 rounded-lg flex flex-col items-center justify-center shrink-0">
-                                      <span className="text-[10px] font-bold uppercase">{new Date(b.travelDate).toLocaleDateString(undefined, {month:'short'})}</span>
-                                      <span className="text-sm font-bold leading-none">{new Date(b.travelDate).getDate()}</span>
+                          <div className="divide-y divide-slate-50">
+                              {upcomingDepartures.slice(0, 5).map(b => (
+                                  <div key={b.id} className="p-4 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition" onClick={() => navigate(`/booking/${b.id}`)}>
+                                      <div className="flex-1 min-w-0">
+                                          <div className="flex justify-between mb-0.5">
+                                              <span className="font-bold text-slate-800 text-sm truncate">{b.destination}</span>
+                                              <span className="text-xs font-medium text-slate-500">{new Date(b.travelDate).toLocaleDateString()}</span>
+                                          </div>
+                                          <p className="text-xs text-slate-400 truncate">
+                                              {b.agentName} • {b.paxCount} Pax
+                                          </p>
+                                      </div>
+                                      <ArrowRight size={14} className="text-slate-300" />
                                   </div>
-                                  <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-bold text-slate-900 truncate">{b.destination}</p>
-                                      <p className="text-xs text-slate-500 truncate">{b.paxCount} Pax • {b.agentName}</p>
-                                  </div>
-                                  <Link to={`/admin/bookings`} className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded">
-                                      <ArrowRight size={16} />
-                                  </Link>
-                              </div>
-                          ))
+                              ))}
+                          </div>
                       ) : (
                           <div className="p-6 text-center text-slate-400 text-xs">
-                              No immediate departures scheduled.
+                              No immediate departures.
                           </div>
                       )}
                   </div>
@@ -233,18 +401,18 @@ export const StaffDashboard: React.FC = () => {
 
               {/* Quick Links */}
               <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-lg p-6 text-white">
-                  <h3 className="font-bold text-lg mb-4">Quick Shortcuts</h3>
+                  <h3 className="font-bold text-lg mb-4">Quick Access</h3>
                   <div className="space-y-2">
-                      <Link to="/admin/pricing" className="block p-3 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition flex items-center justify-between">
-                          <span>Update Pricing Rules</span>
-                          <ArrowRight size={14} className="opacity-50" />
-                      </Link>
                       <Link to="/admin/hotels" className="block p-3 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition flex items-center justify-between">
-                          <span>Manage Hotel Inventory</span>
+                          <span className="flex items-center gap-2"><MapPin size={16}/> Hotel Inventory</span>
                           <ArrowRight size={14} className="opacity-50" />
                       </Link>
                       <Link to="/admin/suppliers" className="block p-3 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition flex items-center justify-between">
-                          <span>Supplier Directory</span>
+                          <span className="flex items-center gap-2"><User size={16}/> Supplier Directory</span>
+                          <ArrowRight size={14} className="opacity-50" />
+                      </Link>
+                      <Link to="/admin/approvals" className="block p-3 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition flex items-center justify-between">
+                          <span className="flex items-center gap-2"><CheckCircle size={16}/> Pending Inventory</span>
                           <ArrowRight size={14} className="opacity-50" />
                       </Link>
                   </div>

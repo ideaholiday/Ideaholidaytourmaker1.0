@@ -101,7 +101,7 @@ export const Register: React.FC = () => {
                   className="block w-full pl-10 p-2.5 border border-slate-300 rounded-md focus:ring-brand-500 focus:border-brand-500 sm:text-sm bg-white"
                 >
                   <option value={UserRole.AGENT}>Travel Agent</option>
-                  <option value={UserRole.OPERATOR}>Ground Operator (DMC)</option>
+                  <option value={UserRole.OPERATOR}>DMC Partner</option>
                   <option value={UserRole.STAFF}>Internal Staff</option>
                 </select>
               </div>

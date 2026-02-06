@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { profileService } from '../../services/profileService';
@@ -40,6 +41,8 @@ export const OperatorProfile: React.FC = () => {
         <ArrowLeft size={18} className="mr-1" /> Back to List
       </button>
 
+      <h1 className="text-2xl font-bold text-slate-900 mb-4">DMC Profile</h1>
+
       <ProfileCard 
         user={operator} 
         actions={
@@ -47,7 +50,7 @@ export const OperatorProfile: React.FC = () => {
             onClick={handleStatusToggle}
             className={`px-4 py-2 rounded-lg text-sm font-bold border ${operator.status === 'BLOCKED' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}
           >
-            {operator.status === 'BLOCKED' ? 'Unblock Operator' : 'Block Operator'}
+            {operator.status === 'BLOCKED' ? 'Unblock DMC' : 'Block DMC'}
           </button>
         }
       />

@@ -234,7 +234,7 @@ export const UserManagement: React.FC = () => {
                     onClick={() => setRoleFilter(r as any)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${roleFilter === r ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
-                      {r === 'ALL' ? 'All Users' : r.replace('_', ' ')}
+                      {r === 'ALL' ? 'All Users' : r === UserRole.OPERATOR ? 'DMC' : r.replace('_', ' ')}
                   </button>
               ))}
           </div>
@@ -286,7 +286,7 @@ export const UserManagement: React.FC = () => {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2 text-slate-700">
                     {getRoleIcon(u.role)}
-                    <span className="capitalize text-xs font-medium">{u.role.toLowerCase().replace('_', ' ')}</span>
+                    <span className="capitalize text-xs font-medium">{u.role === UserRole.OPERATOR ? 'DMC' : u.role.toLowerCase().replace('_', ' ')}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -420,7 +420,7 @@ export const UserManagement: React.FC = () => {
                       className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none font-medium"
                     >
                         <option value={UserRole.AGENT}>Travel Agent</option>
-                        <option value={UserRole.OPERATOR}>Ground Operator (DMC)</option>
+                        <option value={UserRole.OPERATOR}>DMC</option>
                         <option value={UserRole.HOTEL_PARTNER}>Hotel Partner</option>
                         <option value={UserRole.STAFF}>Internal Staff</option>
                         <option value={UserRole.ADMIN}>Administrator</option>

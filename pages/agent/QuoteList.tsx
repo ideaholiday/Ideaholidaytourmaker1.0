@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { agentService } from '../../services/agentService';
 import { bookingService } from '../../services/bookingService';
-import { Search, Plus, Copy, Download, Share2, Eye, Filter, ArrowUpDown, ArrowUp, ArrowDown, Trash2, CheckCircle, Link as LinkIcon, History, FileText, Loader2, Plane, UserCheck } from 'lucide-react';
+import { Search, Plus, Copy, Download, Share2, Eye, Filter, ArrowUpDown, ArrowUp, ArrowDown, Trash2, CheckCircle, Link as LinkIcon, History, FileText, Loader2, Plane, UserCheck, XCircle } from 'lucide-react';
 import { formatWhatsAppQuote } from '../../utils/whatsappFormatter';
 import { generateQuotePDF } from '../../utils/pdfGenerator';
 import { Quote } from '../../types';
@@ -164,6 +164,14 @@ export const QuoteList: React.FC = () => {
           return (
               <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
                   <UserCheck size={12} /> Ground Ops Ready
+              </span>
+          );
+      }
+
+      if (booking.operatorStatus === 'DECLINED') {
+          return (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full" title="Click view to see reason">
+                  <XCircle size={12} /> Ops Declined
               </span>
           );
       }

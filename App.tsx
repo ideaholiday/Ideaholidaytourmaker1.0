@@ -1,3 +1,4 @@
+
 import React, { useMemo, ReactNode, ErrorInfo, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
@@ -20,6 +21,9 @@ import { Terms, Privacy, Support, Faq } from './pages/StaticPages';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UserRole } from './types';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+
+// Common
+import { NotificationsPage } from './pages/common/NotificationsPage';
 
 // Admin CMS Imports
 import { AdminLayout } from './pages/admin/AdminLayout';
@@ -228,6 +232,7 @@ const App: React.FC = () => {
               {/* General Authenticated Routes */}
               <Route element={<Layout />}>
                   <Route path="/dashboard" element={<DashboardRedirect />} />
+                  <Route path="/notifications" element={<NotificationsPage />} />
                   <Route path="/quote/:id" element={<QuoteDetail />} />
                   <Route path="/booking/:id" element={<BookingRouter />} />
                   

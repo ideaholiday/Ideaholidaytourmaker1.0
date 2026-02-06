@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { bookingService } from '../../services/bookingService';
 import { bookingOperatorService } from '../../services/bookingOperatorService';
@@ -5,7 +6,7 @@ import { Booking, UserRole } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { AssignOperatorModal } from '../../components/booking/AssignOperatorModal';
 import { PaymentStatusBadge } from '../../components/booking/PaymentStatusBadge';
-import { Search, Eye, UserPlus, Filter, CheckCircle, AlertTriangle, Clock, Briefcase, RefreshCw } from 'lucide-react';
+import { Search, Eye, UserPlus, Filter, CheckCircle, AlertTriangle, Clock, Briefcase, RefreshCw, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 type Tab = 'ALL' | 'READY_FOR_OPS' | 'ASSIGNED' | 'COMPLETED';
@@ -176,7 +177,9 @@ export const BookingManager: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                   {filteredBookings.map(b => {
                       const isReadyToAssign = (b.paymentStatus === 'PAID_IN_FULL' || b.paymentStatus === 'ADVANCE_PAID') && !b.operatorId;
-                      
+                      const isDeclined = b.operatorStatus === 'DECLINED';
+                      const isAccepted = b.operatorStatus === 'ACCEPTED';
+
                       return (
                         <tr key={b.id} className="hover:bg-slate-50 transition group">
                             <td className="px-6 py-4">
@@ -195,10 +198,12 @@ export const BookingManager: React.FC = () => {
                                 {b.operatorName ? (
                                     <div>
                                         <span className="text-slate-900 font-medium block">{b.operatorName}</span>
-                                        <span className={`text-[10px] uppercase font-bold ${
-                                            b.operatorStatus === 'ACCEPTED' ? 'text-green-600' :
-                                            b.operatorStatus === 'DECLINED' ? 'text-red-600' : 'text-amber-600'
+                                        <span className={`text-[10px] uppercase font-bold flex items-center gap-1 ${
+                                            isAccepted ? 'text-green-600' :
+                                            isDeclined ? 'text-red-600' : 'text-amber-600'
                                         }`}>
+                                            {isDeclined && <XCircle size={10} />}
+                                            {isAccepted && <CheckCircle size={10} />}
                                             {b.operatorStatus || 'ASSIGNED'}
                                         </span>
                                     </div>
@@ -211,7 +216,7 @@ export const BookingManager: React.FC = () => {
                                     <button 
                                         onClick={() => openAssignModal(b)}
                                         className={`p-2 rounded-lg transition border ${
-                                            isReadyToAssign 
+                                            isReadyToAssign || isDeclined
                                                 ? 'bg-brand-600 text-white border-brand-600 hover:bg-brand-700 shadow-sm' 
                                                 : 'bg-white text-slate-500 border-slate-200 hover:border-brand-300 hover:text-brand-600'
                                         }`}

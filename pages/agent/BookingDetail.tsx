@@ -9,8 +9,10 @@ import { ItineraryView } from '../../components/ItineraryView';
 import { BookingStatusTimeline } from '../../components/booking/BookingStatusTimeline';
 import { PaymentPanel } from '../../components/booking/PaymentPanel';
 import { CancellationRequestModal } from '../../components/booking/CancellationRequestModal';
-import { ArrowLeft, MapPin, Calendar, Users, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText, Eye, EyeOff, Truck, Phone, Briefcase, Info, Save, Loader2, Edit2, User, UserCheck, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Users, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText, Eye, EyeOff, Truck, Phone, Briefcase, Info, Save, Loader2, Edit2, User, UserCheck, CheckCircle2, UserPlus, CheckCircle } from 'lucide-react';
 import { generateQuotePDF, generateInvoicePDF } from '../../utils/pdfGenerator';
+import { AssignOperatorModal } from '../../components/booking/AssignOperatorModal';
+import { bookingOperatorService } from '../../services/bookingOperatorService';
 
 export const BookingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -29,8 +31,14 @@ export const BookingDetail: React.FC = () => {
   const [isOpsEditing, setIsOpsEditing] = useState(false);
   const [opsData, setOpsData] = useState<BookingOpsDetails>({});
 
+  // Re-assign Modal (For Admin handling declines)
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+
   useEffect(() => {
-    const load = async () => {
+    loadBooking();
+  }, [id]);
+
+  const loadBooking = async () => {
         if (id) {
             const found = await bookingService.getBooking(id);
             setBooking(found || null);
@@ -40,9 +48,7 @@ export const BookingDetail: React.FC = () => {
                 gstService.getInvoiceByBooking(found.id).then(inv => setHasInvoice(!!inv));
             }
         }
-    };
-    load();
-  }, [id]);
+  };
 
   if (!booking || !user) return <div className="p-8 text-center">Loading Booking...</div>;
 
@@ -86,8 +92,7 @@ export const BookingDetail: React.FC = () => {
   const handleCancellationRequest = async (reason: string) => {
       await bookingService.requestCancellation(booking.id, reason, user);
       setIsCancelModalOpen(false);
-      const updated = await bookingService.getBooking(booking.id);
-      setBooking(updated || null);
+      loadBooking();
   };
   
   const handleSavePublicNote = async () => {
@@ -105,9 +110,18 @@ export const BookingDetail: React.FC = () => {
       alert("Operational details updated.");
   };
 
+  const handleReassign = async (operatorId: string, operatorName: string, options: any) => {
+    if (!booking || !user) return;
+    await bookingOperatorService.assignOperator(booking.id, operatorId, operatorName, options, user);
+    setIsAssignModalOpen(false);
+    loadBooking();
+    alert("Operator Re-assigned successfully.");
+  };
+
   const isCancellable = ['CONFIRMED', 'BOOKED', 'IN_PROGRESS'].includes(bookingStatus);
   const isCancelled = bookingStatus.includes('CANCEL') || bookingStatus === 'CANCELLATION_REQUESTED';
   const isGroundOpsReady = booking.operatorStatus === 'ACCEPTED';
+  const isOpsDeclined = booking.operatorStatus === 'DECLINED';
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -139,6 +153,67 @@ export const BookingDetail: React.FC = () => {
                 <EyeOff size={18} />
                 <strong>Client Preview Mode:</strong> Viewing as your customer sees it. Internal costs and operational details are hidden.
             </div>
+      )}
+
+      {/* --- STATUS ALERTS: DECLINED or ACCEPTED --- */}
+      
+      {/* 1. DECLINED ALERT */}
+      {showInternal && isOpsDeclined && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-xl mb-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                  <h3 className="font-bold text-red-900 text-lg flex items-center gap-2">
+                      <XCircle size={24} /> Operational Request Declined
+                  </h3>
+                  <p className="text-red-800 mt-1">
+                      The assigned Operator has declined this booking. 
+                  </p>
+                  <div className="mt-3 bg-white/60 p-3 rounded-lg border border-red-100 text-sm text-red-900">
+                      <strong>Reason Provided:</strong> "{booking.operatorDeclineReason || 'No reason specified'}"
+                  </div>
+              </div>
+              <div>
+                  {isAdminOrStaff ? (
+                      <button 
+                          onClick={() => setIsAssignModalOpen(true)}
+                          className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-700 transition flex items-center gap-2 shadow-lg"
+                      >
+                          <UserPlus size={18} /> Reassign Operator
+                      </button>
+                  ) : (
+                      <div className="text-sm font-medium text-red-700 bg-red-100 px-4 py-2 rounded-lg">
+                          Please contact support to reassign this booking.
+                      </div>
+                  )}
+              </div>
+          </div>
+      )}
+
+      {/* 2. ACCEPTED (CONFIRMED) BANNER */}
+      {showInternal && isGroundOpsReady && !isCancelled && (
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-6 rounded-r-xl mb-8 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-start gap-3">
+                 <div className="bg-emerald-100 p-2 rounded-full text-emerald-600 mt-1">
+                    <CheckCircle size={24} />
+                 </div>
+                 <div>
+                    <h3 className="font-bold text-emerald-900 text-lg">DMC Confirmed</h3>
+                    <p className="text-emerald-800 text-sm mt-1">
+                        {isAdminOrStaff 
+                            ? `DMC '${booking.operatorName}' has accepted this assignment.` 
+                            : "The DMC team has confirmed this booking. Driver details will be updated shortly."}
+                    </p>
+                 </div>
+              </div>
+              {/* Only Admin sees reassign button on accepted bookings if needed, usually rare */}
+              {isAdminOrStaff && (
+                   <button 
+                      onClick={() => setIsAssignModalOpen(true)}
+                      className="text-xs text-emerald-700 hover:text-emerald-900 font-bold underline"
+                   >
+                       Change Operator
+                   </button>
+              )}
+          </div>
       )}
 
       <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden mb-8">
@@ -183,14 +258,6 @@ export const BookingDetail: React.FC = () => {
                 </button>
             </div>
         </div>
-
-        {/* OPS STATUS BANNER */}
-        {showInternal && !isCancelled && isGroundOpsReady && (
-             <div className="bg-green-50 border-b border-green-200 p-4 flex items-center gap-3 text-green-900 text-sm">
-                <div className="bg-green-100 p-1.5 rounded-full"><UserCheck size={18} className="text-green-700" /></div>
-                <p><strong>Operations Confirmed:</strong> The Ground Team has accepted this booking and is ready for arrival.</p>
-            </div>
-        )}
 
         {/* Cancellation Banner */}
         {bookingStatus === 'CANCELLATION_REQUESTED' && showInternal && (
@@ -387,6 +454,17 @@ export const BookingDetail: React.FC = () => {
         onClose={() => setIsCancelModalOpen(false)}
         onSubmit={handleCancellationRequest}
       />
+      
+      {/* Reassign Modal */}
+      {isAssignModalOpen && (
+          <AssignOperatorModal 
+             isOpen={isAssignModalOpen}
+             onClose={() => setIsAssignModalOpen(false)}
+             onAssign={handleReassign}
+             currentNetCost={booking.netCost}
+             currency={booking.currency}
+          />
+      )}
     </div>
   );
 };

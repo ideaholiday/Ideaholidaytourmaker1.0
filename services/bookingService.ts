@@ -1,8 +1,8 @@
 
 import { Booking, BookingStatus, Quote, User, Message, UserRole, PaymentEntry, PaymentMode, Traveler } from '../types';
-import { agentService } from './agentService';
 import { dbHelper } from './firestoreHelper';
 import { companyService } from './companyService';
+import { notificationService } from './notificationService';
 
 const COLLECTION = 'bookings';
 
@@ -100,8 +100,18 @@ class BookingService {
 
     await dbHelper.save(COLLECTION, newBooking);
     
-    await agentService.updateQuote({ ...quote, status: 'BOOKED' });
+    // Direct DB update to break circular dependency with agentService
+    await dbHelper.save('quotes', { id: quote.id, status: 'BOOKED', isLocked: true, updatedAt: new Date().toISOString() });
+    
     this.syncAllBookings();
+
+    // NOTIFY ADMINS
+    await notificationService.notifyAdmins(
+        `New Booking Request: ${newBooking.uniqueRefNo}`,
+        `${newBooking.agentName} requested a booking for ${newBooking.destination}.`,
+        `/booking/${newBooking.id}`,
+        'BOOKING'
+    );
 
     return newBooking;
   }
@@ -132,6 +142,15 @@ class BookingService {
 
     await dbHelper.save(COLLECTION, updated);
     this.syncAllBookings();
+
+    // Notify Agent
+    await notificationService.send(
+        booking.agentId,
+        `Booking Status Update: ${booking.uniqueRefNo}`,
+        `Your booking is now ${status.replace('_', ' ')}. ${reason || ''}`,
+        'ALERT',
+        `/booking/${booking.id}`
+    );
   }
 
   async updateBooking(booking: Booking) {
@@ -151,8 +170,6 @@ class BookingService {
       const booking = await this.getBooking(bookingId);
       if (!booking) return;
 
-      // Duplicate Check: If we already have this reference (likely from webhook or retry), stop.
-      // Exception: If prev attempt failed verification, allow retry (not implemented here for simplicity)
       if (booking.payments.some(p => p.reference === reference)) {
           console.warn("Duplicate payment attempt detected", reference);
           return;
@@ -177,15 +194,11 @@ class BookingService {
       };
 
       const newPaid = booking.paidAmount + amount;
-      
-      // Strict Floating Point Safety
       const total = booking.totalAmount;
       const paid = Math.round(newPaid * 100) / 100;
       
       let newStatus = booking.paymentStatus;
       
-      // Update Status based on Agent's Payable Amount (Net Cost)
-      // Allow tiny rounding diff (0.5)
       if (paid >= (total - 0.5)) { 
           newStatus = 'PAID_IN_FULL';
       } else if (paid > 0) {
@@ -203,6 +216,23 @@ class BookingService {
 
       await dbHelper.save(COLLECTION, updated);
       this.syncAllBookings();
+
+      // NOTIFY ADMINS
+      await notificationService.notifyAdmins(
+          `Payment Received: ${booking.uniqueRefNo}`,
+          `Amount: ${booking.currency} ${amount} via ${mode}.`,
+          `/booking/${booking.id}`,
+          'PAYMENT'
+      );
+      
+      // NOTIFY AGENT (Confirmation)
+      await notificationService.send(
+          booking.agentId,
+          `Payment Successful`,
+          `We received payment of ${booking.currency} ${amount} for booking ${booking.uniqueRefNo}.`,
+          'SUCCESS',
+          `/booking/${booking.id}`
+      );
   }
 
   async requestCancellation(bookingId: string, reason: string, user: User) {
@@ -223,6 +253,14 @@ class BookingService {
 
     await dbHelper.save(COLLECTION, updated);
     this.syncAllBookings();
+
+    // NOTIFY ADMINS
+    await notificationService.notifyAdmins(
+        `Cancellation Request: ${booking.uniqueRefNo}`,
+        `Reason: ${reason}`,
+        `/booking/${booking.id}`,
+        'WARNING'
+    );
   }
 
   async addComment(bookingId: string, message: Message) {

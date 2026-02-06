@@ -217,7 +217,7 @@ export const AdminDashboard: React.FC = () => {
           color="bg-indigo-600" 
         />
         <StatCard 
-          title="Operators" 
+          title="DMCs" 
           value={stats.totalOperators} 
           subtext="Ground Partners" 
           icon={<Briefcase size={24} />} 
@@ -289,7 +289,7 @@ export const AdminDashboard: React.FC = () => {
                       <Briefcase size={20} />
                   </div>
                   <div>
-                      <h4 className="font-bold text-slate-700">Add Operator</h4>
+                      <h4 className="font-bold text-slate-700">Add DMC</h4>
                       <p className="text-xs text-slate-500">Ground DMC</p>
                   </div>
               </Link>
@@ -327,7 +327,7 @@ export const AdminDashboard: React.FC = () => {
              </Link>
              <Link to="/admin/operators" className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-center group">
                 <Briefcase size={24} className="mx-auto text-slate-400 group-hover:text-purple-600 mb-2" />
-                <span className="text-sm font-medium text-slate-700">Manage Operators</span>
+                <span className="text-sm font-medium text-slate-700">Manage DMCs</span>
              </Link>
              <Link to="/admin/bookings" className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-center group">
                 <BookCheck size={24} className="mx-auto text-slate-400 group-hover:text-green-600 mb-2" />

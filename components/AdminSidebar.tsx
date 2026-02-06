@@ -21,7 +21,7 @@ export const AdminSidebar: React.FC = () => {
     // Admin Management Links
     { icon: <Shield size={20} />, label: 'Users & Roles', path: '/admin/users', roles: [UserRole.ADMIN] }, 
     { icon: <Users size={20} />, label: 'Agents', path: '/admin/agents', roles: [UserRole.ADMIN] },
-    { icon: <Briefcase size={20} />, label: 'Operators', path: '/admin/operators', roles: [UserRole.ADMIN] },
+    { icon: <Briefcase size={20} />, label: 'DMCs', path: '/admin/operators', roles: [UserRole.ADMIN] },
     { icon: <Store size={20} />, label: 'Hotel Partners', path: '/admin/partners', roles: [UserRole.ADMIN, UserRole.STAFF] }, 
     { icon: <UserCog size={20} />, label: 'Staff Permissions', path: '/admin/staff', roles: [UserRole.ADMIN] },
     { icon: <Building size={20} />, label: 'Companies', path: '/admin/companies', roles: [UserRole.ADMIN] },

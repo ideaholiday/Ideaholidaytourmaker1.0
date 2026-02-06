@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 interface Props {
-    label: string;
+    label?: string;
     value: string;
     onChange: (val: string) => void;
     placeholder?: string;
@@ -19,7 +19,6 @@ export const RichTextEditor: React.FC<Props> = ({ label, value, onChange, placeh
     const editorRef = useRef<HTMLDivElement>(null);
     const [activeFormats, setActiveFormats] = useState<string[]>([]);
 
-    // Sync external value to internal HTML only if completely different/empty
     useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== value) {
              // Only update if editor is empty or value is reset, to avoid cursor jumping
@@ -51,6 +50,34 @@ export const RichTextEditor: React.FC<Props> = ({ label, value, onChange, placeh
         }
     };
 
+    const handlePaste = (e: React.ClipboardEvent) => {
+        e.preventDefault();
+        const html = e.clipboardData.getData('text/html');
+        const text = e.clipboardData.getData('text/plain');
+
+        if (html) {
+            // Smart Clean: Remove AI/Web styles (backgrounds, fonts) but keep structure
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            
+            // Strip style attributes and classes
+            const elements = temp.querySelectorAll('*');
+            elements.forEach(el => {
+                el.removeAttribute('style');
+                el.removeAttribute('class');
+            });
+            
+            document.execCommand('insertHTML', false, temp.innerHTML);
+        } else {
+            // Fallback for plain text
+            document.execCommand('insertText', false, text);
+        }
+        
+        if (editorRef.current) {
+            onChange(editorRef.current.innerHTML);
+        }
+    };
+
     const ToolbarButton = ({ onClick, icon, title, formatKey }: any) => {
         const isActive = formatKey && activeFormats.includes(formatKey);
         return (
@@ -73,7 +100,7 @@ export const RichTextEditor: React.FC<Props> = ({ label, value, onChange, placeh
 
     return (
         <div className="w-full group">
-            <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">{label}</label>
+            {label && <label className="block text-sm font-bold text-slate-700 mb-1.5 ml-1">{label}</label>}
             <div className="border border-slate-300 rounded-xl overflow-hidden bg-white shadow-sm transition-all focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500">
                 
                 {/* Toolbar */}
@@ -132,12 +159,14 @@ export const RichTextEditor: React.FC<Props> = ({ label, value, onChange, placeh
                     onInput={(e) => onChange(e.currentTarget.innerHTML)}
                     onKeyUp={updateActiveFormats}
                     onMouseUp={updateActiveFormats}
+                    onPaste={handlePaste}
                     data-placeholder={placeholder}
                     style={{ minHeight: '150px' }}
                 />
             </div>
             <div className="flex justify-between mt-1 px-1">
-                <p className="text-[10px] text-slate-400">Rich Text Editor</p>
+                <p className="text-[10px] text-slate-400">Smart Paste Active (ChatGPT/Web Friendly)</p>
+                <p className="text-[10px] text-slate-400">{value.length} chars</p>
             </div>
         </div>
     );
