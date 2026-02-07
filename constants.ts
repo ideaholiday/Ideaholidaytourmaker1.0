@@ -5,8 +5,9 @@ export const BRANDING = {
   name: "Idea Tour Maker",
   legalName: "Idea Holiday Pvt Ltd.",
   logoUrl: "", // Removed broken URL, will fallback to Globe icon
-  email: "info@ideaholiday.com",
-  supportPhone: "+91 9696 777 391",
+  email: "support@ideaholiday.com",
+  b2bEmail: "B2b@ideaholiday.com",
+  supportPhone: "9696777391 | 8881000391 | 9336757106 | 9219999214 | 0522-407-33-33",
   website: "b2b.ideaholiday.com",
   authDomain: "b2b.ideaholiday.com",
   address: "Office No 129, Deva Palace, Lucknow",

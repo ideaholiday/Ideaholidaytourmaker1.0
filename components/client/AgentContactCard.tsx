@@ -6,6 +6,9 @@ import { Phone, Mail, MapPin, Globe } from 'lucide-react';
 export const AgentContactCard: React.FC = () => {
   const { agencyName, phone, email, address, website, styles } = useClientBranding();
 
+  // Extract primary phone for clickable link
+  const primaryPhone = phone.split('|')[0].replace(/,/g, '').trim();
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
       <h3 className="font-bold text-slate-900 mb-4 text-lg">Your Travel Agent</h3>
@@ -13,12 +16,12 @@ export const AgentContactCard: React.FC = () => {
       <div className="space-y-4">
         {phone && (
           <div className="flex items-center gap-3">
-            <div className="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-100">
+            <div className="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-100 shrink-0">
               <Phone size={18}/>
             </div>
             <div>
               <p className="text-xs text-slate-500 uppercase font-bold">Call Us</p>
-              <a href={`tel:${phone}`} className="text-sm font-medium hover:underline" style={styles.primaryText}>
+              <a href={`tel:${primaryPhone}`} className="text-sm font-medium hover:underline" style={styles.primaryText}>
                 {phone}
               </a>
             </div>
@@ -26,7 +29,7 @@ export const AgentContactCard: React.FC = () => {
         )}
 
         <div className="flex items-center gap-3">
-          <div className="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-100">
+          <div className="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-100 shrink-0">
             <Mail size={18}/>
           </div>
           <div>
@@ -39,7 +42,7 @@ export const AgentContactCard: React.FC = () => {
 
         {website && (
           <div className="flex items-center gap-3">
-            <div className="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-100">
+            <div className="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-100 shrink-0">
               <Globe size={18}/>
             </div>
             <div>
@@ -53,7 +56,7 @@ export const AgentContactCard: React.FC = () => {
 
         {address && (
           <div className="flex items-start gap-3">
-            <div className="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-100">
+            <div className="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-100 shrink-0">
               <MapPin size={18}/>
             </div>
             <div>

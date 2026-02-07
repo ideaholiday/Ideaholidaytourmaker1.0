@@ -6,6 +6,9 @@ import { Phone, MessageCircle } from 'lucide-react';
 export const ClientHeader: React.FC = () => {
   const { agencyName, logoUrl, phone, whatsapp, styles } = useClientBranding();
 
+  // Handle multiple numbers: Use first valid number for tel: link
+  const primaryPhone = phone.split('|')[0].replace(/,/g, '').trim();
+
   return (
     <header className="bg-white border-b border-slate-100 shadow-sm sticky top-0 z-50">
       {/* Brand Color Top Line */}
@@ -39,9 +42,9 @@ export const ClientHeader: React.FC = () => {
         <div className="flex items-center gap-2">
           {phone && (
             <a 
-              href={`tel:${phone}`}
+              href={`tel:${primaryPhone}`}
               className="p-2 rounded-full hover:bg-slate-50 border border-slate-200 text-slate-600 transition flex items-center justify-center"
-              title="Call Agency"
+              title={`Call ${primaryPhone}`}
             >
               <Phone size={18} />
             </a>

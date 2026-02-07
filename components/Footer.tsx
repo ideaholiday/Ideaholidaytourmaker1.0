@@ -3,6 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Facebook, Instagram } from 'lucide-react';
 import { useClientBranding } from '../hooks/useClientBranding';
+import { BRANDING } from '../constants';
 
 export const Footer: React.FC = () => {
   const { agencyName, email, phone, website, address, styles, isPlatformDefault } = useClientBranding();
@@ -45,20 +46,25 @@ export const Footer: React.FC = () => {
             <ul className="space-y-3 text-sm">
               {address && (
                   <li className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 shrink-0 opacity-70" />
-                    <span>{address}</span>
+                    <MapPin className="w-5 h-5 shrink-0 opacity-70 mt-1" />
+                    <span className="whitespace-pre-line">{address}</span>
                   </li>
               )}
               {phone && (
-                  <li className="flex items-center gap-3">
-                    <Phone className="w-5 h-5 shrink-0 opacity-70" />
+                  <li className="flex items-start gap-3">
+                    <Phone className="w-5 h-5 shrink-0 opacity-70 mt-1" />
                     <span>{phone}</span>
                   </li>
               )}
               {email && (
-                  <li className="flex items-center gap-3">
-                    <Mail className="w-5 h-5 shrink-0 opacity-70" />
-                    <a href={`mailto:${email}`} className="hover:text-white">{email}</a>
+                  <li className="flex items-start gap-3">
+                    <Mail className="w-5 h-5 shrink-0 opacity-70 mt-1" />
+                    <div className="flex flex-col">
+                        <a href={`mailto:${email}`} className="hover:text-white">{email}</a>
+                        {isPlatformDefault && BRANDING.b2bEmail && (
+                             <a href={`mailto:${BRANDING.b2bEmail}`} className="hover:text-white">{BRANDING.b2bEmail}</a>
+                        )}
+                    </div>
                   </li>
               )}
             </ul>

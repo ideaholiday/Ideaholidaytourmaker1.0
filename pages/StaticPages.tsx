@@ -101,7 +101,8 @@ export const Terms: React.FC = () => (
 
         <div className="bg-slate-50 p-6 rounded-lg border border-slate-100 mt-8">
             <h3 className="text-lg font-bold text-slate-900 mb-2">10. Contact Information</h3>
-            <p className="text-sm text-slate-600 mb-1"><strong>Email:</strong> {BRANDING.email}</p>
+            <p className="text-sm text-slate-600 mb-1"><strong>Email:</strong> {BRANDING.email}, {BRANDING.b2bEmail}</p>
+            <p className="text-sm text-slate-600 mb-1"><strong>Phone:</strong> {BRANDING.supportPhone}</p>
             <p className="text-sm text-slate-600"><strong>Website:</strong> {BRANDING.website}</p>
         </div>
     </div>
@@ -240,6 +241,7 @@ export const Privacy: React.FC = () => (
             <p className="font-bold">{BRANDING.legalName}</p>
             <p className="text-sm text-slate-600 whitespace-pre-line mb-4">{BRANDING.address}</p>
             <p className="text-sm text-slate-600"><strong>Email:</strong> <a href={`mailto:${BRANDING.email}`} className="text-brand-600 hover:underline">{BRANDING.email}</a></p>
+             <p className="text-sm text-slate-600"><strong>B2B Support:</strong> <a href={`mailto:${BRANDING.b2bEmail}`} className="text-brand-600 hover:underline">{BRANDING.b2bEmail}</a></p>
             <p className="text-sm text-slate-600"><strong>Website:</strong> <a href={`https://${BRANDING.website}`} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">{BRANDING.website}</a></p>
         </section>
     </div>
@@ -251,8 +253,9 @@ export const Support: React.FC = () => (
     <h1 className="text-2xl font-bold mb-6">Support Center</h1>
     <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
       <p className="mb-2"><strong>Email:</strong> {BRANDING.email}</p>
-      <p className="mb-2"><strong>Phone:</strong> {BRANDING.supportPhone}</p>
-      <p>Please quote your Agent ID when contacting support.</p>
+      <p className="mb-2"><strong>B2B Support:</strong> {BRANDING.b2bEmail}</p>
+      <p className="mb-2"><strong>Phone:</strong> <span className="font-medium">{BRANDING.supportPhone}</span></p>
+      <p className="text-sm text-slate-500 mt-4">Please quote your Agent ID when contacting support.</p>
     </div>
   </div>
 );

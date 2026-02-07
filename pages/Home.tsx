@@ -1,167 +1,274 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BRANDING } from '../constants';
-import { Shield, Users, Briefcase, Lock, Globe, CheckCircle, Award, HeartHandshake } from 'lucide-react';
+import { 
+  Zap, Globe, LayoutTemplate, ArrowRight, CheckCircle2, 
+  ShieldCheck, Map, Users, TrendingUp, FileText, Send, UserPlus, Share2 
+} from 'lucide-react';
 
 export const Home: React.FC = () => {
   return (
-    <div className="flex-1 flex flex-col font-sans">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-b from-brand-50 to-white py-20 px-4 relative overflow-hidden">
-        {/* Decorative background blobs for depth */}
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-100/40 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-100/40 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none"></div>
+    <div className="flex-1 flex flex-col font-sans bg-white text-slate-900 selection:bg-brand-100 selection:text-brand-900">
+      
+      {/* --- HERO SECTION --- */}
+      <section className="relative pt-24 pb-20 lg:pt-32 lg:pb-32 overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-100/50 via-white to-white"></div>
+        <div className="absolute inset-0 -z-10 opacity-[0.03]" style={{ backgroundImage: 'url("https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg")' }}></div>
 
-        <div className="container mx-auto text-center max-w-4xl relative z-10">
+        <div className="container mx-auto px-4 max-w-6xl relative z-10 text-center">
           
-          {/* Company Logo Icon - Refined & Animated */}
-          <div className="flex justify-center mb-8 animate-in fade-in zoom-in duration-1000">
-            <div className="relative animate-float">
-                <div className="absolute inset-0 bg-brand-400 rounded-full blur-xl opacity-30 animate-pulse"></div>
-                {/* Tilted Axis Wrapper */}
-                <div className="rotate-12 transform-gpu">
-                    <div className="w-32 h-32 bg-white rounded-full shadow-2xl flex items-center justify-center text-brand-600 border-4 border-white/50 backdrop-blur-sm relative z-10">
-                        <Globe size={64} strokeWidth={1.5} className="animate-spin-slow" />
-                    </div>
-                </div>
-            </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-100 text-brand-700 text-sm font-semibold mb-8 animate-in fade-in slide-in-from-bottom-4">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
+            </span>
+            #1 Travel Tech Platform
           </div>
 
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-brand-100 text-brand-600 text-xs font-bold uppercase tracking-wider mb-6 shadow-sm animate-in fade-in slide-in-from-top-4">
-            <Award size={14} /> #1 B2B Travel Platform
-          </div>
-          <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 mb-6 tracking-tight leading-tight animate-in fade-in slide-in-from-bottom-2">
-            The Ultimate <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-purple-600">Travel Operating System</span>
+          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 leading-tight text-slate-900 animate-in fade-in slide-in-from-bottom-6">
+            Sell Global Travel. <br className="hidden md:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-teal-500">Faster.</span>
           </h1>
-          <p className="text-xl text-slate-600 mb-10 leading-relaxed max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-3 duration-700">
-            Streamline your travel business with Idea Tour Maker. 
-            Connect Admins, Staff, Agents, and Operators in one secure ecosystem.
+
+          <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8">
+            Access <strong>global DMC prices</strong> and create branded itineraries, quotes, and tour packages in just <span className="text-brand-700 font-bold border-b-2 border-brand-200">10 seconds</span>.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            <Link to="/login" className="w-full sm:w-auto bg-brand-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-brand-700 transition shadow-xl shadow-brand-500/20 transform hover:-translate-y-1">
-              Login to Portal
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-in fade-in slide-in-from-bottom-10">
+            <Link 
+              to="/signup" 
+              className="w-full sm:w-auto px-8 py-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-lg shadow-xl shadow-brand-200 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2"
+            >
+              Start for Free <ArrowRight size={20} />
             </Link>
-            <Link to="/signup" className="w-full sm:w-auto bg-white text-slate-700 border border-slate-200 px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-50 transition shadow-sm hover:shadow-md">
-              Become a Partner
+            <Link 
+              to="/signup" 
+              className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2"
+            >
+              Register as Partner
             </Link>
+          </div>
+          
+          <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-6 text-sm text-slate-500 font-medium animate-in fade-in slide-in-from-bottom-12 delay-100">
+             <div className="flex items-center gap-2">
+                 <CheckCircle2 size={18} className="text-green-500" /> Zero Cost to Start
+             </div>
+             <div className="flex items-center gap-2">
+                 <CheckCircle2 size={18} className="text-green-500" /> No Subscription Fees
+             </div>
+             <div className="flex items-center gap-2">
+                 <CheckCircle2 size={18} className="text-green-500" /> Instant Access
+             </div>
           </div>
         </div>
       </section>
 
-      {/* TRUST BADGE STRIP */}
-      <section className="bg-slate-50 border-y border-slate-200 py-12">
-        <div className="container mx-auto px-4">
-          <p className="text-center text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mb-10">Trusted by leading travel partners</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div className="flex flex-col items-center text-center gap-3 group">
-              <div className="p-4 bg-white rounded-2xl shadow-sm text-green-600 mb-1 group-hover:scale-110 transition-transform duration-300">
-                <Shield size={28} strokeWidth={2} />
+      {/* --- TRUST SECTION --- */}
+      <section className="bg-slate-50 py-10 border-y border-slate-100">
+          <div className="container mx-auto px-4 text-center">
+              <p className="text-slate-500 font-bold uppercase tracking-widest text-xs mb-6">Trusted by 3000+ Travel Agents Pan India</p>
+              <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+                  {/* Abstract Logos */}
+                  <div className="flex items-center gap-2 text-xl font-black text-slate-800"><Globe className="text-brand-600"/> TRAVEL<span className="text-brand-600">HUB</span></div>
+                  <div className="flex items-center gap-2 text-xl font-black text-slate-800"><Map className="text-purple-600"/> TRIP<span className="text-purple-600">GO</span></div>
+                  <div className="flex items-center gap-2 text-xl font-black text-slate-800"><Send className="text-teal-600"/> FLY<span className="text-teal-600">FAST</span></div>
+                  <div className="flex items-center gap-2 text-xl font-black text-slate-800"><ShieldCheck className="text-blue-600"/> SECURE<span className="text-blue-600">TRIP</span></div>
               </div>
-              <div>
-                <h3 className="font-bold text-slate-900">100% Secure</h3>
-                <p className="text-sm text-slate-500">Bank-grade encryption</p>
-              </div>
-            </div>
-            <div className="flex flex-col items-center text-center gap-3 group">
-              <div className="p-4 bg-white rounded-2xl shadow-sm text-blue-600 mb-1 group-hover:scale-110 transition-transform duration-300 rotate-12">
-                <Globe size={28} strokeWidth={2} className="group-hover:animate-spin-slow" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">Global Network</h3>
-                <p className="text-sm text-slate-500">Verified partners only</p>
-              </div>
-            </div>
-            <div className="flex flex-col items-center text-center gap-3 group">
-              <div className="p-4 bg-white rounded-2xl shadow-sm text-purple-600 mb-1 group-hover:scale-110 transition-transform duration-300">
-                <CheckCircle size={28} strokeWidth={2} />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">Verified Inventory</h3>
-                <p className="text-sm text-slate-500">Direct net rates</p>
-              </div>
-            </div>
-            <div className="flex flex-col items-center text-center gap-3 group">
-              <div className="p-4 bg-white rounded-2xl shadow-sm text-amber-600 mb-1 group-hover:scale-110 transition-transform duration-300">
-                <HeartHandshake size={28} strokeWidth={2} />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">24/7 Support</h3>
-                <p className="text-sm text-slate-500">Dedicated B2B assistance</p>
-              </div>
-            </div>
           </div>
-        </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="py-24 bg-white">
-        <div className="container mx-auto px-4">
+      {/* --- KEY FEATURES --- */}
+      <section className="py-24 bg-white relative">
+        <div className="container mx-auto px-4 max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-4">Everything you need to grow</h2>
-            <p className="text-slate-500 max-w-2xl mx-auto text-lg leading-relaxed">
-              A complete suite of tools designed specifically for the complexities of modern travel distribution.
+            <p className="text-slate-500 max-w-2xl mx-auto">
+                Stop wasting hours on Excel. Our AI-powered platform gives you superpowers.
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <FeatureCard 
-              icon={<Shield className="w-6 h-6 text-brand-600" />}
-              title="Privacy Walls"
-              desc="Advanced role-based access control ensuring operators and agents see only what they need."
-            />
-            <FeatureCard 
-              icon={<Users className="w-6 h-6 text-purple-600" />}
-              title="Multi-Role Architecture"
-              desc="Dedicated dashboards for Admins, Staff, Agents, and Ground Operators."
-            />
-            <FeatureCard 
-              icon={<Briefcase className="w-6 h-6 text-amber-600" />}
-              title="Operations Automation"
-              desc="Automated booking flows, status updates, and voucher generation."
-            />
-             <FeatureCard 
-              icon={<div className="rotate-12"><Globe className="w-6 h-6 text-green-600 animate-spin-slow" /></div>}
-              title="Direct Inventory"
-              desc="Connect directly with ground suppliers for the best net rates."
-            />
-             <FeatureCard 
-              icon={<Lock className="w-6 h-6 text-red-600" />}
-              title="Secure Payments"
-              desc="Integrated payment gateways and credit limit management for agents."
-            />
-             <FeatureCard 
-              icon={<Award className="w-6 h-6 text-blue-600" />}
-              title="White-Label Ready"
-              desc="Send quotes and itineraries with your own agency branding."
-            />
+            {/* Feature 1 */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-brand-100 transition-all duration-300 group">
+              <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 mb-6 group-hover:scale-110 transition-transform">
+                <Globe size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Global DMC Pricing</h3>
+              <p className="text-slate-600 leading-relaxed">
+                Access real-time net rates from verified DMCs worldwide. No middlemen, better margins for you.
+              </p>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-teal-100 transition-all duration-300 group">
+              <div className="w-14 h-14 bg-teal-50 rounded-xl flex items-center justify-center text-teal-600 mb-6 group-hover:scale-110 transition-transform">
+                <Zap size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">10-Second Builder</h3>
+              <p className="text-slate-600 leading-relaxed">
+                Build professional itineraries instantly. Smart automation selects the best routes and hotels.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-purple-100 transition-all duration-300 group">
+              <div className="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 mb-6 group-hover:scale-110 transition-transform">
+                <LayoutTemplate size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Free Agent Branding</h3>
+              <p className="text-slate-600 leading-relaxed">
+                Your logo, your contact details. Every PDF and link is 100% white-labeled to your agency.
+              </p>
+            </div>
+
+            {/* Feature 4 */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-orange-100 transition-all duration-300 group">
+              <div className="w-14 h-14 bg-orange-50 rounded-xl flex items-center justify-center text-orange-600 mb-6 group-hover:scale-110 transition-transform">
+                <FileText size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Flyer & Quote Gen</h3>
+              <p className="text-slate-600 leading-relaxed">
+                Generate marketing flyers and detailed quote PDFs with one click. Share instantly via WhatsApp.
+              </p>
+            </div>
+
+            {/* Feature 5 */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-emerald-100 transition-all duration-300 group lg:col-span-2">
+               <div className="flex flex-col md:flex-row gap-6 items-center">
+                    <div className="w-14 h-14 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 mb-2 md:mb-0 shrink-0 group-hover:scale-110 transition-transform">
+                        <TrendingUp size={28} />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">Zero Cost to Start</h3>
+                        <p className="text-slate-600 leading-relaxed">
+                            No setup fees. No monthly subscription. Pay only when you book or use our wallet system for seamless transactions. 
+                            <Link to="/signup" className="text-brand-600 font-bold hover:underline ml-2">Register Free &rarr;</Link>
+                        </p>
+                    </div>
+               </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="bg-slate-900 text-white py-20 px-4 relative overflow-hidden">
-        {/* Subtle texture overlay */}
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?ixlib=rb-4.0.3&auto=format&fit=crop&w=2021&q=80')] bg-cover bg-center opacity-10"></div>
-        
-        <div className="container mx-auto text-center relative z-10">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to modernize your travel business?</h2>
-          <p className="text-slate-300 mb-10 max-w-2xl mx-auto text-lg">
-            Join hundreds of partners using {BRANDING.name} to deliver exceptional travel experiences.
-          </p>
-          <Link to="/signup" className="inline-block bg-brand-500 text-white px-10 py-4 rounded-xl font-bold text-lg hover:bg-brand-400 transition shadow-lg shadow-brand-900/50 transform hover:-translate-y-1">
-            Get Started Now
-          </Link>
-        </div>
+      {/* --- HOW IT WORKS (SIMPLIFYING B2B TRAVEL) --- */}
+      <section className="py-24 relative overflow-hidden bg-slate-950">
+          {/* Background Effects */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-blue-950/20 to-slate-950"></div>
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
+              <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-[100px]"></div>
+              <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-[100px]"></div>
+          </div>
+          {/* Grid Pattern */}
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5"></div>
+
+          <div className="container mx-auto px-4 relative z-10">
+              <div className="text-center mb-20">
+                  <h2 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
+                      Simplifying B2B Travel
+                  </h2>
+                  <p className="text-xl text-slate-400 max-w-2xl mx-auto font-light">
+                      From lead to booking in <span className="text-teal-400 font-medium">minutes</span> — not days.
+                  </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
+                  {/* Connecting Line (Desktop) */}
+                  <div className="hidden md:block absolute top-12 left-[12%] right-[12%] h-0.5 bg-gradient-to-r from-transparent via-slate-700 to-transparent z-0"></div>
+
+                  {/* Steps */}
+                  {[
+                      { 
+                          step: "01", 
+                          title: "Register", 
+                          desc: "Create your free agent or DMC account instantly. No setup cost, no subscription.",
+                          icon: <UserPlus size={24} className="text-blue-400" />
+                      },
+                      { 
+                          step: "02", 
+                          title: "Create", 
+                          desc: "Build branded itineraries, quotes, or fixed packages in under 10 seconds using global DMC pricing.",
+                          icon: <Zap size={24} className="text-amber-400" />
+                      },
+                      { 
+                          step: "03", 
+                          title: "Share", 
+                          desc: "Send white-label PDFs or links to clients via WhatsApp, email, or link — fully branded.",
+                          icon: <Share2 size={24} className="text-purple-400" />
+                      },
+                      { 
+                          step: "04", 
+                          title: "Sell", 
+                          desc: "Confirm bookings, earn better margins, and scale your travel business effortlessly.",
+                          icon: <TrendingUp size={24} className="text-emerald-400" />
+                      }
+                  ].map((item, idx) => (
+                      <div key={idx} className="relative z-10 group">
+                          <div className="flex flex-col items-center text-center">
+                              {/* Icon Circle */}
+                              <div className="w-24 h-24 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(0,0,0,0.3)] group-hover:border-slate-500 group-hover:shadow-[0_0_30px_rgba(14,165,233,0.15)] transition-all duration-500 relative">
+                                  {/* Large Number Background */}
+                                  <span className="absolute text-5xl font-black text-slate-800/50 select-none group-hover:text-slate-700/50 transition-colors">
+                                      {item.step}
+                                  </span>
+                                  <div className="relative z-10">
+                                      {item.icon}
+                                  </div>
+                              </div>
+
+                              <h3 className="text-xl font-bold text-white mb-3 group-hover:text-brand-300 transition-colors">
+                                  {item.title}
+                              </h3>
+                              <p className="text-sm text-slate-400 leading-relaxed">
+                                  {item.desc}
+                              </p>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
       </section>
+
+      {/* --- ROLE SELECTION CTA --- */}
+      <section className="py-24 bg-white">
+          <div className="container mx-auto px-4 max-w-5xl">
+              <div className="text-center mb-12">
+                  <h2 className="text-3xl font-bold text-slate-900">Join the Ecosystem</h2>
+              </div>
+              
+              <div className="grid md:grid-cols-2 gap-8">
+                  {/* Agent Card */}
+                  <div className="bg-brand-50 rounded-3xl p-10 border border-brand-100 hover:shadow-2xl hover:scale-[1.01] transition-all relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                          <Users size={120} className="text-brand-600"/>
+                      </div>
+                      <div className="relative z-10">
+                          <h3 className="text-2xl font-bold text-brand-900 mb-2">I am a Travel Agent</h3>
+                          <p className="text-brand-800 mb-8 h-12">Looking for net rates, branding tools, and faster itinerary building.</p>
+                          <Link to="/signup" className="inline-flex items-center gap-2 bg-brand-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-brand-700 transition shadow-lg shadow-brand-200">
+                              Register as Agent <ArrowRight size={18}/>
+                          </Link>
+                      </div>
+                  </div>
+
+                  {/* DMC Card */}
+                  <div className="bg-slate-50 rounded-3xl p-10 border border-slate-200 hover:shadow-2xl hover:scale-[1.01] transition-all relative overflow-hidden group">
+                       <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                          <Globe size={120} className="text-slate-600"/>
+                      </div>
+                      <div className="relative z-10">
+                          <h3 className="text-2xl font-bold text-slate-900 mb-2">I am a DMC / Operator</h3>
+                          <p className="text-slate-600 mb-8 h-12">I want to distribute my inventory and services to thousands of agents.</p>
+                          <Link to="/signup" className="inline-flex items-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-800 transition shadow-lg">
+                              Partner Sign Up <ArrowRight size={18}/>
+                          </Link>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </section>
+
     </div>
   );
 };
-
-const FeatureCard: React.FC<{icon: React.ReactNode, title: string, desc: string}> = ({ icon, title, desc }) => (
-  <div className="p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:shadow-lg hover:border-brand-100 transition duration-300 group">
-    <div className="mb-6 p-4 bg-white rounded-xl shadow-sm w-fit group-hover:scale-110 transition-transform duration-300">{icon}</div>
-    <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
-    <p className="text-slate-600 leading-relaxed">{desc}</p>
-  </div>
-);
