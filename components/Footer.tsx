@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, Facebook, Instagram, Globe, ExternalLink, ArrowRight } from 'lucide-react';
+import { Mail, Phone, MapPin, Facebook, Instagram, Globe, ExternalLink, ArrowRight, Youtube } from 'lucide-react';
 import { useClientBranding } from '../hooks/useClientBranding';
 import { BRANDING } from '../constants';
 
@@ -48,6 +48,9 @@ export const Footer: React.FC = () => {
               <a href="#" className="p-2.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 hover:text-white transition-all text-slate-400">
                 <Instagram size={18} />
               </a>
+              <a href="https://www.youtube.com/@ideatourmaker" target="_blank" rel="noreferrer" className="p-2.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 hover:text-white transition-all text-slate-400">
+                <Youtube size={18} />
+              </a>
               {website && (
                   <a href={`https://${website}`} target="_blank" rel="noreferrer" className="p-2.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 hover:text-white transition-all text-slate-400">
                     <Globe size={18} />
@@ -67,6 +70,7 @@ export const Footer: React.FC = () => {
               <li><Link to="/privacy" className="hover:text-brand-400 hover:translate-x-1 transition-all inline-block flex items-center gap-2"><div className="w-1 h-1 bg-slate-500 rounded-full"></div> Privacy Policy</Link></li>
               <li><Link to="/faq" className="hover:text-brand-400 hover:translate-x-1 transition-all inline-block flex items-center gap-2"><div className="w-1 h-1 bg-slate-500 rounded-full"></div> FAQ</Link></li>
               <li><Link to="/support" className="hover:text-brand-400 hover:translate-x-1 transition-all inline-block flex items-center gap-2"><div className="w-1 h-1 bg-slate-500 rounded-full"></div> Support Center</Link></li>
+              <li><a href="https://www.youtube.com/@ideatourmaker" target="_blank" rel="noreferrer" className="hover:text-brand-400 hover:translate-x-1 transition-all inline-block flex items-center gap-2"><div className="w-1 h-1 bg-slate-500 rounded-full"></div> Knowledge Video</a></li>
             </ul>
           </div>
 
