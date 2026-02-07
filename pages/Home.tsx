@@ -26,13 +26,13 @@ export const Home: React.FC = () => {
             #1 Travel Tech Platform
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 leading-tight text-slate-900 animate-in fade-in slide-in-from-bottom-6">
+          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 leading-tight text-red-600 animate-in fade-in slide-in-from-bottom-6">
             Sell Global Travel. <br className="hidden md:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-teal-500">Faster.</span>
+            <span className="text-red-600">Faster.</span>
           </h1>
 
-          <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8">
-            Access <strong>global DMC prices</strong> and create branded itineraries, quotes, and tour packages in just <span className="text-brand-700 font-bold border-b-2 border-brand-200">10 seconds</span>.
+          <p className="text-xl md:text-3xl text-slate-800 font-extrabold mb-10 max-w-4xl mx-auto leading-tight animate-in fade-in slide-in-from-bottom-8">
+            Access <span className="text-brand-600">Global DMC Prices</span> and Create itineraries, and Tour Packages in <span className="text-white bg-red-600 px-3 py-1 rounded-lg transform rotate-2 inline-block shadow-lg">10 seconds</span>.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-in fade-in slide-in-from-bottom-10">
@@ -90,7 +90,7 @@ export const Home: React.FC = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Feature 1 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-brand-100 transition-all duration-300 group">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 border-t-4 border-t-blue-500 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
               <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 mb-6 group-hover:scale-110 transition-transform">
                 <Globe size={28} />
               </div>
@@ -101,7 +101,7 @@ export const Home: React.FC = () => {
             </div>
 
             {/* Feature 2 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-teal-100 transition-all duration-300 group">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 border-t-4 border-t-teal-500 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
               <div className="w-14 h-14 bg-teal-50 rounded-xl flex items-center justify-center text-teal-600 mb-6 group-hover:scale-110 transition-transform">
                 <Zap size={28} />
               </div>
@@ -112,7 +112,7 @@ export const Home: React.FC = () => {
             </div>
 
             {/* Feature 3 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-purple-100 transition-all duration-300 group">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 border-t-4 border-t-purple-500 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
               <div className="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 mb-6 group-hover:scale-110 transition-transform">
                 <LayoutTemplate size={28} />
               </div>
@@ -123,18 +123,18 @@ export const Home: React.FC = () => {
             </div>
 
             {/* Feature 4 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-orange-100 transition-all duration-300 group">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 border-t-4 border-t-orange-500 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
               <div className="w-14 h-14 bg-orange-50 rounded-xl flex items-center justify-center text-orange-600 mb-6 group-hover:scale-110 transition-transform">
                 <FileText size={28} />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-3">Flyer & Quote Gen</h3>
               <p className="text-slate-600 leading-relaxed">
-                Generate marketing flyers and detailed quote PDFs with one click. Share instantly via WhatsApp.
+                Generate marketing flyers and detailed quote PDFs with own Branding. Share instantly via WhatsApp.
               </p>
             </div>
 
             {/* Feature 5 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-emerald-100 transition-all duration-300 group lg:col-span-2">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 border-t-4 border-t-emerald-500 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group lg:col-span-2">
                <div className="flex flex-col md:flex-row gap-6 items-center">
                     <div className="w-14 h-14 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 mb-2 md:mb-0 shrink-0 group-hover:scale-110 transition-transform">
                         <TrendingUp size={28} />
@@ -142,7 +142,7 @@ export const Home: React.FC = () => {
                     <div>
                         <h3 className="text-xl font-bold text-slate-900 mb-2">Zero Cost to Start</h3>
                         <p className="text-slate-600 leading-relaxed">
-                            No setup fees. No monthly subscription. Pay only when you book or use our wallet system for seamless transactions. 
+                            No setup fees. No monthly subscription. 
                             <Link to="/signup" className="text-brand-600 font-bold hover:underline ml-2">Register Free &rarr;</Link>
                         </p>
                     </div>

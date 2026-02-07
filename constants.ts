@@ -10,7 +10,7 @@ export const BRANDING = {
   supportPhone: "9696777391 | 8881000391 | 9336757106 | 9219999214 | 0522-407-33-33",
   website: "b2b.ideaholiday.com",
   authDomain: "b2b.ideaholiday.com",
-  address: "Office No 129, Deva Palace, Lucknow",
+  address: "Office No 129, Deva Palace,\nViram Khand-1, Gomti Nagar,\nLucknow",
   googleClientId: "669144046620-dr4v4553lo3nvpbus5b1b2h8h8a5uiq9.apps.googleusercontent.com",
   oauthRedirectUri: "https://b2b.ideaholiday.com/__/auth/handler"
 };
