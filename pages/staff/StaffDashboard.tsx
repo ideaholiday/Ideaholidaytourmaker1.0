@@ -18,7 +18,8 @@ import {
   DollarSign,
   User,
   MapPin,
-  Loader2
+  Loader2,
+  Sparkles // New Icon
 } from 'lucide-react';
 
 export const StaffDashboard: React.FC = () => {
@@ -26,7 +27,7 @@ export const StaffDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'REQUESTS' | 'OPERATIONS' | 'ISSUES'>('REQUESTS');
+  const [activeTab, setActiveTab] = useState<'REQUESTS' | 'OPERATIONS' | 'ISSUES' | 'TODAY'>('REQUESTS'); // Added TODAY tab type
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,28 +80,34 @@ export const StaffDashboard: React.FC = () => {
 
   // --- KPI CALCULATIONS ---
   const safeBookings = bookings || [];
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayDate = new Date();
+
+  // 1. Created Today
+  const createdToday = safeBookings.filter(b => b.createdAt.startsWith(todayStr));
   
+  // 2. Pending Requests
   const pendingRequests = safeBookings.filter(b => b.status === 'REQUESTED');
-  const cancellationRequests = safeBookings.filter(b => b.status === 'CANCELLATION_REQUESTED');
   
-  const today = new Date();
-  
+  // 3. Upcoming Departures
   const upcomingDepartures = safeBookings.filter(b => {
       if (b.status === 'CANCELLED_NO_REFUND' || b.status === 'CANCELLED_WITH_REFUND' || b.status === 'REJECTED') return false;
       const travelDate = new Date(b.travelDate);
-      const diff = travelDate.getTime() - today.getTime();
+      const diff = travelDate.getTime() - todayDate.getTime();
       const days = Math.ceil(diff / (1000 * 3600 * 24));
       return days >= 0 && days <= 7; // Next 7 days
   }).sort((a, b) => new Date(a.travelDate).getTime() - new Date(b.travelDate).getTime());
 
+  // 4. Active Operations
   const activeOperations = safeBookings.filter(b => b.status === 'IN_PROGRESS');
 
-  // Identify Payment Risks (Balance due and travel within 15 days)
+  // 5. Issues (Cancellation / Payment)
+  const cancellationRequests = safeBookings.filter(b => b.status === 'CANCELLATION_REQUESTED');
   const paymentRisks = safeBookings.filter(b => {
       if (b.balanceAmount <= 0) return false;
       if ((b.status || '').includes('CANCEL')) return false;
       const travelDate = new Date(b.travelDate);
-      const diff = travelDate.getTime() - today.getTime();
+      const diff = travelDate.getTime() - todayDate.getTime();
       const days = Math.ceil(diff / (1000 * 3600 * 24));
       return days >= 0 && days <= 15; 
   });
@@ -109,7 +116,9 @@ export const StaffDashboard: React.FC = () => {
   const getTabList = () => {
       let list: Booking[] = [];
       
-      if (activeTab === 'REQUESTS') {
+      if (activeTab === 'TODAY') {
+          list = createdToday;
+      } else if (activeTab === 'REQUESTS') {
           list = pendingRequests;
       } else if (activeTab === 'ISSUES') {
           list = [...cancellationRequests, ...paymentRisks]; 
@@ -206,6 +215,25 @@ export const StaffDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* TODAY'S ACTIVITY ALERT - NEW WIDGET */}
+      {createdToday.length > 0 && (
+          <div 
+            onClick={() => setActiveTab('TODAY')}
+            className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl p-4 text-white shadow-lg cursor-pointer hover:shadow-xl transition flex items-center justify-between animate-in fade-in slide-in-from-top-4"
+          >
+              <div className="flex items-center gap-4">
+                  <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm animate-pulse">
+                      <Sparkles size={24} />
+                  </div>
+                  <div>
+                      <h3 className="font-bold text-lg">New Bookings Today</h3>
+                      <p className="text-white/80 text-sm">{createdToday.length} agents have created new bookings today. Click to view.</p>
+                  </div>
+              </div>
+              <ArrowRight size={24} className="opacity-70 group-hover:opacity-100 transform group-hover:translate-x-1 transition" />
+          </div>
+      )}
+
       {/* KPI ROW */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
@@ -255,6 +283,12 @@ export const StaffDashboard: React.FC = () => {
                         className={`flex-1 py-4 px-4 text-sm font-bold flex items-center justify-center gap-2 transition border-b-2 whitespace-nowrap ${activeTab === 'REQUESTS' ? 'border-amber-500 text-amber-700 bg-amber-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}
                       >
                           <Clock size={16} /> New Requests ({pendingRequests.length})
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('TODAY')}
+                        className={`flex-1 py-4 px-4 text-sm font-bold flex items-center justify-center gap-2 transition border-b-2 whitespace-nowrap ${activeTab === 'TODAY' ? 'border-violet-500 text-violet-700 bg-violet-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}
+                      >
+                          <Sparkles size={16} /> Created Today ({createdToday.length})
                       </button>
                       <button 
                         onClick={() => setActiveTab('OPERATIONS')}
@@ -333,7 +367,7 @@ export const StaffDashboard: React.FC = () => {
               </div>
           </div>
 
-          {/* SIDEBAR: INFO & ALERTS */}
+          {/* SIDEBAR: INFO & ALERTS (Existing Code kept) */}
           <div className="xl:col-span-1 space-y-6">
               
               {/* Payment Risk Summary */}
@@ -407,7 +441,7 @@ export const StaffDashboard: React.FC = () => {
                           <span className="flex items-center gap-2"><MapPin size={16}/> Hotel Inventory</span>
                           <ArrowRight size={14} className="opacity-50" />
                       </Link>
-                      <Link to="/admin/suppliers" className="block p-3 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition flex items-center justify-between">
+                      <Link to="/admin/partners" className="block p-3 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition flex items-center justify-between">
                           <span className="flex items-center gap-2"><User size={16}/> Supplier Directory</span>
                           <ArrowRight size={14} className="opacity-50" />
                       </Link>

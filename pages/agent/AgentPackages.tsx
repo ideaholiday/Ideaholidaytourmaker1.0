@@ -8,7 +8,7 @@ import { inventoryService } from '../../services/inventoryService'; // Import In
 import { useAuth } from '../../context/AuthContext';
 import { useClientBranding } from '../../hooks/useClientBranding';
 import { FixedPackage, Quote, ItineraryItem, OperatorInventoryItem } from '../../types';
-import { Package, Calendar, MapPin, ArrowRight, Loader2, Info, X, User, Image as ImageIcon, Hotel, ChevronDown, CheckCircle, FileText, Eye, Check, Clock, Mail, Globe, AlertTriangle, XCircle, Phone, LayoutTemplate, Star, Zap, Plane, Utensils, Car, Camera, QrCode, BadgeCheck, Sparkles } from 'lucide-react';
+import { Package, Calendar, MapPin, ArrowRight, Loader2, Info, X, User, Image as ImageIcon, Hotel, ChevronDown, CheckCircle, FileText, Eye, Check, Clock, Mail, Globe, AlertTriangle, XCircle, Phone, LayoutTemplate, Star, Zap, Plane, Utensils, Car, Camera, QrCode, BadgeCheck, Sparkles, TrendingUp } from 'lucide-react';
 import { generateFixedPackagePDF } from '../../utils/pdfGenerator';
 
 type FlyerDesign = 'MINIMAL' | 'LUXURY' | 'BOLD';
@@ -46,6 +46,7 @@ export const AgentPackages: React.FC = () => {
       adults: 2,
       children: 0
   });
+  const [markup, setMarkup] = useState<number>(10); // Default Markup State
   const [isCreating, setIsCreating] = useState(false);
   
   // Flyer Generation State
@@ -111,6 +112,13 @@ export const AgentPackages: React.FC = () => {
 
   const openBookingModal = (pkg: DisplayPackage) => {
       setSelectedPkg(pkg);
+      
+      // Initialize Markup from Agent Branding Defaults
+      const rules = adminService.getPricingRuleSync();
+      // Use Agent's default markup if set, else fallback to Admin rules, else 10
+      const defaultMarkup = user?.agentBranding?.defaultMarkup ?? rules.agentMarkup ?? 10;
+      setMarkup(defaultMarkup);
+
       let defaultDate = '';
       
       // Smart Default Date Logic
@@ -190,9 +198,21 @@ export const AgentPackages: React.FC = () => {
 
         const totalPax = Number(bookingForm.adults) + Number(bookingForm.children);
         
-        // Calculate Price: For Operator Packages, we might have tiers.
-        // For simplicity in this view, we use the base fixedPrice as per-person B2B cost
-        const totalPrice = pkg.fixedPrice * totalPax;
+        // --- PRICING LOGIC ---
+        // 1. Get Pricing Rules from Admin Settings
+        const rules = adminService.getPricingRuleSync();
+        
+        // 2. Calculate Operator Net (Supplier Cost)
+        const operatorTotalNet = pkg.fixedPrice * totalPax;
+
+        // 3. Add Admin/Company Markup (e.g. 10%)
+        // Formula: OperatorNet + (OperatorNet * CompanyMarkup%)
+        const companyMarkupAmount = operatorTotalNet * (rules.companyMarkup / 100);
+        const agentNetCost = operatorTotalNet + companyMarkupAmount;
+
+        // 4. Initial Selling Price using CUSTOM Markup from Modal (which came from defaults)
+        const agentMarkupAmount = agentNetCost * (markup / 100);
+        const initialSellingPrice = agentNetCost + agentMarkupAmount;
 
         const compiledNotes = `
 INCLUSIONS:
@@ -209,8 +229,9 @@ ${pkg.notes || 'As per standard booking terms.'}
             ...newQuote,
             serviceDetails: `Package: ${pkg.packageName} (${pkg.nights} Nights). Hotel: ${pkg.hotelDetails || 'Standard'}`,
             itinerary: itinerary,
-            price: totalPrice, // Net Cost
-            sellingPrice: totalPrice, // Init selling price same as net
+            cost: operatorTotalNet, // True Supplier Cost (Hidden from Agent)
+            price: agentNetCost, // B2B Net Cost (Visible to Agent as "Cost")
+            sellingPrice: initialSellingPrice, // Client Price
             currency: 'INR',
             status: 'DRAFT',
             isLocked: false,
@@ -219,7 +240,9 @@ ${pkg.notes || 'As per standard booking terms.'}
             // If Operator Package, assign automatically!
             operatorId: pkg.isOperator ? pkg.operatorId : undefined,
             operatorName: pkg.isOperator ? pkg.operatorName : undefined,
-            operatorStatus: pkg.isOperator ? 'PENDING' : undefined // Agent needs to submit/confirm
+            operatorStatus: pkg.isOperator ? 'PENDING' : undefined, // Agent needs to submit/confirm
+            netCostVisibleToOperator: false, // Default to hidden, use fixed price logic if needed
+            operatorPrice: operatorTotalNet // Pass the agreed operator price
         };
 
         await agentService.updateQuote(updatedQuote);
@@ -237,6 +260,12 @@ ${pkg.notes || 'As per standard booking terms.'}
   const openDesignModal = (e: React.MouseEvent, pkg: DisplayPackage) => {
       e.stopPropagation();
       setTargetFlyerPkg(pkg);
+      
+      // Initialize Markup for Flyer preview from branding defaults
+      const rules = adminService.getPricingRuleSync();
+      const defaultMarkup = user?.agentBranding?.defaultMarkup ?? rules.agentMarkup ?? 10;
+      setMarkup(defaultMarkup);
+      
       setShowDesignModal(true);
   };
 
@@ -314,7 +343,20 @@ ${pkg.notes || 'As per standard booking terms.'}
           </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {packages.map(pkg => (
+            {packages.map(pkg => {
+                // Calculation for Display in Grid - Using DEFAULT markup to estimate "Starting From"
+                const rules = adminService.getPricingRuleSync();
+                const defaultAgentMarkup = user?.agentBranding?.defaultMarkup ?? rules.agentMarkup ?? 10;
+                
+                // 1. Operator Net + Admin Margin
+                const adminMargin = pkg.fixedPrice * (rules.companyMarkup / 100);
+                const agentNetCost = pkg.fixedPrice + adminMargin;
+                
+                // 2. Agent Markup (Default)
+                const agentProfit = agentNetCost * (defaultAgentMarkup / 100);
+                const displaySellingPrice = agentNetCost + agentProfit;
+
+                return (
                 <div key={pkg.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col hover:shadow-lg transition group ${pkg.isOperator ? 'border-purple-200' : 'border-slate-200'}`}>
                     <div className="h-48 bg-slate-200 relative overflow-hidden group">
                         {pkg.imageUrl ? (
@@ -342,8 +384,8 @@ ${pkg.notes || 'As per standard booking terms.'}
                                 <p className="font-bold text-slate-800">{pkg.nights} Nights</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-xs text-slate-500">Net Rate</p>
-                                <p className="font-mono font-bold text-brand-600 text-lg">₹ {pkg.fixedPrice.toLocaleString()}</p>
+                                <p className="text-xs text-slate-500">Net Rate (B2B)</p>
+                                <p className="font-mono font-bold text-brand-600 text-lg">₹ {agentNetCost.toLocaleString()}</p>
                             </div>
                         </div>
 
@@ -378,7 +420,7 @@ ${pkg.notes || 'As per standard booking terms.'}
                         </div>
                     </div>
                 </div>
-            ))}
+            )})}
         </div>
       )}
 
@@ -474,22 +516,80 @@ ${pkg.notes || 'As per standard booking terms.'}
                            />
                        </div>
 
-                       {/* Total Estimate */}
-                       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center">
-                           <div>
-                               <p className="text-xs font-bold text-blue-600 uppercase">Total Estimate</p>
-                               <p className="text-xs text-blue-400">
-                                   {bookingForm.adults + bookingForm.children} Pax × ₹ {selectedPkg.fixedPrice.toLocaleString()}
-                               </p>
+                       {/* MARKUP CONTROL & BREAKDOWN */}
+                       <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                           <div className="mb-4">
+                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1 flex items-center justify-between">
+                                   <span>Your Markup</span>
+                                   <span className="text-brand-600">{markup}%</span>
+                               </label>
+                               <div className="flex items-center gap-3">
+                                   <input 
+                                       type="range" 
+                                       min="0" 
+                                       max="50" 
+                                       value={markup} 
+                                       onChange={(e) => setMarkup(Number(e.target.value))}
+                                       className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                                   />
+                                   <div className="relative w-20">
+                                       <input 
+                                           type="number" 
+                                           min="0"
+                                           value={markup}
+                                           onChange={(e) => setMarkup(Number(e.target.value))}
+                                           className="w-full pl-2 pr-6 py-1.5 text-sm border border-slate-300 rounded-lg text-center font-bold outline-none focus:border-brand-500"
+                                       />
+                                       <span className="absolute right-2 top-1.5 text-slate-400 font-bold text-sm">%</span>
+                                   </div>
+                               </div>
                            </div>
-                           <div className="text-xl font-bold text-slate-900">
-                               ₹ {((bookingForm.adults + bookingForm.children) * selectedPkg.fixedPrice).toLocaleString()}
+
+                           <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-slate-200">
+                               {(() => {
+                                   const totalPax = bookingForm.adults + bookingForm.children;
+                                   const rules = adminService.getPricingRuleSync();
+                                   
+                                   // 1. Operator Net (Raw Supplier Cost)
+                                   const opNet = selectedPkg.fixedPrice * totalPax;
+                                   
+                                   // 2. Admin Markup (Company Margin)
+                                   const adminMargin = opNet * (rules.companyMarkup / 100);
+                                   
+                                   // 3. Agent Net (B2B Price)
+                                   const agentNet = opNet + adminMargin;
+                                   
+                                   // 4. Agent Markup (Custom from State)
+                                   const agentProfit = agentNet * (markup / 100);
+                                   
+                                   // 5. Final Client Price
+                                   const clientPrice = agentNet + agentProfit;
+
+                                   return (
+                                       <>
+                                           <div>
+                                               <p className="text-[10px] text-slate-500 font-bold uppercase">Net Cost</p>
+                                               <p className="text-sm font-medium text-slate-700">₹ {Math.round(agentNet).toLocaleString()}</p>
+                                           </div>
+                                           <div>
+                                                <p className="text-[10px] text-green-600 font-bold uppercase flex items-center justify-center gap-1">
+                                                    <TrendingUp size={10} /> Profit
+                                                </p>
+                                                <p className="text-sm font-bold text-green-600">+ ₹ {Math.round(agentProfit).toLocaleString()}</p>
+                                           </div>
+                                           <div>
+                                               <p className="text-[10px] text-brand-600 font-bold uppercase">Sell Price</p>
+                                               <p className="text-lg font-bold text-brand-700">₹ {Math.round(clientPrice).toLocaleString()}</p>
+                                           </div>
+                                       </>
+                                   );
+                               })()}
                            </div>
                        </div>
 
                        <button type="submit" disabled={isCreating} className="w-full bg-brand-600 text-white py-4 rounded-xl font-bold hover:bg-brand-700 transition shadow-lg shadow-brand-200">
                            {isCreating ? (
-                               <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={20}/> Processing...</span>
+                               <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={20}/> Creating Quote...</span>
                            ) : (
                                'Create Booking Quote'
                            )}
@@ -500,6 +600,7 @@ ${pkg.notes || 'As per standard booking terms.'}
       )}
 
       {/* DESIGN SELECTION MODAL */}
+      {/* ... (Keep existing Design Modal code same) ... */}
       {showDesignModal && targetFlyerPkg && (
            <div className="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
@@ -546,17 +647,20 @@ ${pkg.notes || 'As per standard booking terms.'}
            </div>
       )}
 
-      {/* --- HIDDEN FLYER TEMPLATES (1080x1080) --- */}
+      {/* ... (Keep existing Hidden Flyer Templates code same) ... */}
       {(isGenerating || targetFlyerPkg) && selectedDesign && (
           <div style={{ position: 'fixed', left: '-9999px', top: '0', zIndex: -50 }}>
               <div 
                   id="flyer-generator-target"
                   className="w-[1080px] h-[1080px] relative flex flex-col font-sans overflow-hidden bg-white"
               >
-                  {/* DESIGN 1: MODERN / MINIMAL (Magazine + Brochure Hybrid) */}
+                  {/* ... Existing flyer templates ... */}
+                  {/* Note: Ensure the Price display in the flyer ALSO calculates the markup if you want the Agent to advertise the selling price, not net. 
+                      Ideally, for Flyers, we should show "Starting From [AgentNet + Markup]" 
+                   */}
+                   {/* DESIGN 1: MODERN / MINIMAL */}
                   {selectedDesign === 'MINIMAL' && targetFlyerPkg && (
                       <div className="w-full h-full flex flex-col bg-white">
-                          {/* Top: Logo */}
                           <div className="h-24 flex items-center justify-center pt-6 pb-2">
                               {logoUrl ? (
                                   <img src={logoUrl} className="h-20 object-contain" crossOrigin="anonymous" />
@@ -564,8 +668,6 @@ ${pkg.notes || 'As per standard booking terms.'}
                                   <h2 className="text-3xl font-bold text-slate-800 uppercase tracking-widest">{displayAgencyName}</h2>
                               )}
                           </div>
-
-                          {/* Hero: Image + Title Overlay */}
                           <div className="relative h-[450px] w-full m-4 mx-auto w-[95%] rounded-3xl overflow-hidden shadow-xl">
                               {targetFlyerPkg.imageUrl ? (
                                   <img src={targetFlyerPkg.imageUrl} className="w-full h-full object-cover" crossOrigin="anonymous" />
@@ -583,8 +685,6 @@ ${pkg.notes || 'As per standard booking terms.'}
                                   </p>
                               </div>
                           </div>
-
-                          {/* Middle: 2 Columns Inclusions/Exclusions */}
                           <div className="flex-1 px-12 py-6 grid grid-cols-2 gap-12">
                               <div className="border-r border-slate-200 pr-8">
                                   <h3 className="text-2xl font-bold text-brand-700 uppercase mb-4 border-b-2 border-brand-200 pb-2 inline-block">Inclusions</h3>
@@ -609,13 +709,13 @@ ${pkg.notes || 'As per standard booking terms.'}
                                   </ul>
                               </div>
                           </div>
-
-                          {/* Bottom: Price Ribbon & CTA */}
                           <div className="mt-auto h-40 relative">
-                              {/* Price Ribbon */}
                               <div className="absolute -top-6 right-0 bg-red-600 text-white py-4 px-12 rounded-l-full shadow-lg z-10">
                                   <p className="text-xl uppercase font-bold opacity-80">Deal Price</p>
-                                  <p className="text-5xl font-black">₹ {targetFlyerPkg.fixedPrice.toLocaleString()}</p>
+                                  <p className="text-5xl font-black">
+                                      {/* Flyer Price: Use calculated Selling Price based on state markup */}
+                                      ₹ {Math.round((targetFlyerPkg.fixedPrice * (1 + (adminService.getPricingRuleSync().companyMarkup/100))) * (1 + (markup/100))).toLocaleString()}
+                                  </p>
                               </div>
 
                               <div className="h-full bg-slate-900 text-white flex items-center justify-between px-12">
@@ -631,16 +731,12 @@ ${pkg.notes || 'As per standard booking terms.'}
                           </div>
                       </div>
                   )}
-
-                  {/* DESIGN 2: LUXURY (Card-Based) */}
+                  {/* Keep other designs (Luxury, Bold) logic identical to Minimal for price calculation */}
                   {selectedDesign === 'LUXURY' && targetFlyerPkg && (
                      <div className="w-full h-full bg-slate-100 p-8 flex flex-col gap-6 font-serif">
-                        {/* Background Image Layer */}
                         <div className="absolute inset-0 z-0">
                             <img src={targetFlyerPkg.imageUrl} className="w-full h-full object-cover opacity-20 filter blur-sm" crossOrigin="anonymous" />
                         </div>
-
-                        {/* Card 1: Header */}
                         <div className="relative z-10 bg-white rounded-3xl shadow-xl overflow-hidden h-[45%] flex">
                             <div className="w-1/2 p-12 flex flex-col justify-center">
                                 <p className="text-amber-600 text-xl uppercase tracking-[0.3em] font-bold mb-4">Premium Escape</p>
@@ -655,8 +751,6 @@ ${pkg.notes || 'As per standard booking terms.'}
                                 <div className="absolute inset-0 bg-gradient-to-r from-white via-transparent to-transparent"></div>
                             </div>
                         </div>
-
-                        {/* Card 2: Details Grid */}
                         <div className="relative z-10 grid grid-cols-3 gap-6 h-[30%]">
                             <div className="col-span-2 bg-white/90 backdrop-blur-md rounded-3xl shadow-lg p-10 border border-white/50">
                                  <h3 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
@@ -674,12 +768,10 @@ ${pkg.notes || 'As per standard booking terms.'}
                             <div className="bg-slate-900 text-white rounded-3xl shadow-lg p-10 flex flex-col justify-center text-center relative overflow-hidden">
                                 <div className="absolute inset-0 bg-amber-500/10 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
                                 <p className="text-slate-400 text-xl uppercase tracking-widest mb-2 relative z-10">Starting At</p>
-                                <p className="text-6xl font-bold text-amber-400 relative z-10">₹ {targetFlyerPkg.fixedPrice.toLocaleString()}</p>
+                                <p className="text-6xl font-bold text-amber-400 relative z-10">₹ {Math.round((targetFlyerPkg.fixedPrice * (1 + (adminService.getPricingRuleSync().companyMarkup/100))) * (1 + (markup/100))).toLocaleString()}</p>
                                 <p className="text-sm text-slate-400 mt-2 relative z-10">Per Person</p>
                             </div>
                         </div>
-
-                        {/* Card 3: Footer */}
                         <div className="relative z-10 flex-1 bg-white rounded-3xl shadow-xl p-8 flex justify-between items-center">
                             <div className="flex items-center gap-6">
                                 {logoUrl && <img src={logoUrl} className="h-24 w-auto object-contain" crossOrigin="anonymous" />}
@@ -696,16 +788,11 @@ ${pkg.notes || 'As per standard booking terms.'}
                      </div>
                   )}
 
-                  {/* DESIGN 3: BOLD (Split-Panel Magazine) */}
                   {selectedDesign === 'BOLD' && targetFlyerPkg && (
                       <div className="w-full h-full flex bg-white">
-                          {/* Left Panel: Content (40%) */}
                           <div className="w-[40%] bg-brand-600 text-white p-12 flex flex-col relative overflow-hidden">
-                              {/* Pattern */}
                               <div className="absolute top-0 left-0 w-full h-full opacity-10" style={{ backgroundImage: 'radial-gradient(#fff 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
-
                               <div className="relative z-10">
-                                  {/* Logo Area */}
                                   <div className="mb-12">
                                       {logoUrl ? (
                                           <img src={logoUrl} className="h-20 object-contain brightness-0 invert" crossOrigin="anonymous" />
@@ -713,10 +800,8 @@ ${pkg.notes || 'As per standard booking terms.'}
                                           <h2 className="text-4xl font-black uppercase">{displayAgencyName}</h2>
                                       )}
                                   </div>
-
                                   <p className="text-2xl font-bold opacity-80 uppercase tracking-widest mb-2">Special Offer</p>
                                   <h1 className="text-7xl font-black leading-none mb-6">{targetFlyerPkg.packageName}</h1>
-                                  
                                   <div className="bg-white/10 p-6 rounded-xl border border-white/20 mb-8 backdrop-blur-sm">
                                       <p className="text-xl font-bold mb-4 uppercase tracking-wider border-b border-white/20 pb-2">Includes</p>
                                       <ul className="space-y-3">
@@ -727,7 +812,6 @@ ${pkg.notes || 'As per standard booking terms.'}
                                           ))}
                                       </ul>
                                   </div>
-
                                   <div className="mt-auto">
                                       <p className="text-xl font-bold opacity-70 mb-1">Book Now</p>
                                       <p className="text-5xl font-black">{displayPhone}</p>
@@ -735,19 +819,13 @@ ${pkg.notes || 'As per standard booking terms.'}
                                   </div>
                               </div>
                           </div>
-
-                          {/* Right Panel: Image (60%) */}
                           <div className="w-[60%] relative">
                               <img src={targetFlyerPkg.imageUrl} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                              
-                              {/* Price Overlay */}
                               <div className="absolute top-12 right-0 bg-white text-slate-900 py-8 px-12 shadow-2xl">
                                   <p className="text-2xl font-bold text-slate-400 uppercase">Only</p>
-                                  <p className="text-7xl font-black text-brand-600">₹ {targetFlyerPkg.fixedPrice.toLocaleString()}</p>
+                                  <p className="text-7xl font-black text-brand-600">₹ {Math.round((targetFlyerPkg.fixedPrice * (1 + (adminService.getPricingRuleSync().companyMarkup/100))) * (1 + (markup/100))).toLocaleString()}</p>
                                   <p className="text-right text-lg font-bold text-slate-500">/ Person</p>
                               </div>
-
-                              {/* Destination Name Vertical */}
                               <div className="absolute bottom-12 left-12">
                                   <h2 className="text-[120px] font-black text-white leading-none opacity-90 drop-shadow-lg uppercase writing-mode-vertical" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
                                       {getDestinationName(targetFlyerPkg.destinationId)}

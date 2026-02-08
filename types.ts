@@ -1,5 +1,4 @@
 
-
 export enum UserRole {
   ADMIN = 'ADMIN',
   STAFF = 'STAFF',
@@ -20,6 +19,7 @@ export interface AgentBranding {
   website?: string;
   officeAddress?: string;
   whatsappNumber?: string;
+  defaultMarkup?: number; // Added for automatic pricing
 }
 
 export interface BankDetails {

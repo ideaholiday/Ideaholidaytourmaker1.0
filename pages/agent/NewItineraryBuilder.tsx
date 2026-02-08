@@ -34,16 +34,27 @@ const BuilderContent: React.FC = () => {
       const dayIndex = state.days.findIndex(d => d.id === dayId);
       if (dayIndex === -1) return 1;
 
-      let nights = 1;
+      let count = 1;
+      let reachedEnd = true;
+
       // Look ahead in the itinerary for consecutive days with the same destination
       for (let i = dayIndex + 1; i < state.days.length; i++) {
           if (state.days[i].destination_id === destId) {
-              nights++;
+              count++;
           } else {
+              reachedEnd = false; // Sequence broken by different city
               break;
           }
       }
-      return nights;
+
+      // If we reached the end of the itinerary (e.g. Day 4 of 4 Days), 
+      // subtract 1 assuming the last day is departure/checkout.
+      // But only if total count > 1 (a 1-day trip is 1 night/day use).
+      if (reachedEnd && count > 1) {
+          return count - 1;
+      }
+      
+      return count;
   };
 
   if (state.days.length === 0) {

@@ -6,6 +6,7 @@ import { currencyService } from '../services/currencyService';
 import { calculatePriceFromNet } from '../utils/pricingEngine';
 import { InventoryModal } from './builder/InventoryModal';
 import { Save, Plus, Trash2, MapPin, Hotel, Camera, Car, X, Info, Settings, ToggleLeft, ToggleRight, User, Copy, ArrowUp, ArrowDown, GripVertical, Calendar, Image as ImageIcon } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   initialItinerary: ItineraryItem[];
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destination, pax, onSave, onCancel }) => {
+  const { user } = useAuth();
   const [itinerary, setItinerary] = useState<ItineraryItem[]>(JSON.parse(JSON.stringify(initialItinerary)));
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,8 +27,8 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   // Drag and Drop State
   const [draggedDayIndex, setDraggedDayIndex] = useState<number | null>(null);
   
-  // Pricing Controls
-  const [markupPercent, setMarkupPercent] = useState<number>(10);
+  // Pricing Controls - Initialize with user default if available, else 10
+  const [markupPercent, setMarkupPercent] = useState<number>(user?.agentBranding?.defaultMarkup ?? 10);
   const [enableMarkup, setEnableMarkup] = useState<boolean>(true);
 
   // Recalculate price whenever itinerary changes or markup settings change
@@ -206,17 +208,34 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
   const activeCityId = activeDay?.cityId || '';
   const perPersonPrice = pax > 0 ? Math.round(financials.selling / pax) : 0;
 
-  // Calculate consecutive nights in the current city (for Hotel default duration)
-  let suggestedNights = 1;
-  if (activeCityId) {
-      for (let i = activeDayIndex + 1; i < itinerary.length; i++) {
-          if (itinerary[i].cityId === activeCityId) {
-              suggestedNights++;
-          } else {
-              break;
-          }
-      }
-  }
+  // Logic: Calculate consecutive days in current city.
+  // If sequence ends because itinerary ends -> likely a checkout/departure, subtract 1.
+  // If sequence ends because city changes -> likely just a move, use full count.
+  const calculateSuggestedNights = () => {
+    if (!activeDay || !activeDay.cityId) return 1;
+    
+    let count = 1;
+    let reachedEnd = true;
+
+    for (let i = activeDayIndex + 1; i < itinerary.length; i++) {
+        if (itinerary[i].cityId === activeDay.cityId) {
+            count++;
+        } else {
+            reachedEnd = false; // Stopped because of city change, not end of trip
+            break;
+        }
+    }
+    
+    // If we reached the absolute end of the itinerary, subtract 1 (Departure day)
+    // e.g. 4 Days Dubai -> 3 Nights Hotel.
+    if (reachedEnd && count > 1) {
+        return count - 1;
+    }
+    
+    return count;
+  };
+
+  const suggestedNights = calculateSuggestedNights();
 
   return (
     <div className="flex flex-col h-[calc(100vh-40px)] bg-slate-50 rounded-xl overflow-hidden border border-slate-200 shadow-2xl fixed inset-0 z-50 m-4 md:m-5">
@@ -535,8 +554,8 @@ export const ItineraryBuilder: React.FC<Props> = ({ initialItinerary, destinatio
                 destinationId={activeCityId} 
                 onSelect={handleAddService}
                 currentServices={activeDay?.services || []} 
-                defaultNights={suggestedNights}
-                paxCount={pax} // PASS PAX COUNT HERE
+                defaultNights={modalType === 'HOTEL' ? suggestedNights : 1}
+                paxCount={pax}
             />
         )}
     </div>

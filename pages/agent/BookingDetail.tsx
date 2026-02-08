@@ -9,10 +9,12 @@ import { ItineraryView } from '../../components/ItineraryView';
 import { BookingStatusTimeline } from '../../components/booking/BookingStatusTimeline';
 import { PaymentPanel } from '../../components/booking/PaymentPanel';
 import { CancellationRequestModal } from '../../components/booking/CancellationRequestModal';
-import { ArrowLeft, MapPin, Calendar, Users, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText, Eye, EyeOff, Truck, Phone, Briefcase, Info, Save, Loader2, Edit2, User, UserCheck, CheckCircle2, UserPlus, CheckCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Users, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText, Eye, EyeOff, Truck, Phone, Briefcase, Info, Save, Loader2, Edit2, User, UserCheck, CheckCircle2, UserPlus, CheckCircle, Mail } from 'lucide-react';
 import { generateQuotePDF, generateInvoicePDF } from '../../utils/pdfGenerator';
 import { AssignOperatorModal } from '../../components/booking/AssignOperatorModal';
 import { bookingOperatorService } from '../../services/bookingOperatorService';
+import { functions } from '../../services/firebase';
+import { httpsCallable } from 'firebase/functions';
 
 export const BookingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +23,7 @@ export const BookingDetail: React.FC = () => {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [hasInvoice, setHasInvoice] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // View Mode
   const [viewMode, setViewMode] = useState<'INTERNAL' | 'CLIENT'>('INTERNAL');
@@ -87,6 +90,21 @@ export const BookingDetail: React.FC = () => {
       const url = `${protocol}//${domain}/#/view/${booking.id}`;
       navigator.clipboard.writeText(url);
       alert("Public Link copied to clipboard!");
+  };
+
+  const handleSendEmail = async () => {
+      if(!confirm("Send AI-Generated Booking Confirmation email to Agent?")) return;
+      setIsSendingEmail(true);
+      try {
+          const sendMail = httpsCallable(functions, 'sendBookingEmail');
+          await sendMail({ bookingId: booking.id, type: 'BOOKING_CONFIRMATION' });
+          alert("Email Sent Successfully!");
+      } catch(e: any) {
+          console.error(e);
+          alert("Error sending email: " + e.message);
+      } finally {
+          setIsSendingEmail(false);
+      }
   };
 
   const handleCancellationRequest = async (reason: string) => {
@@ -235,6 +253,16 @@ export const BookingDetail: React.FC = () => {
                 </div>
             </div>
             <div className="mt-4 md:mt-0 flex gap-2">
+                {isAdminOrStaff && showInternal && (
+                    <button 
+                        onClick={handleSendEmail}
+                        disabled={isSendingEmail}
+                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition font-medium disabled:opacity-70"
+                    >
+                        {isSendingEmail ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
+                        Send Email
+                    </button>
+                )}
                 {hasInvoice && showInternal && (
                     <button onClick={handleDownloadInvoice} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition font-medium">
                         <FileText size={16} /> Tax Invoice

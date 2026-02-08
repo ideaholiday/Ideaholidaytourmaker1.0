@@ -10,7 +10,7 @@ import {
     Plus, Save, X, Box, GitBranch, DollarSign, Bus, Car, Ticket, 
     Edit2, Trash2, Search, Filter, Image as ImageIcon, MapPin, 
     Calendar, FileText, Check, ArrowUpDown, ArrowUp, ArrowDown, 
-    CalendarRange, Hotel, Users, Layers, Package
+    CalendarRange, Hotel, Users, Layers, Package, Info
 } from 'lucide-react';
 
 const DEFAULT_TRANSFER_OPTS: ActivityTransferOptions = {
@@ -36,7 +36,7 @@ export const InventoryManager: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [destinations, setDestinations] = useState<Destination[]>([]);
   
-  // Modal & Form State
+  // ... (rest of state initialization remains same)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ModalTab>('GENERAL');
   const [editingItem, setEditingItem] = useState<OperatorInventoryItem | null>(null);
@@ -48,7 +48,7 @@ export const InventoryManager: React.FC = () => {
       datesText?: string;
       nights?: number;
       itinerary?: ItineraryItem[];
-      dateType?: 'SPECIFIC' | 'RANGE'; // Added dateType
+      dateType?: 'SPECIFIC' | 'RANGE'; 
   }>({});
   
   const [transferOpts, setTransferOpts] = useState<ActivityTransferOptions>(DEFAULT_TRANSFER_OPTS);
@@ -82,6 +82,8 @@ export const InventoryManager: React.FC = () => {
     init();
   }, [user]);
 
+  // ... (rest of logic functions like refreshList, handleSort, handleSelectAll, etc. remain unchanged)
+  
   const refreshList = async () => {
       if(user) {
           const data = await inventoryService.getItemsByOperator(user.id);
@@ -227,26 +229,22 @@ export const InventoryManager: React.FC = () => {
               payload.transferOptions = transferOpts;
           }
           if (payload.type === 'PACKAGE') {
-              // Parse Text Areas
               payload.inclusions = formData.inclusionsText?.split('\n').map(s => s.trim()).filter(s => s) || [];
               payload.exclusions = formData.exclusionsText?.split('\n').map(s => s.trim()).filter(s => s) || [];
               payload.pricingTiers = pricingTiers;
               
-              // Date Logic
               payload.dateType = formData.dateType || 'SPECIFIC';
               if (payload.dateType === 'SPECIFIC') {
                   payload.validDates = formData.datesText?.split(',').map(s => s.trim()).filter(s => s) || [];
                   payload.validFrom = null; 
                   payload.validTo = null;
               } else {
-                  // RANGE: Use validFrom/validTo already in payload, clear array
                   payload.validDates = [];
                   if (!payload.validFrom || !payload.validTo) {
                       throw new Error("Valid From and To dates are required for Date Range.");
                   }
               }
 
-              // Use costPrice for package fixed price (Base 2pax usually)
               payload.fixedPrice = pricingTiers.twin || payload.costPrice;
               payload.costPrice = pricingTiers.twin || payload.costPrice;
               
@@ -255,7 +253,6 @@ export const InventoryManager: React.FC = () => {
           
           payload.currency = 'INR';
 
-          // Clean up temp UI fields
           delete payload.inclusionsText;
           delete payload.exclusionsText;
           delete payload.datesText;
@@ -283,13 +280,10 @@ export const InventoryManager: React.FC = () => {
 
   const updateSic = (field: string, value: any) => setTransferOpts(prev => ({ ...prev, sic: { ...prev.sic, [field]: value } }));
   const updatePvt = (field: string, value: any) => setTransferOpts(prev => ({ ...prev, pvt: { ...prev.pvt, [field]: value } }));
-  
-  // Update Tiers Logic
   const updateTier = (field: keyof PackagePricingTiers, value: number) => {
       setPricingTiers(prev => ({ ...prev, [field]: value }));
   };
 
-  // --- ITINERARY BUILDER LOGIC ---
   const handleAddDay = () => {
       const current = formData.itinerary || [];
       const dayNum = current.length + 1;
@@ -297,7 +291,7 @@ export const InventoryManager: React.FC = () => {
           day: dayNum,
           title: `Day ${dayNum}`,
           description: '',
-          services: [] // For fixed packages, we might stick to text descriptions mainly, but structure is there
+          services: [] 
       };
       setFormData({...formData, itinerary: [...current, newDay]});
   };
@@ -311,7 +305,6 @@ export const InventoryManager: React.FC = () => {
   const handleRemoveDay = (idx: number) => {
       const current = [...(formData.itinerary || [])];
       current.splice(idx, 1);
-      // Re-index days
       const updated = current.map((day, i) => ({ ...day, day: i + 1 }));
       setFormData({...formData, itinerary: updated});
   };
@@ -323,6 +316,7 @@ export const InventoryManager: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* ... (Header and Bulk Actions are same) ... */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
@@ -369,7 +363,7 @@ export const InventoryManager: React.FC = () => {
           </div>
       )}
 
-      {/* Filters */}
+      {/* ... (Filters block same as before) ... */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 space-y-4">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               
@@ -428,7 +422,7 @@ export const InventoryManager: React.FC = () => {
               </th>
               <th className="px-6 py-4 font-semibold">Type</th>
               <th className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort('costPrice')}>
-                  <div className="flex items-center">Net Rate <SortIcon col='costPrice'/></div>
+                  <div className="flex items-center">Net Rate (You) <SortIcon col='costPrice'/></div>
               </th>
               <th className="px-6 py-4 font-semibold">Status</th>
               <th className="px-6 py-4 font-semibold cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort('createdAt')}>
@@ -440,6 +434,7 @@ export const InventoryManager: React.FC = () => {
           <tbody className="divide-y divide-slate-100">
             {processedItems.map(item => (
               <tr key={item.id} className={`transition ${selectedIds.has(item.id) ? 'bg-brand-50/50' : 'hover:bg-slate-50'}`}>
+                {/* ... (Checkbox, Image, Name, Type columns same as before) ... */}
                 <td className="px-6 py-4 text-center">
                     <input 
                         type="checkbox" 
@@ -571,6 +566,7 @@ export const InventoryManager: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                 <div className="p-6 space-y-6">
+                    {/* ... (GENERAL and ITINERARY tabs same as before) ... */}
                     
                     {/* TAB: GENERAL */}
                     {activeTab === 'GENERAL' && (
@@ -699,11 +695,18 @@ export const InventoryManager: React.FC = () => {
                     {/* TAB: PRICING */}
                     {activeTab === 'PRICING' && (
                         <div className="space-y-6 animate-in fade-in">
+                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 flex items-start gap-3">
+                                <Info className="text-blue-600 shrink-0 mt-0.5" size={20} />
+                                <div className="text-sm text-blue-900">
+                                    <strong>Important:</strong> Enter your <strong>NET RATE</strong> (Payable to You). <br/>
+                                    The system will automatically add the admin markup before showing prices to agents. Do not add markup here.
+                                </div>
+                            </div>
                             
                             {/* D. PACKAGE FORM */}
                             {formData.type === 'PACKAGE' && (
                                 <div className="space-y-6">
-                                    {/* NEW: Accommodation Section */}
+                                    {/* ... Accommodation Section same ... */}
                                     <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
                                         <h4 className="text-xs font-bold text-indigo-800 uppercase mb-3 flex items-center gap-2"><Hotel size={14}/> Accommodation Details</h4>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -735,7 +738,8 @@ export const InventoryManager: React.FC = () => {
                                     </div>
 
                                     <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                                        <h4 className="text-xs font-bold text-orange-800 uppercase mb-3 flex items-center gap-2"><Package size={14}/> Package Specifics</h4>
+                                        {/* ... Date Logic same ... */}
+                                         <h4 className="text-xs font-bold text-orange-800 uppercase mb-3 flex items-center gap-2"><Package size={14}/> Package Specifics</h4>
                                         
                                         {/* Date Type Selector */}
                                         <div className="flex gap-4 mb-4">
@@ -752,7 +756,7 @@ export const InventoryManager: React.FC = () => {
                                             <label className="flex items-center gap-2 cursor-pointer">
                                                 <input 
                                                     type="radio" 
-                                                    name="dateType"
+                                                    name="dateType" 
                                                     checked={formData.dateType === 'RANGE'}
                                                     onChange={() => setFormData({...formData, dateType: 'RANGE'})}
                                                     className="text-orange-600 focus:ring-orange-500"
@@ -802,7 +806,7 @@ export const InventoryManager: React.FC = () => {
                                         {/* NEW: Tiered Pricing Grid */}
                                         <div className="mt-6 border-t border-orange-200 pt-4">
                                             <label className="block text-xs font-bold text-slate-700 uppercase mb-2 flex items-center gap-2">
-                                                <Users size={14}/> Tiered Pricing (Net Per Person in INR)
+                                                <Users size={14}/> Tiered Pricing (Your Net Cost in INR)
                                             </label>
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-3 rounded-lg border border-slate-200">
                                                 <div>
@@ -828,15 +832,16 @@ export const InventoryManager: React.FC = () => {
                                                     <input type="number" min="0" className="w-full border p-2 rounded text-sm font-mono" placeholder="0" value={pricingTiers.childWithBed} onChange={e => updateTier('childWithBed', Number(e.target.value))} />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-slate-400 mb-1">Child No Bed</label>
+                                                    <label className="block text-xs font-bold text-slate-400 mb-1">Child No Bed</label>
                                                     <input type="number" min="0" className="w-full border p-2 rounded text-sm font-mono" placeholder="0" value={pricingTiers.childNoBed} onChange={e => updateTier('childNoBed', Number(e.target.value))} />
                                                 </div>
                                             </div>
-                                            <p className="text-[10px] text-slate-400 mt-2">Enter the Net Cost per person based on the group size sharing the vehicle/services.</p>
+                                            <p className="text-[10px] text-slate-400 mt-2">Enter the Net Cost per person. We calculate total and add system markup.</p>
                                         </div>
 
                                     </div>
 
+                                    {/* ... Inclusions/Exclusions same ... */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inclusions (One per line)</label>
@@ -866,22 +871,22 @@ export const InventoryManager: React.FC = () => {
                             {formData.type === 'ACTIVITY' && (
                                 <div className="space-y-4">
                                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Base Ticket Pricing (INR)</h4>
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Net Ticket Cost (INR)</h4>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-xs text-slate-500 mb-1">Adult Price</label>
+                                                <label className="block text-xs text-slate-500 mb-1">Adult Net</label>
                                                 <input required type="number" min="0" value={formData.costAdult} onChange={e => setFormData({...formData, costAdult: Number(e.target.value), costPrice: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-slate-500 mb-1">Child Price</label>
+                                                <label className="block text-xs text-slate-500 mb-1">Child Net</label>
                                                 <input required type="number" min="0" value={formData.costChild} onChange={e => setFormData({...formData, costChild: Number(e.target.value)})} className="w-full border border-slate-300 rounded-lg p-2 font-mono" />
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    {/* Transfer Toggles */}
+                                    {/* ... Transfer Toggles same ... */}
                                     <div className="space-y-3 p-4 border border-slate-200 rounded-xl">
-                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Transfer Add-ons</h4>
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Transfer Add-ons (Net Cost)</h4>
                                         
                                         <div className="flex items-center justify-between">
                                         <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
@@ -935,7 +940,7 @@ export const InventoryManager: React.FC = () => {
                                             <input required type="number" min="0" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" value={formData.luggageCapacity || ''} onChange={e => setFormData({...formData, luggageCapacity: Number(e.target.value)})} />
                                         </div>
                                         <div className="col-span-2">
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cost Per Vehicle (INR)</label>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Net Cost Per Vehicle (INR)</label>
                                             <input required type="number" min="0" className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-bold font-mono" value={formData.costPrice || ''} onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})} />
                                         </div>
                                     </div>

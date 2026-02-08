@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { apiClient } from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
 
 // --- TYPES ---
 export interface BuilderService {
@@ -142,7 +143,15 @@ const BuilderContext = createContext<{
 } | undefined>(undefined);
 
 export const ItineraryBuilderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  // Initialize Markup from User Defaults
+  useEffect(() => {
+    if (user?.agentBranding?.defaultMarkup) {
+        dispatch({ type: 'SET_MARKUP', payload: user.agentBranding.defaultMarkup });
+    }
+  }, [user]);
 
   // Auto-Calculate Effect
   useEffect(() => {

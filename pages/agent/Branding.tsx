@@ -5,12 +5,13 @@ import { AgentBranding, User } from '../../types';
 import { agentService } from '../../services/agentService';
 import { LogoUploader } from '../../components/agent/LogoUploader';
 import { BrandColorPicker } from '../../components/agent/BrandColorPicker';
-import { Palette, Globe, Phone, MapPin, Save, ArrowLeft, LayoutTemplate } from 'lucide-react';
+import { Palette, Globe, Phone, MapPin, Save, ArrowLeft, LayoutTemplate, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const DEFAULT_BRANDING: AgentBranding = {
     primaryColor: '#0ea5e9', // Brand 500
     secondaryColor: '#0284c7', // Brand 600
+    defaultMarkup: 10,
 };
 
 export const Branding: React.FC = () => {
@@ -29,7 +30,8 @@ export const Branding: React.FC = () => {
             agencyName: user.companyName,
             contactPhone: user.phone,
             primaryColor: '#0ea5e9',
-            secondaryColor: '#0f172a'
+            secondaryColor: '#0f172a',
+            defaultMarkup: 10
         }));
     }
   }, [user]);
@@ -117,6 +119,31 @@ export const Branding: React.FC = () => {
                               onChange={(c) => handleChange('secondaryColor', c)}
                           />
                       </div>
+                  </div>
+              </div>
+
+              {/* Pricing Config Section (New) */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                      <TrendingUp size={18} /> Default Pricing
+                  </h3>
+                  <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Default Markup Percentage (%)</label>
+                      <div className="relative max-w-xs">
+                          <input 
+                              type="number" 
+                              min="0"
+                              max="100"
+                              value={formData.defaultMarkup || 10}
+                              onChange={(e) => handleChange('defaultMarkup', Number(e.target.value))}
+                              className="w-full pl-3 pr-8 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                              placeholder="e.g. 10"
+                          />
+                          <span className="absolute right-3 top-2.5 text-slate-400 font-bold">%</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2">
+                          This markup will be automatically applied to all new Quotes and Fixed Packages. You can still adjust it per booking.
+                      </p>
                   </div>
               </div>
 

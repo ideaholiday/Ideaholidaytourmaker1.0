@@ -4,6 +4,8 @@ import * as admin from 'firebase-admin';
 import * as nodemailer from 'nodemailer';
 import * as crypto from 'crypto';
 import { getWelcomeEmailHtml } from './welcomeTemplate';
+import { generateEmailContent } from './aiEmailService';
+import { sendGmail } from './gmailService';
 import { Buffer } from 'buffer';
 
 admin.initializeApp();
@@ -14,13 +16,68 @@ const RAZORPAY_KEY_ID = "rzp_live_SAPwjiuTqQAC6H";
 const RAZORPAY_KEY_SECRET = "Joq1q45SoxsRACwun6yN36dA";
 const WEBHOOK_SECRET = "idea_holiday_secret_key_123";
 
-// Configure Transporter (Use Environment Variables in Prod)
+// Configure Transporter (Fallback if Gmail API fails or for internal alerts)
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: functions.config().email?.user || 'demo@gmail.com', 
     pass: functions.config().email?.pass || 'demo_pass'  
   }
+});
+
+// --- EMAIL AUTOMATION FUNCTION ---
+export const sendBookingEmail = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be logged in.');
+    }
+
+    const { bookingId, type } = data; // type: 'BOOKING_CONFIRMATION', 'PAYMENT_RECEIPT'
+    
+    if (!bookingId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Booking ID is required');
+    }
+
+    try {
+        const bookingSnap = await db.collection('bookings').doc(bookingId).get();
+        if (!bookingSnap.exists) throw new Error("Booking not found");
+        
+        const booking = bookingSnap.data();
+        
+        // 1. Fetch Agent Email
+        const agentSnap = await db.collection('users').doc(booking?.agentId).get();
+        const agent = agentSnap.data();
+        const targetEmail = agent?.email;
+
+        if (!targetEmail) throw new Error("Agent email not found");
+
+        // 2. Generate Content via AI
+        console.log(`Generating AI content for ${type}...`);
+        const { subject, email_body_html } = await generateEmailContent(type, {
+            ...booking,
+            agentName: agent?.name,
+            companyName: agent?.companyName
+        });
+
+        // 3. Send via Gmail API
+        console.log(`Sending email to ${targetEmail}...`);
+        await sendGmail(targetEmail, subject, email_body_html);
+
+        // 4. Log
+        await db.collection('audit_logs').add({
+            entityType: 'EMAIL',
+            entityId: bookingId,
+            action: 'EMAIL_SENT',
+            description: `Sent ${type} to ${targetEmail}`,
+            performedById: context.auth.uid,
+            timestamp: new Date().toISOString()
+        });
+
+        return { success: true, message: "Email sent successfully" };
+
+    } catch (error: any) {
+        console.error("Email Automation Error:", error);
+        throw new functions.https.HttpsError('internal', error.message);
+    }
 });
 
 // --- RAZORPAY WEBHOOK ---
