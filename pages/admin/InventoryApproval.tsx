@@ -288,7 +288,7 @@ export const InventoryApproval: React.FC = () => {
                             <h3 className="font-bold text-orange-900 mb-4">Package Configuration</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
                                 <div><span className="text-orange-700 block text-xs font-bold">Duration</span> {viewingItem.nights} Nights</div>
-                                <div><span className="text-orange-700 block text-xs font-bold">Departure Type</span> {viewingItem.dateType === 'DAILY' ? 'Daily / Flexible' : 'Fixed Dates'}</div>
+                                <div><span className="text-orange-700 block text-xs font-bold">Departure Type</span> {viewingItem.dateType === 'RANGE' ? 'Daily / Flexible' : 'Fixed Dates'}</div>
                             </div>
                             
                             {/* Inclusions & Exclusions */}

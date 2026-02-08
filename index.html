@@ -10,13 +10,14 @@
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" crossorigin="anonymous">
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
+              heading: ['Poppins', 'sans-serif'],
             },
             colors: {
               brand: {
@@ -27,11 +28,31 @@
                 700: '#0369a1',
                 800: '#075985',
                 900: '#0c4a6e',
+              },
+              navy: {
+                900: '#0A1A2F',
+                800: '#112240',
+                700: '#233554',
+              },
+              teal: {
+                400: '#00D4C6',
+                500: '#00B8AD',
+              },
+              accent: {
+                500: '#FF6B35',
+                600: '#E85D2E',
               }
             },
             animation: {
               'spin-slow': 'spin-slow 20s linear infinite',
               'float': 'float 6s ease-in-out infinite',
+              'pulse-glow': 'pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            },
+            keyframes: {
+              'pulse-glow': {
+                '0%, 100%': { opacity: 1, boxShadow: '0 0 10px #00D4C6' },
+                '50%': { opacity: .8, boxShadow: '0 0 20px #00D4C6' },
+              }
             }
           }
         }
@@ -39,6 +60,7 @@
     </script>
     <style>
       body { font-family: 'Inter', sans-serif; }
+      h1, h2, h3, h4, h5, h6 { font-family: 'Poppins', sans-serif; }
       
       @keyframes spin-slow {
         from { transform: rotate(0deg); }
@@ -57,6 +79,16 @@
       
       .animate-float {
         animation: float 6s ease-in-out infinite;
+      }
+      
+      /* Hide scrollbar for chrome/safari/opera */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      /* Hide scrollbar for IE, Edge and Firefox */
+      .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
       }
     </style>
   <script type="importmap">
