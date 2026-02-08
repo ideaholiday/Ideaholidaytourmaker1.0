@@ -1,3 +1,4 @@
+
 {
   "compilerOptions": {
     "module": "commonjs",
@@ -12,7 +13,6 @@
   },
   "compileOnSave": true,
   "include": [
-    "index.ts",
-    "welcomeTemplate.ts"
+    "**/*.ts"
   ]
 }

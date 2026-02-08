@@ -52,11 +52,15 @@ export const AdminDashboard: React.FC = () => {
       const allBookings = await bookingService.getAllBookings();
       const todayStr = new Date().toISOString().split('T')[0];
       
-      // Filter for bookings created today
-      const today = allBookings.filter(b => b.createdAt.startsWith(todayStr));
+      // Filter for bookings created today (Safe Check)
+      const today = allBookings.filter(b => b.createdAt && b.createdAt.startsWith(todayStr));
       
-      // Sort by newest first
-      today.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // Sort by newest first (Safe Check)
+      today.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+      });
       
       setTodaysBookings(today);
   };
@@ -197,7 +201,7 @@ export const AdminDashboard: React.FC = () => {
                                           <span className="text-slate-400 font-normal ml-2">({booking.uniqueRefNo})</span>
                                       </p>
                                       <p className="text-xs text-slate-500">
-                                          Agent: {booking.agentName} • {booking.paxCount} Pax • {new Date(booking.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                          Agent: {booking.agentName} • {booking.paxCount} Pax • {booking.createdAt ? new Date(booking.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
                                       </p>
                                   </div>
                               </div>

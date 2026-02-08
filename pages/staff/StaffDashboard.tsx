@@ -37,8 +37,12 @@ export const StaffDashboard: React.FC = () => {
             setLoading(true);
             const data = await bookingService.getAllBookings();
             if (data) {
-                // Sort by creation date descending
-                data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                // Sort by creation date descending (Safe Check)
+                data.sort((a, b) => {
+                    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                    return dateB - dateA;
+                });
                 setBookings(data);
             }
         } catch (err: any) {
@@ -83,8 +87,8 @@ export const StaffDashboard: React.FC = () => {
   const todayStr = new Date().toISOString().split('T')[0];
   const todayDate = new Date();
 
-  // 1. Created Today
-  const createdToday = safeBookings.filter(b => b.createdAt.startsWith(todayStr));
+  // 1. Created Today (Safe Check)
+  const createdToday = safeBookings.filter(b => b.createdAt && b.createdAt.startsWith(todayStr));
   
   // 2. Pending Requests
   const pendingRequests = safeBookings.filter(b => b.status === 'REQUESTED');
