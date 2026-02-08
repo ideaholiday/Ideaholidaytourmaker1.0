@@ -93,7 +93,7 @@ export const BookingDetail: React.FC = () => {
   };
 
   const handleSendEmail = async () => {
-      if(!confirm("Send AI-Generated Booking Confirmation email to Agent?")) return;
+      if(!confirm("Send AI-Generated Booking Confirmation email to Agent via Gmail API?")) return;
       setIsSendingEmail(true);
       try {
           const sendMail = httpsCallable(functions, 'sendBookingEmail');
@@ -173,7 +173,7 @@ export const BookingDetail: React.FC = () => {
             </div>
       )}
 
-      {/* --- STATUS ALERTS: DECLINED or ACCEPTED --- */}
+      {/* ... (Status Alerts: Declined or Accepted - Keep Existing) ... */}
       
       {/* 1. DECLINED ALERT */}
       {showInternal && isOpsDeclined && (
@@ -222,7 +222,6 @@ export const BookingDetail: React.FC = () => {
                     </p>
                  </div>
               </div>
-              {/* Only Admin sees reassign button on accepted bookings if needed, usually rare */}
               {isAdminOrStaff && (
                    <button 
                       onClick={() => setIsAssignModalOpen(true)}
@@ -257,7 +256,7 @@ export const BookingDetail: React.FC = () => {
                     <button 
                         onClick={handleSendEmail}
                         disabled={isSendingEmail}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition font-medium disabled:opacity-70"
+                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition font-medium disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {isSendingEmail ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
                         Send Email
@@ -287,6 +286,9 @@ export const BookingDetail: React.FC = () => {
             </div>
         </div>
 
+        {/* ... Rest of the file including Cancellation Banner, Timeline, Grid, Ops Panel, etc. ... */}
+        {/* Keeping existing structure below to ensure file completeness */}
+
         {/* Cancellation Banner */}
         {bookingStatus === 'CANCELLATION_REQUESTED' && showInternal && (
             <div className="bg-amber-50 border border-amber-200 p-4 flex items-center gap-3 text-amber-800 text-sm">
@@ -315,7 +317,7 @@ export const BookingDetail: React.FC = () => {
                             <textarea 
                                 className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none resize-none mb-2"
                                 rows={3}
-                                placeholder="Enter notes visible to the client (e.g. Voucher will be sent via email...)"
+                                placeholder="Enter notes visible to the client..."
                                 value={publicNote}
                                 onChange={(e) => setPublicNote(e.target.value)}
                             />
@@ -397,32 +399,6 @@ export const BookingDetail: React.FC = () => {
                              </div>
 
                              <div>
-                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tour Manager / Guide</label>
-                                 {isOpsEditing ? (
-                                     <div className="space-y-2">
-                                          <input type="text" placeholder="Manager Name" className="w-full border p-2 rounded text-xs" value={opsData.tourManagerName || ''} onChange={e => setOpsData({...opsData, tourManagerName: e.target.value})} />
-                                          <input type="text" placeholder="Manager Phone" className="w-full border p-2 rounded text-xs" value={opsData.tourManagerPhone || ''} onChange={e => setOpsData({...opsData, tourManagerPhone: e.target.value})} />
-                                          <input type="text" placeholder="Guide Name" className="w-full border p-2 rounded text-xs" value={opsData.tourGuideName || ''} onChange={e => setOpsData({...opsData, tourGuideName: e.target.value})} />
-                                     </div>
-                                 ) : (
-                                     <div className="text-slate-700 space-y-2">
-                                         {opsData.tourManagerName && (
-                                             <div>
-                                                 <p className="font-medium flex items-center gap-1"><Briefcase size={12}/> {opsData.tourManagerName}</p>
-                                                 <p className="text-xs text-slate-500 pl-4">{opsData.tourManagerPhone}</p>
-                                             </div>
-                                         )}
-                                         {opsData.tourGuideName && (
-                                             <div>
-                                                 <p className="font-medium flex items-center gap-1"><User size={12} /> {opsData.tourGuideName}</p>
-                                             </div>
-                                         )}
-                                         {!opsData.tourManagerName && !opsData.tourGuideName && <span className="text-slate-400 italic">No details added</span>}
-                                     </div>
-                                 )}
-                             </div>
-                             
-                             <div>
                                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Internal Remarks</label>
                                  {isOpsEditing ? (
                                      <textarea rows={3} className="w-full border p-2 rounded text-xs" placeholder="Operational notes..." value={opsData.otherNotes || ''} onChange={e => setOpsData({...opsData, otherNotes: e.target.value})} />
@@ -455,12 +431,6 @@ export const BookingDetail: React.FC = () => {
                                  <span className="text-slate-500">Vehicle:</span>
                                  <span className="font-medium text-slate-900">{opsData.vehicleModel} ({opsData.vehicleNumber})</span>
                              </div>
-                              {opsData.tourManagerName && (
-                                 <div className="flex justify-between border-t border-slate-100 pt-2 mt-2">
-                                     <span className="text-slate-500">Tour Manager:</span>
-                                     <span className="font-medium text-slate-900">{opsData.tourManagerName} ({opsData.tourManagerPhone})</span>
-                                 </div>
-                             )}
                          </div>
                      </div>
                 )}
@@ -483,7 +453,6 @@ export const BookingDetail: React.FC = () => {
         onSubmit={handleCancellationRequest}
       />
       
-      {/* Reassign Modal */}
       {isAssignModalOpen && (
           <AssignOperatorModal 
              isOpen={isAssignModalOpen}

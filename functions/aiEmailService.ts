@@ -18,7 +18,7 @@ export const generateEmailContent = async (
         destination: data.destination || 'Destination',
         travelDate: data.travelDate,
         paxCount: data.paxCount,
-        sellingPrice: data.sellingPrice,
+        sellingPrice: data.sellingPrice, // Client view price
         currency: data.currency,
         status: data.status,
         serviceDetails: data.serviceDetails || (data.itinerary ? `${data.itinerary.length} Days Trip` : ''),
@@ -28,44 +28,26 @@ export const generateEmailContent = async (
     const contextStr = JSON.stringify(safeData, null, 2);
 
     const prompt = `
-    You are an email content generator for a professional travel technology platform
-    called "Idea Tour Maker", operated by "Idea Holiday Pvt Ltd.".
-
-    Company Details:
-    - Legal Name: Idea Holiday Pvt Ltd.
-    - Platform Name: Idea Tour Maker
-    - Website: https://b2b.ideaholiday.com
-    - Official Email (sender): info@ideaholiday.com
-
-    Your role:
-    - Generate professional, clear, and trustworthy TRANSACTIONAL emails
-    - Emails are used for B2B travel bookings, quotes, payments, invoices, and trip updates
-    - Tone must be premium, polite, reliable, and business-friendly
-    - Audience includes travel agents, DMCs, and end customers
+    You are an email content generator for "Idea Holiday Pvt Ltd.", a B2B travel platform.
+    Platform Name: Idea Tour Maker.
+    Website: https://b2b.ideaholiday.com
     
-    CONTEXT: Generating a ${type} email.
+    TASK: Generate a professional transactional email for a B2B Travel Agent.
+    TYPE: ${type}
 
     DATA CONTEXT:
     ${contextStr}
 
     STRICT RULES:
-    1. Always return output ONLY in valid JSON
-    2. JSON must contain exactly two keys:
-       - "subject"
-       - "email_body_html"
-    3. Do NOT include markdown, explanations, or extra text
-    4. Do NOT mention AI, automation, system prompts, or internal tools
-    5. Use simple, professional English
-    6. Personalize emails using provided variables in DATA CONTEXT
-    7. Email body must be valid HTML (<p>, <br>, <strong> allowed)
-    8. No emojis unless explicitly requested
-    9. Keep content concise, clear, and action-oriented
-    10. End every email with this exact signature:
-    
+    1. Return output ONLY in valid JSON format.
+    2. JSON keys: "subject", "email_body_html".
+    3. Content must be professional, polite, and clear.
+    4. "email_body_html" must be valid HTML with inline CSS for basic styling.
+    5. Signature: 
        <br><br>
+       Regards,<br>
        Team Idea Holiday<br>
-       info@ideaholiday.com<br>
-       <a href="https://b2b.ideaholiday.com">https://b2b.ideaholiday.com</a>
+       info@ideaholiday.com
     `;
 
     try {
@@ -77,29 +59,26 @@ export const generateEmailContent = async (
             }
         });
 
-        // FIXED: Access text property directly (newer SDK), do not call as function
         const text = response.text; 
         
         if (!text) throw new Error("Empty response from AI");
 
         // Parse JSON
-        const result = JSON.parse(text);
-        return result;
+        return JSON.parse(text);
 
     } catch (error) {
         console.error("AI Email Generation Failed:", error);
         
         // Fallback if AI fails so the email still sends
         return {
-            subject: `Update regarding Booking #${safeData.uniqueRefNo}`,
+            subject: `Update: Booking #${safeData.uniqueRefNo}`,
             email_body_html: `
                 <p>Dear ${safeData.agentName},</p>
-                <p>This is an automated update regarding your booking for <strong>${safeData.destination}</strong> (Ref: ${safeData.uniqueRefNo}).</p>
-                <p>Please log in to your dashboard to view the latest status details.</p>
-                <br><br>
-                Team Idea Holiday<br>
-                info@ideaholiday.com<br>
-                <a href="https://b2b.ideaholiday.com">https://b2b.ideaholiday.com</a>
+                <p>This is an automated update regarding booking <strong>${safeData.uniqueRefNo}</strong> for ${safeData.destination}.</p>
+                <p>Status: ${safeData.status}</p>
+                <p>Please log in to your dashboard for full details.</p>
+                <br>
+                Team Idea Holiday
             `
         };
     }

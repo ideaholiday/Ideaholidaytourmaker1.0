@@ -8,7 +8,7 @@ import { Buffer } from 'buffer';
 const CLIENT_ID = functions.config().gmail?.client_id || "669144046620-dr4v4553lo3nvpbus5b1b2h8h8a5uiq9.apps.googleusercontent.com";
 const CLIENT_SECRET = functions.config().gmail?.client_secret || "YOUR_CLIENT_SECRET"; // Replace with actual secret in Env
 const REDIRECT_URI = "https://b2b.ideaholiday.com/google/callback";
-const REFRESH_TOKEN = functions.config().gmail?.refresh_token; // Critical: You must generate this once using OAuth Playground
+const REFRESH_TOKEN = functions.config().gmail?.refresh_token; 
 
 const oAuth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 
@@ -26,7 +26,7 @@ export const sendGmail = async (to: string, subject: string, htmlBody: string) =
     try {
         const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
-        // Construct MIME message
+        // Construct MIME message manually to support HTML and UTF-8
         const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
         const messageParts = [
             `To: ${to}`,
@@ -38,7 +38,7 @@ export const sendGmail = async (to: string, subject: string, htmlBody: string) =
         ];
         const message = messageParts.join('\n');
 
-        // Encode the message
+        // Encode the message to Base64URL (RFC 4648)
         const encodedMessage = Buffer.from(message)
             .toString('base64')
             .replace(/\+/g, '-')
