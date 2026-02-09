@@ -9,6 +9,7 @@ import { ItineraryView } from '../../components/ItineraryView';
 import { BookingStatusTimeline } from '../../components/booking/BookingStatusTimeline';
 import { PaymentPanel } from '../../components/booking/PaymentPanel';
 import { CancellationRequestModal } from '../../components/booking/CancellationRequestModal';
+import { EmailActionModal } from '../../components/booking/EmailActionModal';
 import { ArrowLeft, MapPin, Calendar, Users, Download, Printer, XCircle, AlertTriangle, ShieldCheck, Globe, FileText, Eye, EyeOff, Truck, Phone, Briefcase, Info, Save, Loader2, Edit2, User, UserCheck, CheckCircle2, UserPlus, CheckCircle, Mail } from 'lucide-react';
 import { generateQuotePDF, generateInvoicePDF } from '../../utils/pdfGenerator';
 import { AssignOperatorModal } from '../../components/booking/AssignOperatorModal';
@@ -24,6 +25,7 @@ export const BookingDetail: React.FC = () => {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [hasInvoice, setHasInvoice] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   // View Mode
   const [viewMode, setViewMode] = useState<'INTERNAL' | 'CLIENT'>('INTERNAL');
@@ -92,13 +94,13 @@ export const BookingDetail: React.FC = () => {
       alert("Public Link copied to clipboard!");
   };
 
-  const handleSendEmail = async () => {
-      if(!confirm("Send AI-Generated Booking Confirmation email to Agent via Gmail API?")) return;
+  const handleSendEmail = async (type: string) => {
       setIsSendingEmail(true);
       try {
           const sendMail = httpsCallable(functions, 'sendBookingEmail');
-          await sendMail({ bookingId: booking.id, type: 'BOOKING_CONFIRMATION' });
-          alert("Email Sent Successfully!");
+          await sendMail({ bookingId: booking.id, type });
+          alert("Email Sent Successfully via Gmail API!");
+          setIsEmailModalOpen(false);
       } catch(e: any) {
           console.error(e);
           alert("Error sending email: " + e.message);
@@ -254,12 +256,10 @@ export const BookingDetail: React.FC = () => {
             <div className="mt-4 md:mt-0 flex gap-2">
                 {isAdminOrStaff && showInternal && (
                     <button 
-                        onClick={handleSendEmail}
-                        disabled={isSendingEmail}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition font-medium disabled:opacity-70 disabled:cursor-not-allowed"
+                        onClick={() => setIsEmailModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition font-medium shadow-sm hover:shadow"
                     >
-                        {isSendingEmail ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
-                        Send Email
+                        <Mail size={16} /> Send Email
                     </button>
                 )}
                 {hasInvoice && showInternal && (
@@ -451,6 +451,14 @@ export const BookingDetail: React.FC = () => {
         isOpen={isCancelModalOpen} 
         onClose={() => setIsCancelModalOpen(false)}
         onSubmit={handleCancellationRequest}
+      />
+
+      <EmailActionModal 
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        onSend={handleSendEmail}
+        isSending={isSendingEmail}
+        bookingStatus={bookingStatus}
       />
       
       {isAssignModalOpen && (

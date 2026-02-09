@@ -7,7 +7,7 @@ import * as functions from 'firebase-functions';
 const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY || functions.config().gemini?.key });
 
 export const generateEmailContent = async (
-    type: 'BOOKING_CONFIRMATION' | 'PAYMENT_RECEIPT' | 'QUOTE',
+    type: 'BOOKING_CONFIRMATION' | 'PAYMENT_RECEIPT' | 'QUOTE' | 'CANCELLATION',
     data: any
 ): Promise<{ subject: string; email_body_html: string }> => {
     
