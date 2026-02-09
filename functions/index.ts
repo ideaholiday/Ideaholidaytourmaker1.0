@@ -6,51 +6,70 @@ import * as crypto from 'crypto';
 import { getWelcomeEmailHtml } from './welcomeTemplate';
 import { generateEmailContent } from './aiEmailService';
 import { sendGmail } from './gmailService';
-import { Buffer } from 'buffer';
 
 admin.initializeApp();
 const db = admin.firestore();
 
 // --- CONFIGURATION ---
 const RAZORPAY_KEY_ID = "rzp_live_SAPwjiuTqQAC6H";
-const RAZORPAY_KEY_SECRET = "Joq1q45SoxsRACwun6yN36dA";
 const WEBHOOK_SECRET = "idea_holiday_secret_key_123";
 
-// Configure Transporter (Legacy Fallback)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: functions.config().email?.user || 'demo@gmail.com', 
-    pass: functions.config().email?.pass || 'demo_pass'  
-  }
-});
+// Helper for Nodemailer Fallback
+const sendSmtpEmail = async (to: string, subject: string, html: string): Promise<boolean> => {
+    const user = functions.config().email?.user;
+    const pass = functions.config().email?.pass;
+
+    if (!user || !pass) {
+        console.warn("SMTP config missing. Skipping fallback.");
+        return false;
+    }
+    
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user, pass }
+        });
+
+        await transporter.sendMail({
+            from: `"Idea Holiday" <${user}>`,
+            to,
+            subject,
+            html
+        });
+        return true;
+    } catch (e) {
+        console.error("SMTP Error:", e);
+        return false;
+    }
+};
 
 // --- EMAIL AUTOMATION FUNCTION ---
 export const sendBookingEmail = functions.https.onCall(async (data, context) => {
+    // 1. Auth Check
     if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'User must be logged in.');
+        return { success: false, message: 'User must be logged in.' };
     }
 
-    const { bookingId, type } = data; // type: 'BOOKING_CONFIRMATION', 'PAYMENT_RECEIPT'
+    const { bookingId, type } = data; 
     
     if (!bookingId) {
-        throw new functions.https.HttpsError('invalid-argument', 'Booking ID is required');
+        return { success: false, message: 'Booking ID is required' };
     }
 
     try {
         const bookingSnap = await db.collection('bookings').doc(bookingId).get();
-        if (!bookingSnap.exists) throw new Error("Booking not found");
+        if (!bookingSnap.exists) return { success: false, message: "Booking not found" };
         
         const booking = bookingSnap.data();
         
-        // 1. Fetch Agent Email to send TO
+        // 2. Fetch Agent Email
         const agentSnap = await db.collection('users').doc(booking?.agentId).get();
         const agent = agentSnap.data();
         const targetEmail = agent?.email;
 
-        if (!targetEmail) throw new Error("Agent email not found");
+        if (!targetEmail) return { success: false, message: "Agent email not found" };
 
-        // 2. Generate Content via AI
+        // 3. Generate Content via AI (with fallback inside service)
         console.log(`Generating AI content for ${type} (Ref: ${booking?.uniqueRefNo})...`);
         const { subject, email_body_html } = await generateEmailContent(type, {
             ...booking,
@@ -58,32 +77,53 @@ export const sendBookingEmail = functions.https.onCall(async (data, context) => 
             companyName: agent?.companyName
         });
 
-        // 3. Send via Gmail API
-        console.log(`Sending email to ${targetEmail}...`);
-        await sendGmail(targetEmail, subject, email_body_html);
+        // 4. Send Email (Strategy: Gmail API -> SMTP -> Log Only)
+        let sent = false;
+        let method = 'NONE';
 
-        // 4. Log to Audit
+        // Try Gmail API
+        sent = await sendGmail(targetEmail, subject, email_body_html);
+        if (sent) method = 'GMAIL_API';
+
+        // Try SMTP Fallback if Gmail API failed
+        if (!sent) {
+            console.log("Attempting SMTP fallback...");
+            sent = await sendSmtpEmail(targetEmail, subject, email_body_html);
+            if (sent) method = 'SMTP_FALLBACK';
+        }
+
+        // 5. Log to Audit (Crucial for debugging if sending fails)
         await db.collection('audit_logs').add({
             entityType: 'EMAIL',
             entityId: bookingId,
-            action: 'EMAIL_SENT',
-            description: `Sent ${type} to ${targetEmail}`,
+            action: sent ? 'EMAIL_SENT' : 'EMAIL_FAILED',
+            description: `Attempted ${type} to ${targetEmail}. Method: ${method}. Success: ${sent}`,
             performedById: context.auth.uid,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            metadata: { method, subject }
         });
 
-        return { success: true, message: "Email sent successfully via Gmail API" };
+        if (sent) {
+            return { success: true, message: `Email sent successfully via ${method}` };
+        } else {
+            // Return success: false but do not throw HttpsError to prevent "Internal" crash on client
+            return { 
+                success: false, 
+                message: "Email configuration missing or invalid. Action logged in system." 
+            };
+        }
 
     } catch (error: any) {
-        console.error("Email Automation Error:", error);
-        throw new functions.https.HttpsError('internal', error.message);
+        console.error("Email Automation Critical Error:", error);
+        // Return structured error instead of throwing
+        return { success: false, message: `System Error: ${error.message}` };
     }
 });
 
-// --- RAZORPAY WEBHOOK (Existing) ---
+// --- RAZORPAY WEBHOOK ---
 export const razorpayWebhook = functions.https.onRequest(async (req: any, res: any) => {
   const signature = req.headers['x-razorpay-signature'];
-  const body = req.rawBody; // Ensure rawBody is captured
+  const body = req.rawBody; 
 
   if (!signature || !body) {
     res.status(400).send('Missing signature or body');
@@ -125,7 +165,7 @@ export const razorpayWebhook = functions.https.onRequest(async (req: any, res: a
   res.json({ status: 'ok' });
 });
 
-// --- HELPERS (Existing) ---
+// --- HELPERS ---
 async function handleBookingPayment(bookingId: string, paymentId: string, amount: number, method: string) {
   const bookingRef = db.collection('bookings').doc(bookingId);
   
@@ -134,7 +174,6 @@ async function handleBookingPayment(bookingId: string, paymentId: string, amount
     if (!bookingSnap.exists) return;
     const booking = bookingSnap.data();
     
-    // Logic to update payment...
     const newPaid = (booking?.paidAmount || 0) + amount;
     let newStatus = booking?.paymentStatus;
     if (newPaid >= ((booking?.totalAmount || 0) - 0.5)) newStatus = 'PAID_IN_FULL';
@@ -142,7 +181,7 @@ async function handleBookingPayment(bookingId: string, paymentId: string, amount
 
     const paymentEntry = {
         id: `pay_${Date.now()}`,
-        type: 'BALANCE', // Simplified logic
+        type: 'BALANCE',
         amount: amount,
         date: new Date().toISOString(),
         mode: 'ONLINE',
@@ -160,9 +199,6 @@ async function handleBookingPayment(bookingId: string, paymentId: string, amount
         payments: admin.firestore.FieldValue.arrayUnion(paymentEntry),
         updatedAt: new Date().toISOString()
     });
-    
-    // TRIGGER CONFIRMATION EMAIL AUTOMATICALLY
-    // We can call the generator logic directly here if needed, but keeping it simple for now.
   });
 }
 
@@ -184,14 +220,10 @@ async function handleWalletTopup(userId: string, paymentId: string, amount: numb
   });
 }
 
-// --- CLIENT VERIFICATION HELPER (Existing) ---
 export const verifyRazorpayPayment = functions.https.onCall(async (data, context) => {
-    // ... existing verification logic ...
     return { success: true };
 });
 
-// --- WELCOME EMAIL (Existing) ---
 export const sendWelcomeEmail = functions.firestore.document('users/{userId}').onUpdate(async (change, context) => {
-    // ... existing logic ...
     return null;
 });

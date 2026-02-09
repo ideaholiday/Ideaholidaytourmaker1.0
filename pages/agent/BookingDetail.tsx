@@ -98,12 +98,18 @@ export const BookingDetail: React.FC = () => {
       setIsSendingEmail(true);
       try {
           const sendMail = httpsCallable(functions, 'sendBookingEmail');
-          await sendMail({ bookingId: booking.id, type });
-          alert("Email Sent Successfully via Gmail API!");
+          const result: any = await sendMail({ bookingId: booking.id, type });
+          
+          const responseData = result.data;
+          if (responseData && responseData.success) {
+              alert(`✅ ${responseData.message}`);
+          } else {
+              alert(`⚠️ ${responseData.message || "Email process completed with warnings. Check audit logs."}`);
+          }
           setIsEmailModalOpen(false);
       } catch(e: any) {
-          console.error(e);
-          alert("Error sending email: " + e.message);
+          console.error("Client Email Error:", e);
+          alert(`Error: ${e.message || "Failed to trigger email function."}`);
       } finally {
           setIsSendingEmail(false);
       }
@@ -175,8 +181,6 @@ export const BookingDetail: React.FC = () => {
             </div>
       )}
 
-      {/* ... (Status Alerts: Declined or Accepted - Keep Existing) ... */}
-      
       {/* 1. DECLINED ALERT */}
       {showInternal && isOpsDeclined && (
           <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-xl mb-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

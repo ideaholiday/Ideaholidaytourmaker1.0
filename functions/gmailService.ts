@@ -6,21 +6,25 @@ import { Buffer } from 'buffer';
 // --- CONFIGURATION ---
 // In production, set these via: firebase functions:config:set gmail.client_id="..." gmail.client_secret="..." gmail.refresh_token="..."
 const CLIENT_ID = functions.config().gmail?.client_id || "669144046620-dr4v4553lo3nvpbus5b1b2h8h8a5uiq9.apps.googleusercontent.com";
-const CLIENT_SECRET = functions.config().gmail?.client_secret || "YOUR_CLIENT_SECRET"; // Replace with actual secret in Env
+const CLIENT_SECRET = functions.config().gmail?.client_secret || "YOUR_CLIENT_SECRET"; 
 const REDIRECT_URI = "https://b2b.ideaholiday.com/google/callback";
 const REFRESH_TOKEN = functions.config().gmail?.refresh_token; 
 
-const oAuth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-
-if (REFRESH_TOKEN) {
-    oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
+let oAuth2Client: any = null;
+try {
+    oAuth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+    if (REFRESH_TOKEN) {
+        oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
+    }
+} catch (e) {
+    console.warn("Failed to init OAuth2Client", e);
 }
 
-export const sendGmail = async (to: string, subject: string, htmlBody: string) => {
+export const sendGmail = async (to: string, subject: string, htmlBody: string): Promise<boolean> => {
     
-    if (!REFRESH_TOKEN) {
-        console.warn("Gmail Refresh Token missing. Skipping email send.");
-        return;
+    if (!REFRESH_TOKEN || !oAuth2Client) {
+        console.warn("Gmail Refresh Token missing or Client init failed. Skipping Gmail API.");
+        return false;
     }
 
     try {
@@ -45,16 +49,16 @@ export const sendGmail = async (to: string, subject: string, htmlBody: string) =
             .replace(/\//g, '_')
             .replace(/=+$/, '');
 
-        const res = await gmail.users.messages.send({
+        await gmail.users.messages.send({
             userId: 'me',
             requestBody: {
                 raw: encodedMessage,
             },
         });
 
-        return res.data;
+        return true;
     } catch (error) {
         console.error("Gmail API Error:", error);
-        throw new Error("Failed to send email via Gmail API");
+        return false;
     }
 };
